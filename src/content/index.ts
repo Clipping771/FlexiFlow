@@ -93,6 +93,7 @@ class ContentScriptManager {
       chrome.storage.onChanged.addListener((changes) => {
         if (changes.lexiflow_user_settings?.newValue) {
           this.userSettings = { ...DEFAULT_SETTINGS, ...changes.lexiflow_user_settings.newValue };
+          CacheManager.getInstance().clear();
           this.applyPopupSize();
           if (this.isSiteDisabled()) {
             this.hidePopup();
@@ -128,6 +129,9 @@ class ContentScriptManager {
   }
 
   private isSiteDisabled(): boolean {
+    if (this.userSettings?.isGloballyPaused) {
+      return true;
+    }
     if (!this.userSettings?.disabledSites || !Array.isArray(this.userSettings.disabledSites)) {
       return false;
     }
@@ -158,7 +162,6 @@ class ContentScriptManager {
     document.addEventListener('mouseup', (e) => {
       this.isMouseDown = false;
       const target = e.target as Element;
-      if (isEditableElement(target)) return;
 
       // Do not re-trigger selection check if user clicked inside our own popup or trigger
       if (this.shadowHost && (this.shadowHost === target || this.shadowHost.contains(target))) {
@@ -166,6 +169,11 @@ class ContentScriptManager {
       }
 
       const sel = window.getSelection();
+      // If user merely clicked inside an editable element without selecting text, ignore
+      if (isEditableElement(target) && (!sel || sel.isCollapsed || !sel.toString().trim())) {
+        return;
+      }
+
       if (sel && !sel.isCollapsed && sel.toString().trim()) {
         this.isUserDismissed = false;
       }
@@ -178,7 +186,11 @@ class ContentScriptManager {
     document.addEventListener('dblclick', (e) => {
       if (this.isSiteDisabled()) return;
       const target = e.target as Element;
-      if (isEditableElement(target)) return;
+      // If user double-clicked inside an editable element without outer selection, ignore
+      const sel = window.getSelection();
+      if (isEditableElement(target) && (!sel || sel.isCollapsed || !sel.toString().trim())) {
+        return;
+      }
 
       this.isDoubleClicked = true;
       this.isUserDismissed = false;
@@ -228,6 +240,18 @@ class ContentScriptManager {
     // 8. Chrome Runtime Messages (Context Menu / Background triggers)
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
       chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+        if (message.type === 'SETTINGS_UPDATED' && message.payload) {
+          this.userSettings = { ...DEFAULT_SETTINGS, ...message.payload };
+          CacheManager.getInstance().clear();
+          this.applyPopupSize();
+          if (this.isSiteDisabled()) {
+            this.hidePopup();
+            this.hideTrigger();
+          }
+          sendResponse?.({ success: true });
+          return;
+        }
+
         if (message.type === 'TRIGGER_MANUAL_LOOKUP' && message.payload?.text) {
           if (this.isSiteDisabled()) {
             sendResponse?.({ success: false, reason: 'Site disabled' });
@@ -264,9 +288,21 @@ class ContentScriptManager {
     if (this.isMouseDown) return;
     if (this.isSiteDisabled()) return;
 
-    // Guard against editable inputs & textareas
-    const active = document.activeElement;
-    if (isEditableElement(active)) return;
+    // Guard: only ignore if the selection itself is inside an editable element
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      const startEl = range.startContainer.nodeType === Node.ELEMENT_NODE
+        ? (range.startContainer as Element)
+        : range.startContainer.parentElement;
+      const endEl = range.endContainer.nodeType === Node.ELEMENT_NODE
+        ? (range.endContainer as Element)
+        : range.endContainer.parentElement;
+
+      if (isEditableElement(startEl) || isEditableElement(endEl)) {
+        return;
+      }
+    }
 
     const data = getSelectionData();
     if (!data || !data.cleanText) return;

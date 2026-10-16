@@ -17,6 +17,7 @@ import { DictionaryService, dictionaryResultToStageA } from '../services/diction
 import { AIService } from '../services/ai';
 import { FSRSEngine } from '../services/fsrs/engine';
 import { getLanguageConfig } from '../config/languages';
+import { detectSelectionType } from '../content/selection';
 import {
   Search,
   Sparkles,
@@ -164,33 +165,26 @@ const PopupCardHost: React.FC<PopupCardHostProps> = ({ initialWord }) => {
       chrome.storage.onChanged.addListener(hostStorageListener);
     }
 
-    const executeLookup = (text: string, selectionType: SelectionType = 'word') => {
+    const executeLookup = (text: string, forcedType?: SelectionType) => {
       if (!text || !text.trim()) return;
       currentWord = text.trim();
 
-      const words = currentWord.split(/\s+/).filter(Boolean);
-      const effectiveType: SelectionType =
-        selectionType || (words.length > 3 ? 'sentence' : words.length > 1 ? 'phrase' : 'word');
+      const effectiveType: SelectionType = forcedType || detectSelectionType(currentWord);
 
-      const isWordOrPhrase = effectiveType === 'word' || effectiveType === 'phrase';
-      let hasLocalDisplay = false;
-
-      // 1. Instant local dictionary lookup (< 1ms)
-      if (isWordOrPhrase) {
+      // Single word mode: local dictionary fast-path (< 1ms) + Stage A contextual meaning
+      if (effectiveType === 'word') {
+        let hasLocalDisplay = false;
         const dictHit = DictionaryService.lookupSync(currentWord, '');
         if (dictHit) {
           const localStageA = dictionaryResultToStageA(dictHit, '');
           view.showStageA(localStageA, '', '', false);
           hasLocalDisplay = true;
         }
-      }
 
-      if (!hasLocalDisplay) {
-        view.showLoading(currentWord, effectiveType);
-      }
+        if (!hasLocalDisplay) {
+          view.showLoading(currentWord, 'word');
+        }
 
-      // 2. Background contextual AI analysis
-      if (isWordOrPhrase) {
         chrome.runtime.sendMessage(
           {
             type: 'ANALYZE_STAGE_A',
@@ -208,26 +202,29 @@ const PopupCardHost: React.FC<PopupCardHostProps> = ({ initialWord }) => {
                 view.prefetchStageB(res.data.lemma, res.data.partOfSpeech, res.data.contextualSenseId);
               }
             } else if (!hasLocalDisplay) {
-              view.showError(res?.error || 'Could not analyze word.');
+              view.showError(res?.error || 'Could not analyze word.', currentWord);
             }
           }
         );
       } else {
+        // Sentence, Paragraph, or Phrase Mode: Full contextual analysis with Phrase-by-Phrase Breakdown (100% parity with web popup)
+        view.showLoading(currentWord, effectiveType);
+
         chrome.runtime.sendMessage(
           {
             type: 'ANALYZE_SELECTION',
-            payload: { text: currentWord, selectionType: effectiveType }
+            payload: { text: currentWord, selectionType: effectiveType, contextSentence: currentWord }
           },
           (res) => {
             if (res?.success && res.data) {
               chrome.runtime.sendMessage(
                 { type: 'GET_VOCAB_BY_WORD', payload: { word: currentWord } },
                 (savedRes) => {
-                  view.showAnalysis(res.data, '', '', Boolean(savedRes?.data));
+                  view.showAnalysis(res.data, currentWord, '', Boolean(savedRes?.data));
                 }
               );
             } else {
-              view.showError(res?.error || 'Could not analyze selection.');
+              view.showError(res?.error || 'Could not analyze sentence.', currentWord);
             }
           }
         );
@@ -380,6 +377,20 @@ export const App: React.FC = () => {
             setDisabledSites(newSettings.disabledSites);
           }
         }
+        if (changes.lexiflow_vocab_updated_at) {
+          if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+            chrome.runtime.sendMessage({ type: 'GET_ALL_VOCAB' }, (res) => {
+              if (res?.success && Array.isArray(res.data)) {
+                setSavedCount(res.data.length);
+              }
+            });
+            chrome.runtime.sendMessage({ type: 'GET_DUE_ITEMS' }, (res) => {
+              if (res?.success && Array.isArray(res.data)) {
+                setDueCount(res.data.length);
+              }
+            });
+          }
+        }
       };
       chrome.storage.onChanged.addListener(storageListener);
       return () => chrome.storage.onChanged.removeListener(storageListener);
@@ -411,6 +422,27 @@ export const App: React.FC = () => {
     }
 
     setDisabledSites(updatedList);
+
+    // Immediately update active tab action badge to 'OFF' or empty
+    if (typeof chrome !== 'undefined' && chrome.action && chrome.tabs?.query) {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const activeTabId = tabs[0]?.id;
+        if (typeof activeTabId === 'number') {
+          if (isCurrentSiteEnabled) {
+            // Toggling from enabled -> paused
+            chrome.action.setBadgeText({ tabId: activeTabId, text: 'OFF' });
+            chrome.action.setBadgeBackgroundColor({ tabId: activeTabId, color: '#EF4444' });
+            if ((chrome.action as any).setBadgeTextColor) {
+              (chrome.action as any).setBadgeTextColor({ tabId: activeTabId, color: '#FFFFFF' });
+            }
+          } else {
+            // Toggling from paused -> enabled
+            chrome.action.setBadgeText({ tabId: activeTabId, text: '' });
+          }
+        }
+      });
+    }
+
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       chrome.runtime.sendMessage({
         type: 'UPDATE_SETTINGS',
@@ -444,9 +476,7 @@ export const App: React.FC = () => {
     }
     setSearchTerm(cleanTerm);
 
-    const words = cleanTerm.split(/\s+/).filter(Boolean);
-    const hasPunctuation = /[.!?]\s|[.!?]$/.test(cleanTerm);
-    const selectionType = (words.length > 3 || hasPunctuation) ? 'sentence' : (words.length > 1 ? 'phrase' : 'word');
+    const selectionType = detectSelectionType(cleanTerm);
 
     try {
       let analysisResult: LinguisticAnalysisResult | null = null;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isEditableElement, detectSelectionType } from '../selection';
+import { isEditableElement, detectSelectionType, getSelectionData } from '../selection';
 
 describe('Selection & Editable Element Detection', () => {
   it('detects input fields and textareas as editable', () => {
@@ -49,6 +49,40 @@ describe('Selection & Editable Element Detection', () => {
 
     document.body.removeChild(parentEditable);
     document.body.removeChild(roleBox);
+  });
+
+  it('allows getSelectionData on text inside normal paragraphs even if a contenteditable prompt exists (ChatGPT scenario)', () => {
+    // Simulate ChatGPT prompt box
+    const promptBox = document.createElement('div');
+    promptBox.id = 'prompt-textarea';
+    promptBox.contentEditable = 'true';
+    promptBox.setAttribute('role', 'textbox');
+    document.body.appendChild(promptBox);
+    promptBox.focus();
+
+    // Simulate ChatGPT assistant message
+    const p = document.createElement('p');
+    p.textContent = 'A mathematical relationship between words and pain.';
+    document.body.appendChild(p);
+
+    // Select the word "between"
+    const textNode = p.firstChild!;
+    const range = document.createRange();
+    range.setStart(textNode, 28); // "between" start
+    range.setEnd(textNode, 35);   // "between" end
+
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    const data = getSelectionData();
+    expect(data).not.toBeNull();
+    expect(data?.cleanText).toBe('between');
+    expect(data?.selectionType).toBe('word');
+
+    document.body.removeChild(promptBox);
+    document.body.removeChild(p);
+    sel.removeAllRanges();
   });
 
   describe('detectSelectionType', () => {

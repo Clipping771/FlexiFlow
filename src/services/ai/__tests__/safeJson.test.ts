@@ -43,6 +43,14 @@ Hope this helps! Let me know if you need anything else.`;
     expect(result).toEqual([{ id: 1 }, { id: 2 }]);
   });
 
+  it('automatically repairs and parses truncated or cut-off JSON output', () => {
+    const truncated = '{"selectedText": "Trump said", "phraseBreakdown": [{"phrase": "Trump said", "meaning": "explained"}], "difficultVocabulary": [{';
+    const result = safeParseJSON(truncated);
+    expect(result).toBeDefined();
+    expect(result.selectedText).toBe('Trump said');
+    expect(result.phraseBreakdown).toHaveLength(1);
+  });
+
   it('throws clear error including the raw response if parsing fails', () => {
     const invalid = 'This is not JSON at all.';
     expect(() => safeParseJSON(invalid)).toThrowError(/Failed to parse AI JSON response/);

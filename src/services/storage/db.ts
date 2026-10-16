@@ -45,10 +45,36 @@ export class StorageService {
     return this.dbPromise;
   }
 
+  static notifyVocabChanged(item?: VocabularyItem): void {
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      try {
+        chrome.storage.local.set({ lexiflow_vocab_updated_at: Date.now() });
+      } catch {}
+    }
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const channel = new BroadcastChannel('lexiflow_vocab_sync');
+        channel.postMessage({ type: 'VOCAB_UPDATED', item, timestamp: Date.now() });
+        channel.close();
+      } catch {}
+    }
+
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      try {
+        chrome.runtime.sendMessage({ type: 'VOCAB_UPDATED', payload: { item, timestamp: Date.now() } }, () => {
+          if (chrome.runtime?.lastError) {
+            // Ignore when no listener is listening
+          }
+        });
+      } catch {}
+    }
+  }
+
   static async saveItem(item: VocabularyItem): Promise<void> {
     try {
       const db = await this.getDB();
-      return new Promise((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_VOCAB, 'readwrite');
         const store = tx.objectStore(STORE_VOCAB);
         const req = store.put(item);
@@ -58,6 +84,7 @@ export class StorageService {
     } catch {
       this.memoryFallback.set(item.id, item);
     }
+    this.notifyVocabChanged(item);
   }
 
   static async getItem(id: string): Promise<VocabularyItem | null> {
@@ -113,7 +140,7 @@ export class StorageService {
   static async deleteItem(id: string): Promise<void> {
     try {
       const db = await this.getDB();
-      return new Promise((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_VOCAB, 'readwrite');
         const store = tx.objectStore(STORE_VOCAB);
         const req = store.delete(id);
@@ -123,6 +150,7 @@ export class StorageService {
     } catch {
       this.memoryFallback.delete(id);
     }
+    this.notifyVocabChanged();
   }
 
   static async exportData(): Promise<string> {

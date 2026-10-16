@@ -216,20 +216,20 @@ export function getSelectionData(): SelectionData | null {
   const cleanText = text.replace(/^["'“”‘`([{]+|[)"'“”’`\]}.,;:!?]+$/g, '').trim();
   if (!cleanText) return null;
 
-  let rect = range.getBoundingClientRect();
-  if (rect.width === 0 || rect.height === 0) {
-    const clientRects = range.getClientRects();
+  let rect: DOMRect | null = typeof range.getBoundingClientRect === 'function' ? range.getBoundingClientRect() : null;
+  if (!rect || (rect.width === 0 && rect.height === 0)) {
+    const clientRects = typeof range.getClientRects === 'function' ? range.getClientRects() : [];
     if (clientRects.length > 0) {
       rect = clientRects[0];
     } else {
       const parent = range.startContainer.parentElement;
-      if (parent) {
+      if (parent && typeof parent.getBoundingClientRect === 'function') {
         rect = parent.getBoundingClientRect();
       }
     }
   }
 
-  if (rect.width === 0 && rect.height === 0) {
+  if (!rect || (rect.width === 0 && rect.height === 0)) {
     rect = {
       top: 100,
       bottom: 120,

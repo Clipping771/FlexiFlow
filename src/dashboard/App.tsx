@@ -14,6 +14,7 @@ import { DEFAULT_SETTINGS } from '../services/storage/settings';
 import { WeaknessDetector } from '../services/weakness/detector';
 import { FSRSEngine } from '../services/fsrs/engine';
 import { Menu, X, BookOpen, RotateCw, Newspaper, Settings as SettingsIcon } from 'lucide-react';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './dashboard.css';
 
 const TAB_TITLES: Record<DashboardTab, string> = {
@@ -55,7 +56,7 @@ export const App: React.FC = () => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Real-time synchronization across popup, settings, and other windows
+  // Real-time synchronization across popup, settings, in-page popups, and other windows
   useEffect(() => {
     if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
       const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
@@ -68,10 +69,60 @@ export const App: React.FC = () => {
             document.documentElement.setAttribute('data-theme', effective);
           }
         }
+        if (changes.lexiflow_vocab_updated_at) {
+          loadData();
+        }
       };
       chrome.storage.onChanged.addListener(listener);
       return () => chrome.storage.onChanged.removeListener(listener);
     }
+  }, []);
+
+  // Listen for runtime broadcast messages
+  useEffect(() => {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+      const msgListener = (msg: any) => {
+        if (msg?.type === 'VOCAB_UPDATED') {
+          loadData();
+        }
+      };
+      chrome.runtime.onMessage.addListener(msgListener);
+      return () => chrome.runtime.onMessage.removeListener(msgListener);
+    }
+  }, []);
+
+  // BroadcastChannel for instant same-origin tab/window/sidepanel reactivity
+  useEffect(() => {
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const channel = new BroadcastChannel('lexiflow_vocab_sync');
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'VOCAB_UPDATED') {
+            loadData();
+          }
+        };
+        return () => channel.close();
+      } catch {}
+    }
+  }, []);
+
+  // Auto-refresh when dashboard tab gains focus or becomes visible
+  useEffect(() => {
+    const handleFocus = () => {
+      loadData();
+    };
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        loadData();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -225,7 +276,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeTab]);
 
   const persistToLocalFallback = (updatedItems: VocabularyItem[]) => {
     if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
@@ -554,63 +605,65 @@ export const App: React.FC = () => {
             </header>
           )}
 
-          {activeTab === 'vocabulary' && (
-            <VocabularyView
-              items={items}
-              onDeleteItem={handleDeleteItem}
-              onToggleStar={handleToggleStar}
-              onToggleDifficult={handleToggleDifficult}
-              onUpdateNotes={handleUpdateNotes}
-              onExport={handleExport}
-              onImport={handleImport}
-              onSelectForCoach={handleNavigateToCoach}
-              onLoadSamples={handleLoadSamples}
-            />
-          )}
+          <ErrorBoundary fallbackTitle="View Encountered an Error">
+            {activeTab === 'vocabulary' && (
+              <VocabularyView
+                items={items}
+                onDeleteItem={handleDeleteItem}
+                onToggleStar={handleToggleStar}
+                onToggleDifficult={handleToggleDifficult}
+                onUpdateNotes={handleUpdateNotes}
+                onExport={handleExport}
+                onImport={handleImport}
+                onSelectForCoach={handleNavigateToCoach}
+                onLoadSamples={handleLoadSamples}
+              />
+            )}
 
-          {activeTab === 'targeted_practice' && (
-            <TargetedPracticeView
-              items={items}
-              onReviewSubmit={handleReviewSubmit}
-              onDismissWeakness={handleDismissWeakness}
-              onSelectWordForCoach={handleNavigateToCoach}
-            />
-          )}
+            {activeTab === 'targeted_practice' && (
+              <TargetedPracticeView
+                items={items}
+                onReviewSubmit={handleReviewSubmit}
+                onDismissWeakness={handleDismissWeakness}
+                onSelectWordForCoach={handleNavigateToCoach}
+              />
+            )}
 
-          {activeTab === 'review' && (
-            <ReviewView
-              dueItems={dueItems}
-              onReviewSubmit={handleReviewSubmit}
-            />
-          )}
+            {activeTab === 'review' && (
+              <ReviewView
+                dueItems={dueItems}
+                onReviewSubmit={handleReviewSubmit}
+              />
+            )}
 
-          {activeTab === 'article_reader' && (
-            <ArticleReaderView
-              onSaveVocabulary={handleSaveVocabulary}
-              existingVocabWords={existingVocabWordSet}
-            />
-          )}
+            {activeTab === 'article_reader' && (
+              <ArticleReaderView
+                onSaveVocabulary={handleSaveVocabulary}
+                existingVocabWords={existingVocabWordSet}
+              />
+            )}
 
-          {activeTab === 'sentence_xray' && <SentenceXRayView />}
+            {activeTab === 'sentence_xray' && <SentenceXRayView />}
 
-          {activeTab === 'word_difference' && <WordDifferenceView />}
+            {activeTab === 'word_difference' && <WordDifferenceView />}
 
-          {activeTab === 'usage_coach' && <CoachView initialWord={coachWord} />}
+            {activeTab === 'usage_coach' && <CoachView initialWord={coachWord} />}
 
-          {activeTab === 'analytics' && (
-            <AnalyticsView
-              items={items}
-              dueCount={dueItems.length}
-              onNavigateToTargetedPractice={() => setActiveTab('targeted_practice')}
-            />
-          )}
+            {activeTab === 'analytics' && (
+              <AnalyticsView
+                items={items}
+                dueCount={dueItems.length}
+                onNavigateToTargetedPractice={() => setActiveTab('targeted_practice')}
+              />
+            )}
 
-          {activeTab === 'settings' && (
-            <SettingsView
-              settings={settings}
-              onSaveSettings={handleSaveSettings}
-            />
-          )}
+            {activeTab === 'settings' && (
+              <SettingsView
+                settings={settings}
+                onSaveSettings={handleSaveSettings}
+              />
+            )}
+          </ErrorBoundary>
 
           {isNarrowScreen && (
             <nav className="narrow-bottom-nav">

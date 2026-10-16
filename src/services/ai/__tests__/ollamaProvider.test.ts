@@ -71,4 +71,71 @@ describe('OllamaProvider error handling & safeParseJSON integration', () => {
       'Ollama blocked the request.'
     );
   });
+
+  it('gracefully parses and normalizes loose/variant model responses without Zod validation failure', async () => {
+    // Model returns alternative keys (e.g. word instead of selectedText, meaning instead of contextualMeaning)
+    const variantJson = {
+      word: 'resilient',
+      meaning: 'Able to recover quickly from difficult conditions.',
+      translation: 'সহনশীল বা প্রতিকূলতা জয় করতে সক্ষম',
+      pos: 'adjective'
+    };
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        response: JSON.stringify(variantJson)
+      })
+    } as any);
+
+    const provider = new OllamaProvider('http://localhost:11434', 'gemma4:31b-cloud');
+    const result = await provider.analyze('resilient', 'word', 'They remained resilient during challenging times.');
+
+    expect(result.selectedText).toBe('resilient');
+    expect(result.selectionType).toBe('word');
+    expect(result.partOfSpeech).toBe('adjective');
+    expect(result.contextualMeaning).toBe('Able to recover quickly from difficult conditions.');
+    expect(result.bengaliTranslation).toBe('সহনশীল বা প্রতিকূলতা জয় করতে সক্ষম');
+  });
+
+  it('handles chat-only models like d1:latest returning message.content from /api/chat', async () => {
+    const mockWord = {
+      selectedText: 'resilient',
+      selectionType: 'word',
+      partOfSpeech: 'adjective',
+      contextualMeaning: 'Able to withstand shock.',
+      simpleEnglishExplanation: 'Recovers fast.',
+      bengaliTranslation: 'সহনশীল',
+      whyFitsContext: 'Fits sentence context.',
+      examples: ['Resilient people adapt.']
+    };
+
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/api/chat')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            message: {
+              role: 'assistant',
+              content: JSON.stringify(mockWord)
+            }
+          })
+        };
+      }
+      return {
+        ok: false,
+        status: 400,
+        text: async () => '"d1:latest" does not support generate'
+      };
+    });
+
+    const provider = new OllamaProvider('http://localhost:11434', 'd1:latest');
+    const result = await provider.analyze('resilient', 'word', 'They remained resilient.');
+
+    expect(result.selectedText).toBe('resilient');
+    expect(result.contextualMeaning).toBe('Able to withstand shock.');
+    expect(result.bengaliTranslation).toBe('সহনশীল');
+  });
 });

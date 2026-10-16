@@ -13,7 +13,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   popupSize: 'medium',
   targetLanguage: 'bn',
   customLanguages: [],
-  disabledSites: []
+  disabledSites: [],
+  isGloballyPaused: false
 };
 
 const SETTINGS_KEY = 'lexiflow_user_settings';

@@ -15,6 +15,13 @@ export class AIService {
   private static cache = new Map<string, unknown>();
   private static inFlightRequests = new Map<string, Promise<unknown>>();
 
+  static clearCache(): void {
+    this.cache.clear();
+    this.inFlightRequests.clear();
+    TwoStageCacheService.clear();
+    CacheManager.getInstance().clear();
+  }
+
   static async getProvider(settings?: UserSettings): Promise<AIProvider> {
     const userSettings = settings || await SettingsService.getSettings();
     if (userSettings.customLanguages) {
@@ -204,12 +211,23 @@ export class AIService {
         sampleResult: `"${wordRes.selectedText || 'resilient'}": ${meanText}${bText}`
       };
     } catch (err: any) {
+      let errorMsg = err?.message || 'Connection test failed.';
+      if (typeof errorMsg === 'string' && errorMsg.trim().startsWith('[') && errorMsg.includes('"message"')) {
+        try {
+          const issues = JSON.parse(errorMsg);
+          if (Array.isArray(issues) && issues.length > 0) {
+            errorMsg = `AI response schema validation failed: ${issues.map((i: any) => `${i.path?.join('.') || 'field'}: ${i.message}`).join('; ')}`;
+          }
+        } catch {
+          // keep original errorMsg
+        }
+      }
       return {
         success: false,
         provider: customSettings?.aiProvider || 'unknown',
         model: customSettings?.selectedModel || 'unknown',
         latencyMs: Date.now() - start,
-        error: err?.message || 'Connection test failed.'
+        error: errorMsg
       };
     }
   }

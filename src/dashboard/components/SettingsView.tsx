@@ -17,8 +17,10 @@ import {
   EyeOff,
   RefreshCw,
   ExternalLink,
-  Sliders
+  Sliders,
+  Volume2
 } from 'lucide-react';
+import { playPronunciation } from '../../services/audio/voiceService';
 
 interface SettingsViewProps {
   settings: UserSettings;
@@ -517,6 +519,76 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Voice & Pronunciation Settings */}
+          <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--line)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Volume2 size={15} style={{ color: 'var(--blue)' }} />
+                  Pronunciation Voice / অডিও উচ্চারণ:
+                </label>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Exclusively Natural Female Voice (Jenny / Aria / Google UK English Female / Samantha / Zira)
+                </div>
+              </div>
+              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                Active: <strong style={{ color: '#10b981' }}>👩 Female Voice Only</strong>
+              </span>
+            </div>
+
+            <div style={{
+              background: 'var(--surface-hover)',
+              border: '1px solid var(--line)',
+              borderRadius: '8px',
+              padding: '12px 14px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px'
+                }}>
+                  👩
+                </div>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+                    Ultra-Realistic Studio Female Voice
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    All robotic and male voices are completely blocked. Natural cadence and pitch for all words, phrases & sentences.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="primary-btn"
+                style={{
+                  padding: '6px 14px',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap'
+                }}
+                onClick={() => {
+                  playPronunciation("Welcome to LexiFlow. Learn English vocabulary effortlessly with natural female voice.");
+                }}
+              >
+                <Volume2 size={14} />
+                Test Female Voice 🔊
+              </button>
             </div>
           </div>
 

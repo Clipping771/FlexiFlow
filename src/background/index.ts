@@ -6,14 +6,35 @@ import { ArticleAnalyzer } from '../services/article/analyzer';
 import { fetchProviderModels } from '../services/ai/modelFetcher';
 import { VocabularyItem, FSRSRating, SelectionType, WritingGoal, WrongMeaningReport } from '../types';
 import { setupOllamaOriginRules } from './ollamaRules';
+import { setupBadgeListeners, updateAllTabBadges } from './badgeService';
 
-// Immediately ensure Ollama dynamic rules are registered
+// Immediately ensure Ollama dynamic rules and Badge synchronization are registered
 setupOllamaOriginRules();
+setupBadgeListeners();
+
+async function injectContentScriptIntoOpenTabs(): Promise<void> {
+  if (typeof chrome === 'undefined' || !chrome.scripting || !chrome.tabs?.query) return;
+  try {
+    const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*', 'file://*/*'] });
+    for (const tab of tabs) {
+      if (typeof tab.id === 'number') {
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content.js']
+        }).catch(() => {});
+      }
+    }
+  } catch {
+    // Non-blocking fallback
+  }
+}
 
 // Setup Context Menu and rules on installation
 if (typeof chrome !== 'undefined' && chrome.runtime) {
   chrome.runtime.onInstalled.addListener(() => {
     setupOllamaOriginRules();
+    updateAllTabBadges();
+    injectContentScriptIntoOpenTabs();
     if (chrome.contextMenus) {
       chrome.contextMenus.create({
         id: 'lexiflow_ai_analyze',
@@ -26,6 +47,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
   if (chrome.runtime.onStartup) {
     chrome.runtime.onStartup.addListener(() => {
       setupOllamaOriginRules();
+      updateAllTabBadges();
+      injectContentScriptIntoOpenTabs();
     });
   }
 }
@@ -259,10 +282,20 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
           case 'EXPLAIN_SENTENCE': {
             const { sentence } = payload as { sentence: string };
             const provider = await AIService.getProvider();
-            const result = await provider.analyze(sentence, 'sentence');
+            const result = (await provider.analyze(sentence, 'sentence')) as any;
             const resMapped = {
               ...result,
-              paraphrase: (result as any).plainEnglishParaphrase || (result as any).paraphrase || '',
+              sentence: result.selectedText || sentence,
+              bengaliTranslation: result.bengaliTranslation || '',
+              paraphrase: result.plainEnglishParaphrase || result.overallMeaning || result.paraphrase || '',
+              clauses: Array.isArray(result.clauses) ? result.clauses : [],
+              grammaticalFeatures: Array.isArray(result.grammaticalHighlights)
+                ? result.grammaticalHighlights
+                : (Array.isArray(result.grammaticalFeatures) ? result.grammaticalFeatures : []),
+              grammaticalHighlights: Array.isArray(result.grammaticalHighlights) ? result.grammaticalHighlights : [],
+              phraseBreakdown: Array.isArray(result.phraseBreakdown) ? result.phraseBreakdown : [],
+              difficultVocabulary: Array.isArray(result.difficultVocabulary) ? result.difficultVocabulary : [],
+              toneAndRegister: result.toneAndRegister || 'Standard English'
             };
             sendResponse({ success: true, data: resMapped });
             break;
@@ -377,6 +410,23 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 
           case 'UPDATE_SETTINGS': {
             const settings = await SettingsService.updateSettings(payload || {});
+            AIService.clearCache();
+            await updateAllTabBadges(settings);
+
+            // Broadcast real-time settings update to all open tabs so active pages update dynamically without refresh
+            if (typeof chrome !== 'undefined' && chrome.tabs?.query) {
+              chrome.tabs.query({}, (tabs) => {
+                for (const tab of tabs) {
+                  if (typeof tab.id === 'number') {
+                    chrome.tabs.sendMessage(tab.id, {
+                      type: 'SETTINGS_UPDATED',
+                      payload: settings
+                    }).catch(() => {});
+                  }
+                }
+              });
+            }
+
             sendResponse({ success: true, data: settings });
             break;
           }
@@ -408,6 +458,30 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             const { jsonString } = payload || {};
             const res = await StorageService.importData(jsonString);
             sendResponse({ success: true, data: res });
+            break;
+          }
+
+          case 'FETCH_AUDIO_BASE64': {
+            const { url } = payload as { url: string };
+            try {
+              const res = await fetch(url);
+              if (!res.ok) {
+                sendResponse({ success: false, error: `HTTP ${res.status}` });
+                break;
+              }
+              const arrayBuffer = await res.arrayBuffer();
+              const bytes = new Uint8Array(arrayBuffer);
+              let binary = '';
+              const chunkSize = 8192;
+              for (let i = 0; i < bytes.length; i += chunkSize) {
+                binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunkSize)));
+              }
+              const base64 = btoa(binary);
+              const mime = res.headers.get('content-type') || 'audio/mpeg';
+              sendResponse({ success: true, dataUrl: `data:${mime};base64,${base64}` });
+            } catch (fetchErr: any) {
+              sendResponse({ success: false, error: fetchErr?.message || 'Audio fetch failed' });
+            }
             break;
           }
 

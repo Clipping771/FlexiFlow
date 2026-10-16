@@ -42,9 +42,9 @@ export class GeminiProvider implements AIProvider {
     modelName: string,
     systemPrompt: string,
     userPrompt: string,
-    maxTokens: number = 750,
+    maxTokens: number = 1500,
     withThinkingConfig: boolean = true,
-    timeoutMs: number = 12000
+    timeoutMs: number = 15000
   ): Promise<Response> {
     const cleanKey = this.apiKey.trim().replace(/^['"]|['"]$/g, '');
     const isOAuthToken = cleanKey.startsWith('ya29.');
@@ -289,12 +289,12 @@ Return JSON adhering to StageBDetailedVocabularySchema:
 
     const userPrompt = `Word: "${cleanLemma}"\nPart of Speech: "${partOfSpeech}"\nContextual Sense ID: "${contextualSenseId}"`;
 
-    let raw = await this.callGemini(systemPrompt, userPrompt, 1100);
+    let raw = await this.callGemini(systemPrompt, userPrompt, 2500);
     let parsed: any;
     try {
       parsed = safeParseJSON(raw);
     } catch {
-      raw = await this.callGemini(systemPrompt, `${userPrompt}\n\nCRITICAL: Output ONLY valid JSON.`, 1100);
+      raw = await this.callGemini(systemPrompt, `${userPrompt}\n\nCRITICAL: Output ONLY valid JSON.`, 2500);
       parsed = safeParseJSON(raw);
     }
 
@@ -302,7 +302,7 @@ Return JSON adhering to StageBDetailedVocabularySchema:
     if (!validation.isValid) {
       console.warn('[LexiFlow AI] Stage B validation failed, retrying once...', validation.errors);
       const correctionPrompt = `${userPrompt}\n\nYour previous response had validation errors:\n${validation.errors.join('\n')}\nPlease ensure the contextual sense is ordered first, all ${lang.targetLabel} fields are accurate, and return valid JSON.`;
-      const retryRaw = await this.callGemini(systemPrompt, correctionPrompt, 1100);
+      const retryRaw = await this.callGemini(systemPrompt, correctionPrompt, 2500);
       try {
         const retryParsed = safeParseJSON(retryRaw);
         const retryVal = validateStageB(retryParsed, cleanLemma, this.targetLang);
@@ -417,7 +417,7 @@ Return JSON adhering to SentenceAnalysisSchema:
   "difficultVocabulary": [{"word": "word", "meaningInContext": "meaning", "bengali": "${lang.targetNativeHeader}"}],
   "toneAndRegister": "Tone"
 }`;
-      const raw = await this.callGemini(sys, `Sentence: ${text}`, 1100);
+      const raw = await this.callGemini(sys, `Sentence: ${text}`, 3000);
       return SentenceAnalysisSchema.parse(safeParseJSON(raw));
     } else {
       const sys = `Analyze this paragraph for a learner. Divide the text into meaningful English phrases or clauses in original order.
@@ -440,7 +440,7 @@ Return JSON adhering to ParagraphAnalysisSchema:
   "argumentStructure": "Flow description",
   "toneAndRegister": "Tone"
 }`;
-      const raw = await this.callGemini(sys, `Paragraph:\n${text}`, 1200);
+      const raw = await this.callGemini(sys, `Paragraph:\n${text}`, 3500);
       return ParagraphAnalysisSchema.parse(safeParseJSON(raw));
     }
   }

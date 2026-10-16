@@ -89,10 +89,105 @@ export class AnthropicProvider implements AIProvider {
     paragraphContext?: string
   ): Promise<LinguisticAnalysisResult> {
     const lang = getLanguageConfig(this.targetLang);
-    const sys = `Analyze English text in context for an ESL ${lang.targetLabel} learner. In translation fields like "bengaliTranslation", "easyBengali", or "explanationBengali", provide ${lang.promptTargetInstruction}. Format as JSON adhering to schema for ${type}.`;
+    let sys = '';
+
+    if (type === 'word') {
+      sys = `You are an expert bilingual lexicographer for an ESL ${lang.targetLabel} learner.
+In "bengaliTranslation", provide ${lang.promptTargetInstruction}.
+Return a valid raw JSON object strictly adhering to this schema:
+{
+  "selectedText": "${text}",
+  "selectionType": "word",
+  "contextualMeaning": "Precise meaning in this context",
+  "simpleEnglishExplanation": "Plain English explanation",
+  "bengaliTranslation": "${lang.targetLabel} meaning and explanation",
+  "whyFitsContext": "Why this specific meaning fits this sentence",
+  "partOfSpeech": "noun / verb / adjective / adverb",
+  "grammaticalNote": "Grammar or syntactic role",
+  "collocations": ["collocation 1", "collocation 2"],
+  "examples": ["example sentence 1"],
+  "synonyms": ["synonym 1"],
+  "antonyms": ["antonym 1"],
+  "registerAndTone": "Tone description"
+}`;
+    } else if (type === 'phrase') {
+      sys = `You are an expert bilingual tutor for an ESL ${lang.targetLabel} learner.
+In "bengaliTranslation", provide ${lang.promptTargetInstruction}.
+Return a valid raw JSON object strictly adhering to this schema:
+{
+  "selectedText": "${text}",
+  "selectionType": "phrase",
+  "phraseType": "idiom",
+  "overallMeaning": "Meaning as a unified unit",
+  "simpleEnglishExplanation": "Simple English explanation",
+  "bengaliTranslation": "${lang.targetLabel} translation and explanation",
+  "literalVsFigurative": "Literal vs figurative distinction",
+  "whyFitsContext": "Why it fits this context",
+  "examples": ["example sentence 1"]
+}`;
+    } else if (type === 'sentence') {
+      sys = `Analyze this sentence for an ESL ${lang.targetLabel} learner.
+In "bengaliTranslation" and "easyBengali", provide ${lang.promptTargetInstruction}.
+Return a valid raw JSON object strictly adhering to this schema:
+{
+  "selectedText": "${text}",
+  "selectionType": "sentence",
+  "plainEnglishParaphrase": "Very easy plain English paraphrase",
+  "overallMeaning": "Overall meaning",
+  "bengaliTranslation": "Complete natural ${lang.targetLabel} translation",
+  "phraseBreakdown": [
+    {
+      "phrase": "Exact meaningful phrase from sentence",
+      "easyEnglish": "Very simple everyday English explanation.",
+      "easyBengali": "Natural easy ${lang.targetLabel} explanation"
+    }
+  ],
+  "clauses": [
+    {
+      "text": "Clause text",
+      "type": "main",
+      "role": "Main Clause",
+      "explanationBengali": "Clause explanation in ${lang.targetLabel}"
+    }
+  ],
+  "grammaticalHighlights": ["Key grammar point"],
+  "difficultVocabulary": [{"word": "word", "meaningInContext": "meaning", "bengali": "translation"}],
+  "toneAndRegister": "Standard English"
+}`;
+    } else {
+      sys = `Analyze this paragraph for an ESL ${lang.targetLabel} learner.
+In "bengaliTranslation" and "easyBengali", provide ${lang.promptTargetInstruction}.
+Return a valid raw JSON object strictly adhering to this schema:
+{
+  "selectedText": "${text}",
+  "selectionType": "paragraph",
+  "mainIdea": "Main thesis of the paragraph",
+  "conciseSummary": "Concise summary",
+  "bengaliTranslation": "Complete natural ${lang.targetLabel} translation",
+  "phraseBreakdown": [
+    {
+      "phrase": "Exact phrase",
+      "easyEnglish": "Simple English explanation",
+      "easyBengali": "Natural ${lang.targetLabel} explanation"
+    }
+  ],
+  "keyVocabulary": [{"term": "term", "meaning": "meaning", "bengali": "translation"}],
+  "toneAndRegister": "Standard English"
+}`;
+    }
+
     const prompt = `Text: ${text}\nType: ${type}\nSentence: ${contextSentence || ''}\nParagraph: ${paragraphContext || ''}`;
     const raw = await this.callAnthropic(sys, prompt);
-    const parsed = safeParseJSON(raw);
+    let parsed: any;
+    try {
+      parsed = safeParseJSON(raw);
+    } catch {
+      parsed = {};
+    }
+    if (parsed && typeof parsed === 'object') {
+      if (!parsed.selectedText) parsed.selectedText = text;
+      if (!parsed.selectionType) parsed.selectionType = type;
+    }
 
     if (type === 'word') return WordAnalysisSchema.parse(parsed);
     if (type === 'phrase') return PhraseAnalysisSchema.parse(parsed);
@@ -101,7 +196,19 @@ export class AnthropicProvider implements AIProvider {
   }
 
   async assistWriting(text: string, goal: WritingGoal): Promise<WritingAssistResult> {
-    const raw = await this.callAnthropic(`Writing assistant for goal "${goal}". Return JSON.`, text);
+    const lang = getLanguageConfig(this.targetLang);
+    const prompt = `Writing assistant for goal "${goal}".
+In "bengaliExplanation", provide ${lang.promptTargetInstruction}.
+Return a valid raw JSON object strictly adhering to this schema:
+{
+  "originalText": "${text}",
+  "goal": "${goal}",
+  "improvedText": "Improved version of text",
+  "changesExplanation": "Clear explanation of improvements made",
+  "bengaliExplanation": "Explanation in ${lang.targetLabel}",
+  "alternatives": ["Alternative phrasing 1", "Alternative phrasing 2"]
+}`;
+    const raw = await this.callAnthropic(prompt, text);
     return WritingAssistSchema.parse(safeParseJSON(raw));
   }
 

@@ -159,6 +159,13 @@ export interface SentenceXRayResult {
   paraphrase: string;
   clauses: SyntacticClause[];
   grammaticalFeatures: string[];
+  grammaticalHighlights?: string[];
+  phraseBreakdown?: PhraseExplanation[];
+  difficultVocabulary?: Array<{
+    word: string;
+    meaningInContext: string;
+    bengali: string;
+  }>;
   toneAndRegister: string;
 }
 
@@ -433,4 +440,5 @@ export interface UserSettings {
   customLanguages?: CustomLanguageConfig[];
   articleDrafts?: ArticleDraft[];
   disabledSites?: string[];
+  isGloballyPaused?: boolean;
 }
