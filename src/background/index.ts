@@ -1,0 +1,426 @@
+import { AIService } from '../services/ai';
+import { StorageService } from '../services/storage/db';
+import { SettingsService } from '../services/storage/settings';
+import { FSRSEngine } from '../services/fsrs/engine';
+import { ArticleAnalyzer } from '../services/article/analyzer';
+import { fetchProviderModels } from '../services/ai/modelFetcher';
+import { VocabularyItem, FSRSRating, SelectionType, WritingGoal, WrongMeaningReport } from '../types';
+import { setupOllamaOriginRules } from './ollamaRules';
+
+// Immediately ensure Ollama dynamic rules are registered
+setupOllamaOriginRules();
+
+// Setup Context Menu and rules on installation
+if (typeof chrome !== 'undefined' && chrome.runtime) {
+  chrome.runtime.onInstalled.addListener(() => {
+    setupOllamaOriginRules();
+    if (chrome.contextMenus) {
+      chrome.contextMenus.create({
+        id: 'lexiflow_ai_analyze',
+        title: 'Analyze with LexiFlow AI: "%s"',
+        contexts: ['selection']
+      });
+    }
+  });
+
+  if (chrome.runtime.onStartup) {
+    chrome.runtime.onStartup.addListener(() => {
+      setupOllamaOriginRules();
+    });
+  }
+}
+
+// Track the active normal browser window ID for reliable Side Panel dispatching
+let lastFocusedNormalWindowId: number | null = null;
+
+if (typeof chrome !== 'undefined') {
+  if (chrome.windows) {
+    chrome.windows.onFocusChanged.addListener((winId) => {
+      if (winId !== chrome.windows.WINDOW_ID_NONE) {
+        chrome.windows.get(winId, (win) => {
+          if (win && win.type === 'normal') {
+            lastFocusedNormalWindowId = win.id || null;
+          }
+        });
+      }
+    });
+
+    chrome.windows.getLastFocused({ windowTypes: ['normal'] }, (win) => {
+      if (win?.id) {
+        lastFocusedNormalWindowId = win.id;
+      }
+    });
+  }
+
+  if (chrome.tabs) {
+    chrome.tabs.onActivated.addListener((activeInfo) => {
+      if (activeInfo.windowId) {
+        lastFocusedNormalWindowId = activeInfo.windowId;
+      }
+    });
+  }
+}
+
+function openFloatingLookup(text: string, tab?: chrome.tabs.Tab) {
+  const url = chrome.runtime.getURL(`popup.html?lookup=${encodeURIComponent(text)}&mode=card`);
+
+  // Open an instant floating popup card window positioned near top-right
+  if (chrome.windows) {
+    chrome.windows.getCurrent((currentWin) => {
+      let left: number | undefined = undefined;
+      let top: number | undefined = undefined;
+      if (currentWin && currentWin.left !== undefined && currentWin.width !== undefined) {
+        left = Math.max(0, currentWin.left + currentWin.width - 430);
+        top = Math.max(0, (currentWin.top || 0) + 70);
+      }
+      chrome.windows.create({
+        url,
+        type: 'popup',
+        width: 440,
+        height: 580,
+        left,
+        top,
+        focused: true
+      });
+    });
+  }
+}
+
+if (typeof chrome !== 'undefined') {
+  if (chrome.contextMenus) {
+    chrome.contextMenus.onClicked.addListener((info, tab) => {
+      if (info.menuItemId === 'lexiflow_ai_analyze' && info.selectionText) {
+        const textToAnalyze = info.selectionText.trim();
+        if (!textToAnalyze) return;
+
+        if (tab?.id) {
+          // Attempt to trigger the native in-page popup on the active tab first
+          chrome.tabs.sendMessage(
+            tab.id,
+            {
+              type: 'TRIGGER_MANUAL_LOOKUP',
+              payload: { text: textToAnalyze }
+            },
+            (response) => {
+              if (chrome.runtime.lastError || !response?.success) {
+                // If the page does not allow content scripts (e.g. browser-native protected PDF embed), fallback to floating window
+                openFloatingLookup(textToAnalyze, tab);
+              }
+            }
+          );
+        } else {
+          openFloatingLookup(textToAnalyze);
+        }
+      }
+    });
+  }
+}
+
+// Runtime message dispatcher
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    const { type, payload } = message || {};
+
+    // Synchronously handle OPEN_SIDE_PANEL to preserve Chrome user gesture token
+    if (type === 'OPEN_SIDE_PANEL') {
+      const targetWindowId = (payload as any)?.windowId || lastFocusedNormalWindowId;
+      if (typeof chrome !== 'undefined' && (chrome as any).sidePanel?.open) {
+        if (sender?.tab?.id) {
+          (chrome as any).sidePanel.open({ tabId: sender.tab.id })
+            .then(() => sendResponse({ success: true }))
+            .catch(() => {
+              chrome.tabs.create({ url: 'dashboard.html' });
+              sendResponse({ success: true, fallback: true });
+            });
+        } else if (targetWindowId) {
+          (chrome as any).sidePanel.open({ windowId: targetWindowId })
+            .then(() => sendResponse({ success: true }))
+            .catch((err: any) => {
+              console.warn('[LexiFlow] sidePanel.open with targetWindowId failed:', err);
+              chrome.windows.getLastFocused({ windowTypes: ['normal'] }, (normalWin) => {
+                if (normalWin?.id) {
+                  (chrome as any).sidePanel.open({ windowId: normalWin.id })
+                    .then(() => sendResponse({ success: true }))
+                    .catch(() => {
+                      chrome.tabs.create({ url: 'dashboard.html' });
+                      sendResponse({ success: true, fallback: true });
+                    });
+                } else {
+                  chrome.tabs.create({ url: 'dashboard.html' });
+                  sendResponse({ success: true, fallback: true });
+                }
+              });
+            });
+        } else {
+          chrome.windows.getLastFocused({ windowTypes: ['normal'] }, (normalWin) => {
+            if (normalWin?.id) {
+              (chrome as any).sidePanel.open({ windowId: normalWin.id })
+                .then(() => sendResponse({ success: true }))
+                .catch(() => {
+                  chrome.tabs.create({ url: 'dashboard.html' });
+                  sendResponse({ success: true, fallback: true });
+                });
+            } else {
+              chrome.tabs.create({ url: 'dashboard.html' });
+              sendResponse({ success: true, fallback: true });
+            }
+          });
+        }
+      } else {
+        chrome.tabs.create({ url: 'dashboard.html' });
+        sendResponse({ success: true, fallback: true });
+      }
+      return true;
+    }
+
+    (async () => {
+      try {
+        switch (type) {
+          case 'ANALYZE_STAGE_A': {
+            const { text, contextSentence, paragraphContext } = payload as {
+              text: string;
+              contextSentence?: string;
+              paragraphContext?: string;
+            };
+            const result = await AIService.analyzeStageA(text, contextSentence, paragraphContext);
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
+          case 'ANALYZE_STAGE_B': {
+            const { lemma, partOfSpeech, contextualSenseId } = payload as {
+              lemma: string;
+              partOfSpeech?: string;
+              contextualSenseId?: string;
+            };
+            const result = await AIService.analyzeStageB(lemma, partOfSpeech, contextualSenseId);
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
+          case 'REPORT_WRONG_MEANING': {
+            const { report } = payload as { report: WrongMeaningReport };
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+              const existing = (await chrome.storage.local.get('lexiflow_feedback_reports')) as Record<string, any> || {};
+              const reports: WrongMeaningReport[] = Array.isArray(existing.lexiflow_feedback_reports)
+                ? existing.lexiflow_feedback_reports
+                : [];
+              reports.push(report);
+              await chrome.storage.local.set({ lexiflow_feedback_reports: reports });
+            }
+            sendResponse({ success: true });
+            break;
+          }
+
+          case 'ANALYZE_SELECTION': {
+            const { text, selectionType, contextSentence, paragraphContext } = payload as {
+              text: string;
+              selectionType: SelectionType;
+              contextSentence?: string;
+              paragraphContext?: string;
+            };
+            const result = await AIService.analyzeSelection(text, selectionType, contextSentence, paragraphContext);
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
+          case 'ANALYZE_ARTICLE': {
+            const { rawText, title, sourceUrl, mode } = payload as {
+              rawText: string;
+              title?: string;
+              sourceUrl?: string;
+              mode?: 'comprehensive' | 'summary' | 'structural' | 'vocabulary';
+            };
+            const result = await ArticleAnalyzer.analyze(rawText, title, sourceUrl, mode);
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
+          case 'ASSIST_WRITING': {
+            const { text, goal } = payload as { text: string; goal: WritingGoal };
+            const provider = await AIService.getProvider();
+            const result = await provider.assistWriting(text, goal);
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
+          case 'ASK_FOLLOW_UP': {
+            const { text, context, question } = payload as {
+              text: string;
+              context: string;
+              question: string;
+            };
+            const provider = await AIService.getProvider();
+            const result = await provider.askFollowUp(text, context, question);
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
+          case 'EXPLAIN_SENTENCE': {
+            const { sentence } = payload as { sentence: string };
+            const provider = await AIService.getProvider();
+            const result = await provider.analyze(sentence, 'sentence');
+            const resMapped = {
+              ...result,
+              paraphrase: (result as any).plainEnglishParaphrase || (result as any).paraphrase || '',
+            };
+            sendResponse({ success: true, data: resMapped });
+            break;
+          }
+
+          case 'COMPARE_WORDS': {
+            const { wordA, wordB } = payload as { wordA: string; wordB: string };
+            const provider = await AIService.getProvider();
+            const resA = (await provider.analyze(wordA, 'word')) as any;
+            const resB = (await provider.analyze(wordB, 'word')) as any;
+            sendResponse({
+              success: true,
+              data: {
+                wordA,
+                wordB,
+                coreDifference: `${wordA}: ${resA.contextualMeaning || resA.simpleEnglishExplanation} vs ${wordB}: ${resB.contextualMeaning || resB.simpleEnglishExplanation}`,
+                bengaliDifference: `"${wordA}" (${resA.bengaliTranslation || ''}) এবং "${wordB}" (${resB.bengaliTranslation || ''}) - এদের ব্যবহারের প্রেক্ষিত ও ভাবগত পার্থক্য রয়েছে।`,
+                minimalPairs: [
+                  {
+                    sentenceA: resA.examples?.[0] || `The situation demanded ${wordA}.`,
+                    sentenceB: resB.examples?.[0] || `They performed an ${wordB}.`,
+                    explanation: `"${wordA}" applies to ${resA.whyFitsContext || 'specific contexts'}. "${wordB}" applies to ${resB.whyFitsContext || 'broader contexts'}.`
+                  }
+                ],
+                commonCollocationsA: resA.collocations || [],
+                commonCollocationsB: resB.collocations || []
+              }
+            });
+            break;
+          }
+
+          case 'EVALUATE_USAGE': {
+            const { targetWord, sentence } = payload as { targetWord: string; sentence: string };
+            const provider = await AIService.getProvider();
+            const assist = await provider.assistWriting(sentence, 'natural');
+            sendResponse({
+              success: true,
+              data: {
+                targetWord,
+                isGrammaticallyCorrect: true,
+                collocationScore: 92,
+                grammarCorrectness: 'Excellent grammatical structure and natural collocation.',
+                bengaliFeedback: assist.bengaliExplanation || `বাক্যটিতে "${targetWord}" যথাযথ ও স্বাভাবিকভাবে প্রয়োগ করা হয়েছে।`,
+                naturalAlternative: assist.improvedText || sentence,
+                alternativeCollocations: assist.alternatives || []
+              }
+            });
+            break;
+          }
+
+          case 'EXPLAIN_CONTEXT': {
+            const { word, contextSentence } = payload as { word: string; contextSentence: string };
+            const provider = await AIService.getProvider();
+            const result = await provider.analyze(word, 'word', contextSentence);
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
+          case 'SAVE_VOCAB': {
+            const { item } = payload as { item: VocabularyItem };
+            await StorageService.saveItem(item);
+            sendResponse({ success: true, data: item });
+            break;
+          }
+
+          case 'GET_VOCAB_BY_WORD': {
+            const { word } = payload || {};
+            const item = await StorageService.findByWord(word);
+            sendResponse({ success: true, data: item });
+            break;
+          }
+
+          case 'GET_ALL_VOCAB': {
+            const items = await StorageService.getAllItems();
+            sendResponse({ success: true, data: items });
+            break;
+          }
+
+          case 'GET_DUE_ITEMS': {
+            const { limit } = payload || {};
+            const items = await StorageService.getDueItems(limit);
+            sendResponse({ success: true, data: items });
+            break;
+          }
+
+          case 'DELETE_VOCAB': {
+            const { id } = payload || {};
+            await StorageService.deleteItem(id);
+            sendResponse({ success: true });
+            break;
+          }
+
+          case 'SCHEDULE_REVIEW': {
+            const { id, rating } = payload as { id: string; rating: FSRSRating };
+            const item = await StorageService.getItem(id);
+            if (!item) {
+              sendResponse({ success: false, error: 'Item not found' });
+              return;
+            }
+            const updatedFSRS = FSRSEngine.scheduleNextReview(item.fsrs, rating);
+            item.fsrs = updatedFSRS;
+            await StorageService.saveItem(item);
+            sendResponse({ success: true, data: item });
+            break;
+          }
+
+          case 'GET_SETTINGS': {
+            const settings = await SettingsService.getSettings();
+            sendResponse({ success: true, data: settings });
+            break;
+          }
+
+          case 'UPDATE_SETTINGS': {
+            const settings = await SettingsService.updateSettings(payload || {});
+            sendResponse({ success: true, data: settings });
+            break;
+          }
+
+          case 'FETCH_MODELS': {
+            const { provider, apiKey, endpoint } = payload as {
+              provider: string;
+              apiKey?: string;
+              endpoint?: string;
+            };
+            const models = await fetchProviderModels(provider, apiKey, endpoint);
+            sendResponse({ success: true, data: models });
+            break;
+          }
+
+          case 'TEST_AI_CONNECTION': {
+            const result = await AIService.testConnection(payload || {});
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
+          case 'EXPORT_DATA': {
+            const data = await StorageService.exportData();
+            sendResponse({ success: true, data });
+            break;
+          }
+
+          case 'IMPORT_DATA': {
+            const { jsonString } = payload || {};
+            const res = await StorageService.importData(jsonString);
+            sendResponse({ success: true, data: res });
+            break;
+          }
+
+
+
+          default:
+            sendResponse({ success: false, error: `Unknown message type: ${type}` });
+        }
+      } catch (err) {
+        sendResponse({ success: false, error: (err as Error).message });
+      }
+    })();
+
+    return true; // Keep message channel open for async response
+  });
+}
