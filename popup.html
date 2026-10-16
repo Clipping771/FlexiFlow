@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#f5f5f7">
+  <meta name="theme-color" content="#1c1c1e">
   <title>LexiFlow</title>
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/icon32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/assets/icon16.png">
@@ -16,14 +16,22 @@
       padding: 0;
       width: 380px;
       min-height: 480px;
-      background: #f5f5f7;
-      color: #1d1d1f;
+      background: var(--pop-bg, #1c1c1e);
+      color: var(--pop-text, #f5f5f7);
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", sans-serif;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       text-rendering: optimizeLegibility;
       letter-spacing: -0.01em;
       overflow-x: hidden;
+    }
+    html[data-theme="dark"] body {
+      background: #1c1c1e;
+      color: #f5f5f7;
+    }
+    html[data-theme="light"] body {
+      background: #ffffff;
+      color: #1d1d1f;
     }
   </style>
 </head>

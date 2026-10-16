@@ -104,6 +104,16 @@ class ContentScriptManager {
   }
 
   private applyPopupSize(): void {
+    const theme = this.userSettings.theme || 'dark';
+    let effective = theme;
+    if (effective === 'system') {
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      effective = prefersDark ? 'dark' : 'light';
+    }
+    if (this.shadowHost) {
+      this.shadowHost.setAttribute('data-theme', effective);
+    }
+
     if (!this.popupView) return;
     const size = this.userSettings.popupSize || 'medium';
     this.popupView.setSize(size);

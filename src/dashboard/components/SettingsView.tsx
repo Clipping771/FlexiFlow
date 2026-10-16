@@ -62,6 +62,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [form, setForm] = useState<UserSettings>({ ...settings });
   const [status, setStatus] = useState<string | null>(null);
 
+  useEffect(() => {
+    setForm({ ...settings });
+  }, [settings]);
+
   const [dynamicModels, setDynamicModels] = useState<Record<string, AvailableModel[]>>({});
   const [fetchingModels, setFetchingModels] = useState(false);
   const [fetchSuccessMsg, setFetchSuccessMsg] = useState<string | null>(null);
@@ -462,6 +466,57 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div className={`ios-toggle ${(form.sidePanelEnabled ?? true) ? 'checked' : ''}`}>
                 <div className="ios-toggle-thumb" />
               </div>
+            </div>
+          </div>
+
+          {/* Appearance & Color Theme */}
+          <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--line)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+                  Appearance & Theme Mode:
+                </label>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Synchronized across Dashboard, Browser Extension Popup, and In-Page Reading Popups
+                </div>
+              </div>
+              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                Active: <strong style={{ color: 'var(--blue)', textTransform: 'capitalize' }}>{form.theme || 'dark'}</strong>
+              </span>
+            </div>
+
+            <div className="size-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+              {[
+                { id: 'dark', label: 'Dark Mode', emoji: '🌙', desc: 'Modern Charcoal & Glass (Eyes Friendly)' },
+                { id: 'light', label: 'Light Mode', emoji: '☀️', desc: 'Clean Studio Slate & Pure Contrast' },
+                { id: 'system', label: 'System Default', emoji: '💻', desc: 'Automatically match Operating System' }
+              ].map((themeOpt) => {
+                const isSelected = (form.theme || 'dark') === themeOpt.id;
+                return (
+                  <button
+                    key={themeOpt.id}
+                    type="button"
+                    className={`size-option-card ${isSelected ? 'selected' : ''}`}
+                    onClick={async () => {
+                      const updated = { ...form, theme: themeOpt.id as UserSettings['theme'] };
+                      setForm(updated);
+                      await onSaveSettings(updated);
+                      setStatus(`Theme set to ${themeOpt.label}. All popups and dashboard synchronized.`);
+                      setTimeout(() => setStatus(null), 3000);
+                    }}
+                  >
+                    <div style={{ fontSize: '20px', marginBottom: '4px' }}>
+                      {themeOpt.emoji}
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: isSelected ? 700 : 600, color: isSelected ? 'var(--blue)' : 'var(--text-main)' }}>
+                      {themeOpt.label}
+                    </span>
+                    <span style={{ fontSize: '10px', color: isSelected ? 'var(--blue)' : 'var(--text-muted)', marginTop: '3px', lineHeight: 1.3 }}>
+                      {themeOpt.desc}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

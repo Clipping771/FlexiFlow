@@ -37,6 +37,15 @@ import {
 import { playPronunciation } from '../services/audio/voiceService';
 import './popup.css';
 
+export const resolveEffectiveTheme = (t?: string): 'light' | 'dark' => {
+  if (t === 'system') {
+    return (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      ? 'dark'
+      : 'light';
+  }
+  return t === 'light' ? 'light' : 'dark';
+};
+
 /**
  * Hosts the exact same PopupView and POPUP_STYLES as in-page web popups.
  * Guarantees 100% visual and functional fidelity across websites, PDFs, and standalone lookup windows.
@@ -127,15 +136,32 @@ const PopupCardHost: React.FC<PopupCardHostProps> = ({ initialWord }) => {
     containerRef.current.appendChild(el);
 
     // Sync theme, size, and language with settings
+    const applyHostSettings = (s: Partial<UserSettings>) => {
+      if (s.theme) {
+        const effective = resolveEffectiveTheme(s.theme);
+        document.documentElement.setAttribute('data-theme', effective);
+        view.setTheme(s.theme);
+      }
+      if (s.popupSize) view.setSize(s.popupSize);
+      if (s.targetLanguage) view.setTargetLanguage(s.targetLanguage);
+    };
+
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }, (res) => {
         if (res?.success && res.data) {
-          const s = res.data as UserSettings;
-          if (s.theme) view.setTheme(s.theme);
-          if (s.popupSize) view.setSize(s.popupSize);
-          if (s.targetLanguage) view.setTargetLanguage(s.targetLanguage);
+          applyHostSettings(res.data as UserSettings);
         }
       });
+    }
+
+    const hostStorageListener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      if (changes.lexiflow_user_settings?.newValue) {
+        applyHostSettings(changes.lexiflow_user_settings.newValue);
+      }
+    };
+
+    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+      chrome.storage.onChanged.addListener(hostStorageListener);
     }
 
     const executeLookup = (text: string, selectionType: SelectionType = 'word') => {
@@ -213,6 +239,9 @@ const PopupCardHost: React.FC<PopupCardHostProps> = ({ initialWord }) => {
     }
 
     return () => {
+      if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+        chrome.storage.onChanged.removeListener(hostStorageListener);
+      }
       el.remove();
     };
   }, [initialWord]);
@@ -312,8 +341,9 @@ export const App: React.FC = () => {
         if (res?.success && res.data) {
           const s = res.data as UserSettings;
           if (s.theme) {
-            setTheme(s.theme);
-            document.documentElement.setAttribute('data-theme', s.theme);
+            const effective = resolveEffectiveTheme(s.theme);
+            setTheme(effective);
+            document.documentElement.setAttribute('data-theme', effective);
           }
           if (s.targetLanguage) setTargetLang(s.targetLanguage);
           if (s.customLanguages) setCustomLanguages(s.customLanguages);
@@ -338,18 +368,21 @@ export const App: React.FC = () => {
     }
 
     if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
-      chrome.storage.onChanged.addListener((changes) => {
+      const storageListener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
         if (changes.lexiflow_user_settings?.newValue) {
           const newSettings = changes.lexiflow_user_settings.newValue as UserSettings;
           if (newSettings.theme) {
-            setTheme(newSettings.theme);
-            document.documentElement.setAttribute('data-theme', newSettings.theme);
+            const effective = resolveEffectiveTheme(newSettings.theme);
+            setTheme(effective);
+            document.documentElement.setAttribute('data-theme', effective);
           }
           if (newSettings.disabledSites && Array.isArray(newSettings.disabledSites)) {
             setDisabledSites(newSettings.disabledSites);
           }
         }
-      });
+      };
+      chrome.storage.onChanged.addListener(storageListener);
+      return () => chrome.storage.onChanged.removeListener(storageListener);
     }
   }, []);
 
@@ -596,6 +629,20 @@ export const App: React.FC = () => {
     sendCoachMessage(promptText);
   };
 
+  const handleToggleTheme = () => {
+    const nextTheme: 'light' | 'dark' = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({
+        type: 'UPDATE_SETTINGS',
+        payload: { theme: nextTheme }
+      });
+    } else {
+      SettingsService.updateSettings({ theme: nextTheme });
+    }
+  };
+
   const openDashboard = () => {
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.openOptionsPage) {
       chrome.runtime.openOptionsPage();
@@ -669,6 +716,27 @@ export const App: React.FC = () => {
             <div className="app-title">LexiFlow</div>
             <div className="app-sub">Contextual Reading & Language Mastery</div>
           </div>
+        </div>
+
+        <div className="popup-header-actions">
+          <button
+            type="button"
+            className="popup-theme-btn"
+            onClick={handleToggleTheme}
+            title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+            aria-label="Toggle theme"
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+          <button
+            type="button"
+            className="popup-theme-btn"
+            onClick={openDashboard}
+            title="Open LexiFlow Dashboard & Settings"
+            aria-label="Settings"
+          >
+            ⚙️
+          </button>
         </div>
       </div>
 

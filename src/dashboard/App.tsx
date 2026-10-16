@@ -42,9 +42,37 @@ export const App: React.FC = () => {
   );
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  const resolveEffectiveTheme = (t?: string): 'light' | 'dark' => {
+    if (t === 'system') {
+      return typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
+    }
+    return t === 'light' ? 'light' : 'dark';
+  };
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // Real-time synchronization across popup, settings, and other windows
+  useEffect(() => {
+    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+      const listener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+        if (changes.lexiflow_user_settings?.newValue) {
+          const newSettings = changes.lexiflow_user_settings.newValue as UserSettings;
+          setSettings(newSettings);
+          if (newSettings.theme) {
+            const effective = resolveEffectiveTheme(newSettings.theme);
+            setTheme(effective);
+            document.documentElement.setAttribute('data-theme', effective);
+          }
+        }
+      };
+      chrome.storage.onChanged.addListener(listener);
+      return () => chrome.storage.onChanged.removeListener(listener);
+    }
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -153,9 +181,9 @@ export const App: React.FC = () => {
       chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }, (res) => {
         if (res?.success && res.data) {
           setSettings(res.data);
-          if (res.data.theme === 'light' || res.data.theme === 'dark') {
-            setTheme(res.data.theme);
-          }
+          const effective = resolveEffectiveTheme(res.data.theme);
+          setTheme(effective);
+          document.documentElement.setAttribute('data-theme', effective);
         }
         setLoading(false);
       });
@@ -165,9 +193,9 @@ export const App: React.FC = () => {
         const localSettings = localStorage.getItem('lexiflow_user_settings');
         if (localSettings) {
           const parsed = JSON.parse(localSettings);
-          if (parsed.theme === 'light' || parsed.theme === 'dark') {
-            setTheme(parsed.theme);
-          }
+          const effective = resolveEffectiveTheme(parsed.theme);
+          setTheme(effective);
+          document.documentElement.setAttribute('data-theme', effective);
         }
       } catch {}
 
@@ -390,6 +418,11 @@ export const App: React.FC = () => {
   };
 
   const handleSaveSettings = async (updates: Partial<UserSettings>) => {
+    if (updates.theme) {
+      const effective = resolveEffectiveTheme(updates.theme);
+      setTheme(effective);
+      document.documentElement.setAttribute('data-theme', effective);
+    }
     setSettings((prev) => ({ ...prev, ...updates }));
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({
@@ -410,8 +443,9 @@ export const App: React.FC = () => {
   };
 
   const handleToggleTheme = () => {
-    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    const nextTheme: 'light' | 'dark' = theme === 'dark' ? 'light' : 'dark';
     setTheme(nextTheme);
+    document.documentElement.setAttribute('data-theme', nextTheme);
     handleSaveSettings({ theme: nextTheme });
   };
 
