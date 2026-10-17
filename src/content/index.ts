@@ -706,6 +706,16 @@ class ContentScriptManager {
     popupEl.style.setProperty('visibility', 'visible', 'important');
     popupEl.style.pointerEvents = 'auto';
 
+    // Telemetry: Record approved popup_shown lifecycle event (no text, URLs, or personal data)
+    this.sendMessage('LOG_EVENT', {
+      event: 'popup_shown',
+      data: {
+        selectionType,
+        triggerMode: this.userSettings.triggerMode || 'auto_selection',
+        readingMode: this.userSettings.readingMode || 'quick'
+      }
+    }).catch(() => {});
+
     // 1. Instant Fast-Path: Dictionary-First Local Lookup (< 1ms)
     const isWordOrPhrase = selectionType === 'word' || selectionType === 'phrase';
     let hasLocalDisplay = false;

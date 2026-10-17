@@ -7,6 +7,7 @@ import { fetchProviderModels } from '../services/ai/modelFetcher';
 import { VocabularyItem, FSRSRating, SelectionType, WritingGoal, WrongMeaningReport } from '../types';
 import { setupOllamaOriginRules } from './ollamaRules';
 import { setupBadgeListeners, updateAllTabBadges } from './badgeService';
+import { EventLogger, ApprovedEventName } from '../services/logging/eventLogger';
 
 // Immediately ensure Ollama dynamic rules and Badge synchronization are registered
 setupOllamaOriginRules();
@@ -231,6 +232,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
               reports.push(report);
               await chrome.storage.local.set({ lexiflow_feedback_reports: reports });
             }
+            await EventLogger.log('report_submitted', {
+              reason: report?.reason || 'wrong_meaning',
+              hasUserNote: Boolean(report?.userNote && report.userNote.trim().length > 0),
+              hasContextSentence: Boolean(report?.contextSentence && report.contextSentence.trim().length > 0)
+            }).catch(() => {});
             sendResponse({ success: true });
             break;
           }
@@ -372,6 +378,10 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
           case 'SAVE_VOCAB': {
             const { item } = payload as { item: VocabularyItem };
             const saved = await StorageService.saveOrUpdate(item);
+            await EventLogger.log('word_saved', {
+              selectionType: item.selectionType || 'word',
+              hasContext: Boolean(item.contextSentence && item.contextSentence.trim().length > 0)
+            }).catch(() => {});
             sendResponse({ success: true, data: saved });
             break;
           }
@@ -413,6 +423,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             const updatedFSRS = FSRSEngine.scheduleNextReview(item.fsrs, rating);
             item.fsrs = updatedFSRS;
             await StorageService.saveItem(item);
+            await EventLogger.log('review_completed', {
+              rating,
+              elapsedDays: item.fsrs.elapsedDays,
+              scheduledDays: updatedFSRS.scheduledDays
+            }).catch(() => {});
             sendResponse({ success: true, data: item });
             break;
           }
@@ -424,7 +439,15 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
           }
 
           case 'UPDATE_SETTINGS': {
+            const currentSettings = await SettingsService.getSettings();
+            const prevMode = currentSettings.readingMode || 'quick';
             const settings = await SettingsService.updateSettings(payload || {});
+            if (payload?.readingMode && payload.readingMode !== prevMode) {
+              await EventLogger.log('mode_changed', {
+                from: prevMode,
+                to: payload.readingMode
+              }).catch(() => {});
+            }
             AIService.clearCache();
             await updateAllTabBadges(settings);
 
@@ -501,6 +524,31 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
           }
 
 
+
+          case 'LOG_EVENT': {
+            const { event, data } = payload as { event: ApprovedEventName; data: any };
+            const logged = await EventLogger.log(event, data);
+            sendResponse({ success: true, data: logged });
+            break;
+          }
+
+          case 'GET_EVENT_LOGS': {
+            const store = await EventLogger.getStore();
+            sendResponse({ success: true, data: store });
+            break;
+          }
+
+          case 'EXPORT_EVENT_LOGS': {
+            const jsonString = await EventLogger.exportLogsAsJson();
+            sendResponse({ success: true, data: jsonString });
+            break;
+          }
+
+          case 'CLEAR_EVENT_LOGS': {
+            await EventLogger.clearLogs();
+            sendResponse({ success: true });
+            break;
+          }
 
           default:
             sendResponse({ success: false, error: `Unknown message type: ${type}` });

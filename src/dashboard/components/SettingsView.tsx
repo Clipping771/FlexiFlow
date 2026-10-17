@@ -107,6 +107,51 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [showAdvancedPrompt, setShowAdvancedPrompt] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [deleteConfirmCode, setDeleteConfirmCode] = useState<string | null>(null);
+  const [telemetryInfo, setTelemetryInfo] = useState<{ rawCount: number; daysCount: number } | null>(null);
+
+  useEffect(() => {
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.sendMessage({ type: 'GET_EVENT_LOGS' }, (res) => {
+        if (res?.success && res.data) {
+          setTelemetryInfo({
+            rawCount: res.data.events?.length || 0,
+            daysCount: Object.keys(res.data.dailyAggregates || {}).length
+          });
+        }
+      });
+    }
+  }, []);
+
+  const handleExportTelemetry = async () => {
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.sendMessage({ type: 'EXPORT_EVENT_LOGS' }, (res) => {
+        if (res?.success && res.data) {
+          const blob = new Blob([res.data], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `lexiflow_telemetry_${new Date().toISOString().slice(0, 10)}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+          setStatus('Telemetry logs exported successfully.');
+          setTimeout(() => setStatus(null), 3000);
+        }
+      });
+    }
+  };
+
+  const handleClearTelemetry = async () => {
+    if (!window.confirm('Are you sure you want to clear all telemetry logs and aggregate counters?')) return;
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.sendMessage({ type: 'CLEAR_EVENT_LOGS' }, (res) => {
+        if (res?.success) {
+          setTelemetryInfo({ rawCount: 0, daysCount: 0 });
+          setStatus('Event logs cleared successfully.');
+          setTimeout(() => setStatus(null), 3000);
+        }
+      });
+    }
+  };
 
   const allLanguages = getAllLanguages(form.customLanguages);
   const customLangs = form.customLanguages || [];
@@ -1353,6 +1398,48 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 Caps pending review session size
               </span>
             </div>
+          </div>
+        </div>
+
+        {/* Minimal Event Telemetry & Privacy Card */}
+        <div className="card" style={{ marginTop: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-main)' }}>
+                📊 Minimal Event Telemetry & Privacy
+              </h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>
+                LexiFlow 2.0 tracks strictly 5 approved lifecycle events with daily aggregate counters. No URLs, page text, words, or personal content are ever stored.
+              </p>
+            </div>
+            {telemetryInfo && (
+              <div style={{ textAlign: 'right', fontSize: '12px', color: 'var(--text-muted)' }}>
+                <div><strong>{telemetryInfo.rawCount}</strong> events recorded</div>
+                <div style={{ fontSize: '11px' }}><strong>{telemetryInfo.daysCount}</strong> active pilot days</div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              onClick={handleExportTelemetry}
+            >
+              📥 Export Event Logs (JSON)
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', fontWeight: 600 }}
+              onClick={handleClearTelemetry}
+            >
+              🗑️ Clear Event Logs
+            </button>
+            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+              Exported as clean, anonymous JSON separate from feedback reports.
+            </span>
           </div>
         </div>
 
