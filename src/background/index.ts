@@ -371,8 +371,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 
           case 'SAVE_VOCAB': {
             const { item } = payload as { item: VocabularyItem };
-            await StorageService.saveItem(item);
-            sendResponse({ success: true, data: item });
+            const saved = await StorageService.saveOrUpdate(item);
+            sendResponse({ success: true, data: saved });
             break;
           }
 

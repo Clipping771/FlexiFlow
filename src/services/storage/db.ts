@@ -87,6 +87,61 @@ export class StorageService {
     this.notifyVocabChanged(item);
   }
 
+  /**
+   * Single shared saveOrUpdate deduplication method.
+   * On match by normalized word, updates context, meaning, tags, notes;
+   * NEVER resets FSRS state or changes existing card ID.
+   * Pre-existing duplicates in storage are never touched/auto-merged.
+   */
+  static async saveOrUpdate(item: VocabularyItem): Promise<VocabularyItem> {
+    if (!item || !item.word || typeof item.word !== 'string') {
+      throw new Error('Vocabulary item must have a valid word string');
+    }
+
+    const norm = item.word.trim().toLowerCase();
+    const existing = await this.findByWord(norm);
+
+    let itemToSave: VocabularyItem;
+
+    if (existing) {
+      itemToSave = {
+        ...existing,
+        contextSentence: item.contextSentence || existing.contextSentence,
+        meaning: item.meaning || existing.meaning,
+        bengaliMeaning: item.bengaliMeaning || existing.bengaliMeaning,
+        bengaliExplanation: item.bengaliExplanation || existing.bengaliExplanation,
+        definition: item.definition || existing.definition,
+        partOfSpeech: item.partOfSpeech || existing.partOfSpeech,
+        selectionType: item.selectionType || existing.selectionType,
+        fullAnalysis: item.fullAnalysis || existing.fullAnalysis,
+        notes: item.notes !== undefined ? item.notes : existing.notes,
+        starred: item.starred !== undefined ? item.starred : existing.starred,
+        isMarkedDifficult: item.isMarkedDifficult !== undefined ? item.isMarkedDifficult : existing.isMarkedDifficult,
+        tags: Array.from(new Set([...(existing.tags || []), ...(item.tags || [])])),
+        collection: item.collection && item.collection !== 'General' ? item.collection : (existing.collection || item.collection || 'General'),
+        difficulty: item.difficulty || existing.difficulty || 'medium',
+        // Critical: Never reset existing ID, FSRS memory state, or review history
+        id: existing.id,
+        fsrs: existing.fsrs || FSRSEngine.createInitialState(),
+        reviewHistory: existing.reviewHistory || []
+      };
+    } else {
+      itemToSave = {
+        ...item,
+        id: item.id || `vocab_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        word: item.word.trim(),
+        dateAdded: item.dateAdded || new Date().toISOString(),
+        fsrs: item.fsrs || FSRSEngine.createInitialState(),
+        tags: Array.isArray(item.tags) ? item.tags : ['web-reading'],
+        collection: item.collection || 'General',
+        difficulty: item.difficulty || 'medium'
+      };
+    }
+
+    await this.saveItem(itemToSave);
+    return itemToSave;
+  }
+
   static async getItem(id: string): Promise<VocabularyItem | null> {
     try {
       const db = await this.getDB();
