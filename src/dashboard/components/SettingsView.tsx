@@ -90,6 +90,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     latencyMs: number;
     sampleResult?: string;
     error?: string;
+    targetLabel?: string;
+    flagEmoji?: string;
   } | null>(null);
 
   // Custom Languages Management State
@@ -681,7 +683,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 setForm(updated);
                 await onSaveSettings(updated);
                 const foundLang = allLanguages.find((l) => l.targetLang === newLang) || customLangs.find((c) => c.code === newLang);
-                setStatus(`Target translation language set to ${foundLang?.flagEmoji || '🌐'} ${foundLang?.targetLabel || (foundLang as any)?.name || newLang}.`);
+                setStatus(`Target translation language set to ${foundLang?.flagEmoji || '🌐'} ${(foundLang as any)?.targetLabel || (foundLang as any)?.name || newLang}.`);
                 setTimeout(() => setStatus(null), 3000);
               }}
             >

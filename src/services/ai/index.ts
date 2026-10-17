@@ -282,10 +282,6 @@ export class AIService {
       };
     }
   }
-
-  static clearCache(): void {
-    this.cache.clear();
-  }
 }
 
 export * from './types';

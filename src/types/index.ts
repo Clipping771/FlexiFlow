@@ -59,12 +59,22 @@ export interface SyntacticClause {
   type: 'main' | 'subordinate' | 'relative' | 'participial' | 'conditional' | 'noun' | 'adverbial' | string;
   typeExplanation?: string;
   subjectAndVerb?: string;
+  subject?: string;
+  verb?: string;
   role: string;
   questionAnswered?: string;
   dependsOn?: string;
   standalone?: string | boolean;
+  canStandAlone?: boolean;
   example?: string;
+  examplePattern?: string;
   explanationBengali: string;
+}
+
+export interface SentenceStructureMapBranch {
+  clauseText: string;
+  relationType: string;
+  roleInSentence: string;
 }
 
 export interface SentenceStructureMapNode {
@@ -77,6 +87,8 @@ export interface SentenceStructureMapNode {
 
 export interface SentenceStructureMap {
   mainClause: string;
+  rootMainClause?: string;
+  branches?: SentenceStructureMapBranch[];
   nodes: SentenceStructureMapNode[];
 }
 
@@ -87,6 +99,7 @@ export interface GrammarRuleDetail {
   whyUsed: string;
   howItWorks: string;
   reusablePattern: string;
+  targetWords?: string;
   example: {
     english: string;
     easyEnglish: string;
@@ -99,9 +112,12 @@ export interface ConnectorRelationship {
   connector: string;
   meaning: string;
   grammaticalPattern: string;
+  pattern?: string;
   logicalRelationship: string;
+  logicalRelation?: string;
   whyAppropriate: string;
   contrastWithSimilar?: string;
+  contrastWith?: string;
 }
 
 export interface WordLevelGrammarDetail {
@@ -114,7 +130,9 @@ export interface WordLevelGrammarDetail {
 
 export interface MistakeAndAlternative {
   commonMistake?: string;
+  studentMisconception?: string;
   correctedExample?: string;
+  correctedSentence?: string;
   naturalAlternative: string;
   nuanceDifference?: string;
 }
@@ -122,9 +140,12 @@ export interface MistakeAndAlternative {
 export interface GrammarPractice {
   reusablePattern: string;
   practiceQuestion: string;
+  question?: string;
   options?: string[];
   answer: string;
+  correctAnswer?: string;
   explanation: string;
+  whyCorrect?: string;
 }
 
 export interface SentenceAnalysisResult extends BaseAIAnalysis {

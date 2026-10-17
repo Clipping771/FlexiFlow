@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HighlightIntelligenceService } from '../highlightIntelligence';
 import { MockAIProvider } from '../mockProvider';
 import { AIService } from '../index';
@@ -30,7 +30,8 @@ describe('Highlight Intelligence & Pedagogical Value Evaluation Suite', () => {
             contextSentence: 'The monetary policy committee decided to safeguard liquidity.',
             easyEnglish: 'Available cash',
             easyBengali: 'তারল্য',
-            reason: 'Crucial financial concept'
+            reason: 'Crucial financial concept',
+            difficulty: 'hard'
           },
           {
             id: 'hl_2',
@@ -39,7 +40,8 @@ describe('Highlight Intelligence & Pedagogical Value Evaluation Suite', () => {
             contextSentence: 'This sentence never existed in the source article at all.',
             easyEnglish: 'Fake meaning',
             easyBengali: 'ভুয়া অর্থ',
-            reason: 'Fabricated candidate'
+            reason: 'Fabricated candidate',
+            difficulty: 'medium'
           }
         ]
       };
@@ -66,7 +68,8 @@ describe('Highlight Intelligence & Pedagogical Value Evaluation Suite', () => {
             contextSentence: 'Wearing a beautiful piece...',
             easyEnglish: 'putting on clothes',
             easyBengali: 'পরিধান করা',
-            reason: 'Common verb'
+            reason: 'Common verb',
+            difficulty: 'easy'
           },
           {
             id: 'hl_t2',
@@ -75,7 +78,8 @@ describe('Highlight Intelligence & Pedagogical Value Evaluation Suite', () => {
             contextSentence: 'makes people discover new joy...',
             easyEnglish: 'find something',
             easyBengali: 'আবিষ্কার করা',
-            reason: 'Common verb'
+            reason: 'Common verb',
+            difficulty: 'easy'
           },
           {
             id: 'hl_t3',
@@ -84,7 +88,8 @@ describe('Highlight Intelligence & Pedagogical Value Evaluation Suite', () => {
             contextSentence: 'piece of jewelry...',
             easyEnglish: 'an item',
             easyBengali: 'টুকরো বা অংশ',
-            reason: 'Common noun'
+            reason: 'Common noun',
+            difficulty: 'easy'
           },
           {
             id: 'hl_t4',
@@ -93,7 +98,8 @@ describe('Highlight Intelligence & Pedagogical Value Evaluation Suite', () => {
             contextSentence: 'makes people discover...',
             easyEnglish: 'causes',
             easyBengali: 'তৈরি করে',
-            reason: 'Common verb'
+            reason: 'Common verb',
+            difficulty: 'easy'
           }
         ]
       };
@@ -117,7 +123,8 @@ describe('Highlight Intelligence & Pedagogical Value Evaluation Suite', () => {
             contextSentence: 'Contemporary design goes beyond nostalgic homage.',
             easyEnglish: 'Exceeds standard limits',
             easyBengali: 'সীমানা ছাড়িয়ে যায়',
-            reason: 'High-utility verb phrase'
+            reason: 'High-utility verb phrase',
+            difficulty: 'medium'
           },
           {
             id: 'hl_p2',
@@ -126,7 +133,8 @@ describe('Highlight Intelligence & Pedagogical Value Evaluation Suite', () => {
             contextSentence: 'Contemporary design goes beyond nostalgic homage.',
             easyEnglish: 'past something',
             easyBengali: 'ছাড়িয়ে',
-            reason: 'Isolated preposition'
+            reason: 'Isolated preposition',
+            difficulty: 'easy'
           },
           {
             id: 'hl_p3',
@@ -135,7 +143,8 @@ describe('Highlight Intelligence & Pedagogical Value Evaluation Suite', () => {
             contextSentence: 'reinventing traditional silhouettes.',
             easyEnglish: 'the contour or shape of garments',
             easyBengali: 'পোশাকের সামগ্রিক অবয়ব',
-            reason: 'Key fashion design vocabulary'
+            reason: 'Key fashion design vocabulary',
+            difficulty: 'hard'
           }
         ]
       };
@@ -291,6 +300,7 @@ describe('Highlight Intelligence & Pedagogical Value Evaluation Suite', () => {
             easyEnglish: 'Involving multiple nations',
             easyBengali: 'বহুপাক্ষিক',
             reason: 'Central diplomatic concept',
+            difficulty: 'hard',
             isArticleCore: true
           }
         ]
@@ -364,7 +374,8 @@ describe('Highlight Intelligence & Pedagogical Value Evaluation Suite', () => {
             contextSentence: 'This brings us to the concept of cognitive sovereignty which may become crucial.',
             easyEnglish: 'Related to mental processes and thinking',
             easyBengali: 'জ্ঞানীয় বা চিন্তা সম্পর্কিত',
-            reason: 'Academic term'
+            reason: 'Academic term',
+            difficulty: 'hard'
           },
           {
             id: 'hl_2',
@@ -373,7 +384,8 @@ describe('Highlight Intelligence & Pedagogical Value Evaluation Suite', () => {
             contextSentence: 'This brings us to the concept of cognitive sovereignty which may become crucial.',
             easyEnglish: 'Supreme power or autonomous authority',
             easyBengali: 'সার্বভৌমত্ব বা স্বায়ত্তশাসন',
-            reason: 'Political and conceptual term'
+            reason: 'Political and conceptual term',
+            difficulty: 'hard'
           }
         ]
       };

@@ -128,7 +128,8 @@ export class DOMHighlighter {
   highlightItems(
     items: HighlightVocabularyItem[],
     color: HighlightColor = 'yellow',
-    filters: HighlightFilters = { words: true, phrases: true, idioms: true }
+    filters: HighlightFilters = { words: true, phrases: true, idioms: true },
+    container?: HTMLElement
   ): number {
     this.clearHighlights();
     this.items = items;
@@ -146,7 +147,7 @@ export class DOMHighlighter {
     const sortedItems = [...items].sort((a, b) => b.text.length - a.text.length);
 
     // Identify readable candidate containers
-    const containers = this.findReadableContainers();
+    const containers = container ? [container] : this.findReadableContainers();
 
     for (const item of sortedItems) {
       this.highlightItemInContainers(item, containers);
@@ -280,12 +281,14 @@ export class DOMHighlighter {
         const target = e.currentTarget as HTMLElement;
         const rect = target.getBoundingClientRect();
         this.setActiveMark(target);
-        const eventObj = Object.assign({ item, targetElement: target, rect }, item);
+        const eventObj = Object.assign({ item, targetElement: target, rect, category: itemCat }, item);
         this.onHighlightClick?.(eventObj, rect);
       });
 
-      matchedNode.parentNode.replaceChild(mark, matchedNode);
-      this.highlightMarks.push(mark);
+      if (matchedNode.parentNode) {
+        matchedNode.parentNode.replaceChild(mark, matchedNode);
+        this.highlightMarks.push(mark);
+      }
     }
   }
 

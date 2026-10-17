@@ -14,25 +14,34 @@ describe('DOMHighlighter Safe Webpage Highlighting', () => {
 
   const sampleItems: HighlightVocabularyItem[] = [
     {
+      id: 'hl_test_1',
       text: 'scrutiny',
-      category: 'word',
+      type: 'word',
       easyEnglish: 'close and careful examination',
       easyBengali: 'পুঙ্খানুপুঙ্খ পরীক্ষা',
-      context: 'Under close scrutiny, the hypothesis failed.'
+      contextSentence: 'Under close scrutiny, the hypothesis failed.',
+      reason: 'Academic vocabulary',
+      difficulty: 'hard'
     },
     {
+      id: 'hl_test_2',
       text: 'look into',
-      category: 'phrase',
+      type: 'phrase',
       easyEnglish: 'investigate or check',
       easyBengali: 'তদন্ত করা বা খতিয়ে দেখা',
-      context: 'The committee will look into the matter.'
+      contextSentence: 'The committee will look into the matter.',
+      reason: 'Common phrasal verb',
+      difficulty: 'medium'
     },
     {
+      id: 'hl_test_3',
       text: 'break the ice',
-      category: 'idiom',
+      type: 'idiom',
       easyEnglish: 'make people feel relaxed',
       easyBengali: 'আড়ষ্টতা দূর করা',
-      context: 'He told a funny joke to break the ice.'
+      contextSentence: 'He told a funny joke to break the ice.',
+      reason: 'Popular idiom',
+      difficulty: 'medium'
     }
   ];
 

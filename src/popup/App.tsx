@@ -15,6 +15,7 @@ import { PopupView } from '../content/popupView';
 import { POPUP_STYLES } from '../content/styles';
 import { DictionaryService, dictionaryResultToStageA } from '../services/dictionary';
 import { AIService } from '../services/ai';
+import { SettingsService } from '../services/storage/settings';
 import { FSRSEngine } from '../services/fsrs/engine';
 import { getLanguageConfig } from '../config/languages';
 import { detectSelectionType } from '../content/selection';

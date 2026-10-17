@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OllamaProvider } from '../ollamaProvider';
+import { WordAnalysisResult } from '../../../types';
 
 describe('OllamaProvider error handling & safeParseJSON integration', () => {
   const originalFetch = global.fetch;
@@ -90,7 +91,7 @@ describe('OllamaProvider error handling & safeParseJSON integration', () => {
     } as any);
 
     const provider = new OllamaProvider('http://localhost:11434', 'gemma4:31b-cloud');
-    const result = await provider.analyze('resilient', 'word', 'They remained resilient during challenging times.');
+    const result = (await provider.analyze('resilient', 'word', 'They remained resilient during challenging times.')) as WordAnalysisResult;
 
     expect(result.selectedText).toBe('resilient');
     expect(result.selectionType).toBe('word');
@@ -132,7 +133,7 @@ describe('OllamaProvider error handling & safeParseJSON integration', () => {
     });
 
     const provider = new OllamaProvider('http://localhost:11434', 'd1:latest');
-    const result = await provider.analyze('resilient', 'word', 'They remained resilient.');
+    const result = (await provider.analyze('resilient', 'word', 'They remained resilient.')) as WordAnalysisResult;
 
     expect(result.selectedText).toBe('resilient');
     expect(result.contextualMeaning).toBe('Able to withstand shock.');
