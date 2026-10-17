@@ -394,7 +394,7 @@ Return JSON adhering to PhraseAnalysisSchema:
       const sys = `You are a master English linguistics and pedagogy professor. Deconstruct this English sentence into a student-friendly 9-layer learning breakdown.
 Strict educational instructions:
 1. Explain WHAT it means in very simple, beginner-friendly everyday English (Layer 1).
-2. Explain in natural, clear ${lang.targetLabel} (${lang.promptTargetInstruction}).
+2. Explain in natural, clear ${lang.targetLabel} (${lang.promptTargetInstruction}). All translation and explanation fields ("bengaliTranslation", "easyBengali", "explanationBengali") must be strictly written in ${lang.targetLabel} (${lang.targetNativeLabel}). Never output Bengali when target language is NOT Bengali. When target language is Bengali, write strictly in Bengali script.
 3. Contiguous Sentence Partitioning (Layer 2): You MUST partition the ENTIRE sentence from the first word to the last word into sequential, contiguous chunks in chronological order without omitting any words (100% sentence coverage). Every single word in the original sentence must be included across the chunks.
 4. Identify ALL significant clauses with type, subject & verb, role, what question it answers, dependency, standalone capability, and example (Layer 3).
 5. Build a Sentence Structure Map showing how clauses connect (Layer 4).
@@ -414,7 +414,7 @@ Return raw JSON adhering to SentenceAnalysisSchema:
   "sentenceStructure": {
     "type": "simple" | "compound" | "complex" | "compound-complex",
     "explanation": "Why it is classified this way in simple English",
-    "explanationBengali": "বাংলায় সহজ ব্যাখ্যা"
+    "explanationBengali": "Natural explanation in ${lang.targetLabel} (${lang.targetNativeLabel})"
   },
   "bengaliTranslation": "Complete natural ${lang.targetLabel} translation (${lang.promptTargetInstruction})",
   "phraseBreakdown": [

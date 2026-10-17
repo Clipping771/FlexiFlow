@@ -976,6 +976,13 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     // 5. Honest AI loading indicator is present with NO fabricated phrase breakdown
     expect(el.textContent).toContain('Analyzing phrase breakdown & Bengali translation with AI...');
     expect(el.textContent).toContain('No fabricated offline breakdown');
+
+    // 6. Switching targetLanguage updates the loading indicator and connector flag dynamically
+    popup.setTargetLanguage('zh');
+    popup.showLoading(testSentence, 'sentence');
+    const zhEl = popup.getElement();
+    expect(zhEl.textContent).toContain('Analyzing phrase breakdown & Chinese translation with AI...');
+    expect(zhEl.innerHTML).toContain('🇨🇳');
   });
 
   // 22. Sentence Quick Mode offline & unavailable handling

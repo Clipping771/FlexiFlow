@@ -298,7 +298,7 @@ export class MockAIProvider implements AIProvider {
           phrases.push({
             phrase: chunk1,
             easyEnglish: `What "${chunk1}" means simply: ${this.explainChunkEnglish(chunk1)}.`,
-            easyBengali: this.explainChunkBengali(chunk1),
+            easyBengali: this.explainChunkTargetLang(chunk1),
             grammaticalFunction: gmFunc,
             connection,
             whyItMatters,
@@ -309,7 +309,7 @@ export class MockAIProvider implements AIProvider {
           phrases.push({
             phrase: chunk2,
             easyEnglish: `What "${chunk2}" means simply: ${this.explainChunkEnglish(chunk2)}.`,
-            easyBengali: this.explainChunkBengali(chunk2),
+            easyBengali: this.explainChunkTargetLang(chunk2),
             grammaticalFunction: 'Complementary modifier',
             connection: 'Completes the clause idea',
             whyItMatters,
@@ -320,7 +320,7 @@ export class MockAIProvider implements AIProvider {
         phrases.push({
           phrase: part,
           easyEnglish: `What "${part}" means simply: ${this.explainChunkEnglish(part)}.`,
-          easyBengali: this.explainChunkBengali(part),
+          easyBengali: this.explainChunkTargetLang(part),
           grammaticalFunction: gmFunc,
           connection,
           whyItMatters,
@@ -366,8 +366,36 @@ export class MockAIProvider implements AIProvider {
     return 'Expresses a meaningful action or condition in this context';
   }
 
-  private explainChunkBengali(chunk: string): string {
+  private explainChunkTargetLang(chunk: string): string {
     const lower = chunk.toLowerCase();
+    if (this.targetLang === 'zh') {
+      if (lower.includes('although') || lower.includes('even though')) {
+        return '尽管当时面临此类状况或背景';
+      }
+      if (lower.includes('inflation')) {
+        return '涉及物价上涨或通胀压力方面的陈述';
+      }
+      if (lower.includes('central bank') || lower.includes('maintained')) {
+        return '中央银行维持既定政策与基准利率稳定不变';
+      }
+      if (lower.includes('in recent months')) {
+        return '在近几个月的时间跨度内';
+      }
+      if (lower.includes('scrutiny')) {
+        return '处于严格审查与重点监控之下';
+      }
+      if (lower.includes('emerging technologies')) {
+        return '新兴前沿科技与数字化系统';
+      }
+      if (lower.includes('critical infrastructure')) {
+        return '国家关键基础设施与公共支撑体系';
+      }
+      return '传达本句中关键的情境信息与核心意图。';
+    }
+    if (this.targetLang !== 'bn') {
+      const lang = getLanguageConfig(this.targetLang);
+      return `${lang.targetLabel}: Meaning of "${chunk.trim()}".`;
+    }
     if (lower.includes('although') || lower.includes('even though')) {
       return 'যদিও পরিস্থিতি বা অবস্থা এমন ছিল';
     }
@@ -680,9 +708,15 @@ export class MockAIProvider implements AIProvider {
       sentenceStructure: {
         type: structureType,
         explanation: structureExplEng,
-        explanationBengali: structureExplBn
+        explanationBengali: this.targetLang === 'zh'
+          ? (structureType === 'compound-complex' ? '复合复杂句：包含两个或多个独立分句及至少一个从属分句。' : (structureType === 'complex' ? '复合句：包含一个主句及一个或多个从属从句。' : (structureType === 'compound' ? '并列句：包含通过并列连词连接的两个独立分句。' : '简单句：包含一个单一的独立主谓分句。')))
+          : (this.targetLang === 'bn' ? structureExplBn : `${getLanguageConfig(this.targetLang).targetLabel}: ${structureExplEng}`)
       },
-      bengaliTranslation: `বাক্যটির মূল অর্থ: বিদ্যমান ঝুঁকি বা প্রতিকূল পরিস্থিতি সত্ত্বেও মূল লক্ষ্য এবং কার্যকারিতা সফলভাবে বজায় রাখা হয়েছে।`,
+      bengaliTranslation: this.targetLang === 'zh'
+        ? '句子主旨：尽管面临潜在挑战与不确定性，核心原则与应对措施仍得到了有效落实。'
+        : (this.targetLang === 'bn'
+          ? 'বাক্যটির মূল অর্থ: বিদ্যমান ঝুঁকি বা প্রতিকূল পরিস্থিতি সত্ত্বেও মূল লক্ষ্য এবং কার্যকারিতা সফলভাবে বজায় রাখা হয়েছে।'
+          : `${getLanguageConfig(this.targetLang).targetLabel}: Even with notable obstacles, core objectives and quality were preserved.`),
       phraseBreakdown,
       clauses,
       structureMap,
@@ -699,7 +733,7 @@ export class MockAIProvider implements AIProvider {
         {
           word: words.find(w => w.length > 7) || 'disruptions',
           meaningInContext: 'Disturbances or interruptions to an established process',
-          bengali: 'বিঘ্ন বা প্রতিবন্ধকতা'
+          bengali: this.targetLang === 'zh' ? '干扰与阻碍' : (this.targetLang === 'bn' ? 'বিঘ্ন বা প্রতিবন্ধকতা' : 'disruptions')
         }
       ],
       toneAndRegister: 'Formal / Professional English'
@@ -716,16 +750,20 @@ export class MockAIProvider implements AIProvider {
       selectionType: 'paragraph',
       mainIdea: `The passage evaluates strategic systemic governance, balancing technological advancement with regulatory risk mitigation.`,
       conciseSummary: `The text underscores how modern institutions navigate emerging disruptions through proactive compliance and data stewardship.`,
-      bengaliTranslation: `অনুচ্ছেদটির সারসংক্ষেপ: উদীয়মান প্রযুক্তি ও অর্থনৈতিক প্রেক্ষাপটে অপ্রত্যাশিত ঝুঁকি মোকাবিলার জন্য নিয়ন্ত্রক সংস্থা ও বহুজাতিক প্রতিষ্ঠানগুলোর ঐক্যবদ্ধ পদক্ষেপের গুরুত্ব তুলে ধরা হয়েছে।`,
+      bengaliTranslation: this.targetLang === 'zh'
+        ? '段落概要：在快速演进的技术与经济背景下，文章阐述了平衡技术突破与合规风控的关键举措，强调健全治理的深远意义。'
+        : (this.targetLang === 'bn'
+          ? 'অনুচ্ছেদটির সারসংক্ষেপ: উদীয়মান প্রযুক্তি ও অর্থনৈতিক প্রেক্ষাপটে অপ্রত্যাশিত ঝুঁকি মোকাবিলার জন্য নিয়ন্ত্রক সংস্থা ও বহুজাতিক প্রতিষ্ঠানগুলোর ঐক্যবদ্ধ পদক্ষেপের গুরুত্ব তুলে ধরা হয়েছে।'
+          : `${getLanguageConfig(this.targetLang).targetLabel}: The passage evaluates systemic governance, balancing technological advancement with regulatory risk mitigation.`),
       phraseBreakdown,
       sentenceBreakdown: [
         `Sentences 1-2: Contextualize regulatory challenges and scrutiny.`,
         `Sentences 3-4: Propose institutional safeguards and long-term compliance.`
       ],
       keyVocabulary: [
-        { term: 'scrutiny', meaning: 'Rigorous examination', bengali: 'তীক্ষ্ণ নজরদারি' },
-        { term: 'mitigate', meaning: 'Lessen severity', bengali: 'উপশম করা' },
-        { term: 'sovereignty', meaning: 'Autonomous jurisdiction', bengali: 'সার্বভৌমত্ব' }
+        { term: 'scrutiny', meaning: 'Rigorous examination', bengali: this.targetLang === 'zh' ? '严格审查' : (this.targetLang === 'bn' ? 'তীক্ষ্ণ নজরদারি' : 'scrutiny') },
+        { term: 'mitigate', meaning: 'Lessen severity', bengali: this.targetLang === 'zh' ? '缓解减轻' : (this.targetLang === 'bn' ? 'উপশম করা' : 'mitigate') },
+        { term: 'sovereignty', meaning: 'Autonomous jurisdiction', bengali: this.targetLang === 'zh' ? '主权管辖' : (this.targetLang === 'bn' ? 'সার্বভৌমত্ব' : 'sovereignty') }
       ],
       argumentStructure: 'Problem Formulation → Proposed Solution → Strategic Implication',
       toneAndRegister: 'Analytical / Policy Journalism'

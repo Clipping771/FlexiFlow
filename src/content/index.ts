@@ -718,19 +718,22 @@ class ContentScriptManager {
 
     // 1. Instant Fast-Path: Dictionary-First Local Lookup (< 1ms)
     const isWordOrPhrase = selectionType === 'word' || selectionType === 'phrase';
+    const currentTargetLang = this.userSettings.targetLanguage || 'bn';
+    const isBengali = currentTargetLang === 'bn';
+    const langPair = `en-${currentTargetLang}`;
     let hasLocalDisplay = false;
 
     if (isWordOrPhrase) {
       // Step A: Check memory cache for existing contextual AI result
-      const aiCacheKey = CacheManager.getInstance().getAIKey(text, contextSentence);
+      const aiCacheKey = CacheManager.getInstance().getAIKey(text, contextSentence, langPair);
       const cachedAI = (CacheManager.getInstance() as any).memoryCache?.get(aiCacheKey) as StageAExplanation | null;
 
       if (cachedAI) {
         this.popupView.showStageA(cachedAI, contextSentence, nearbyParagraph, false);
         this.updatePosition(true);
         hasLocalDisplay = true;
-      } else {
-        // Step B: Synchronous local dictionary search (< 0.01ms)
+      } else if (isBengali) {
+        // Step B: Synchronous local dictionary search (< 0.01ms) - only for Bengali as local dictionary is English-Bengali
         const dictHit = DictionaryService.lookupSync(text, contextSentence);
         if (dictHit) {
           const localStageA = dictionaryResultToStageA(dictHit, contextSentence);
@@ -769,7 +772,7 @@ class ContentScriptManager {
         }
 
         // Cache the successful AI explanation
-        CacheManager.getInstance().setAIExplanation(text, contextSentence, stageAResult);
+        CacheManager.getInstance().setAIExplanation(text, contextSentence, stageAResult, langPair);
 
         const savedItem = await this.sendMessage<VocabularyItem>('GET_VOCAB_BY_WORD', { word: text });
         if (requestId !== this.currentRequestId || abortSignal.aborted) return;

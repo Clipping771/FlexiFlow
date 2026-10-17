@@ -600,6 +600,12 @@ export class PopupView {
     if (isSentence) {
       const connectors = findDiscourseConnectors(clean);
       const isLongSentence = clean.length > 130;
+      const langConfig = getLanguageConfig(this.targetLanguage);
+      const targetLabel = langConfig?.targetLabel || 'Bengali';
+      const flag = langConfig?.flagEmoji || '🇧🇩';
+      const connectorRoleText = langConfig?.targetLang === 'bn'
+        ? connectors[0]?.defaultBengaliRole
+        : connectors[0]?.discourseRole;
 
       this.element.innerHTML = `
         <div class="lf-header">
@@ -641,7 +647,7 @@ export class PopupView {
                 <div style="font-size: 12px; color: var(--text-main, #1d1d1f); line-height: 1.4;">
                   ${escapeHtml(connectors[0].discourseRole)}
                   <div style="font-size: 11px; color: var(--text-muted, #6e6e73); margin-top: 2px;">
-                    🇧🇩 ${escapeHtml(connectors[0].defaultBengaliRole)}
+                    ${flag} ${escapeHtml(connectorRoleText || '')}
                   </div>
                 </div>
               </div>
@@ -653,7 +659,7 @@ export class PopupView {
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
               <div class="lf-skeleton-pulse-dot"></div>
               <span style="font-size: 12.5px; font-weight: 600; color: #0071e3;">
-                Analyzing phrase breakdown & Bengali translation with AI...
+                Analyzing phrase breakdown & ${escapeHtml(targetLabel)} translation with AI...
               </span>
             </div>
             <div style="font-size: 11px; color: var(--text-muted, #86868b); line-height: 1.4;">
@@ -837,7 +843,7 @@ export class PopupView {
                 <div style="font-size: 12px; color: var(--text-main, #1d1d1f); line-height: 1.4;">
                   ${escapeHtml(connectors[0].discourseRole)}
                   <div style="font-size: 11px; color: var(--text-muted, #6e6e73); margin-top: 2px;">
-                    🇧🇩 ${escapeHtml(connectors[0].defaultBengaliRole)}
+                    ${getLanguageConfig(this.targetLanguage)?.flagEmoji || '🇧🇩'} ${escapeHtml(getLanguageConfig(this.targetLanguage)?.targetLang === 'bn' ? connectors[0].defaultBengaliRole : connectors[0].discourseRole)}
                   </div>
                 </div>
               </div>
@@ -846,7 +852,7 @@ export class PopupView {
 
           <div style="margin-top: 10px; padding: 12px 14px; background: rgba(239, 68, 68, 0.06); border-left: 3px solid #ef4444; border-radius: 8px;">
             <div style="font-size: 13px; font-weight: 700; color: #ef4444; margin-bottom: 4px;">
-              AI Interpretation Unavailable / AI বিশ্লেষণ অনুপলব্ধ
+              AI Interpretation Unavailable / ${escapeHtml(getLanguageConfig(this.targetLanguage)?.targetLang === 'bn' ? 'AI বিশ্লেষণ অনুপলব্ধ' : `${getLanguageConfig(this.targetLanguage)?.targetLabel || 'AI'} Offline`)}
             </div>
             <div style="font-size: 12px; color: var(--text-main, #1d1d1f); margin-bottom: 6px; line-height: 1.45;">
               ${escapeHtml(errorMessage || 'AI provider unavailable or offline.')}
@@ -2276,12 +2282,23 @@ export class PopupView {
     const isWord = targetMode === 'word';
     const displayFocus = focusText ? (focusText.length > 32 ? focusText.slice(0, 29) + '...' : focusText) : '';
 
+    const langConfig = getLanguageConfig(this.targetLanguage);
+    const targetFlag = langConfig?.flagEmoji || '🇧🇩';
+    const targetLabel = langConfig?.targetLabel || 'Bengali';
+    const nativeLabel = langConfig?.targetNativeLabel || 'বাংলা';
+
     const wordChips = [
       { emoji: '💡', label: "Explain like I'm 5", prompt: "Explain this word in super simple terms like I'm 5 years old" },
       { emoji: '🔍', label: "Nuance vs Synonyms", prompt: "What is the subtle difference between this word and its common synonyms?" },
       { emoji: '🗣️', label: "Native Daily Usage", prompt: "How do native English speakers naturally use this in everyday conversation?" },
-      { emoji: '✍️', label: "2 Real Examples", prompt: "Give me 2 practical, everyday example sentences with Bengali translation" },
-      { emoji: '🇧🇩', label: "সহজ বাংলায় বিশদ", prompt: "এই শব্দের সূক্ষ্ম অর্থ ও ব্যবহার সহজ বাংলায় বিস্তারিত বুঝিয়ে দাও" },
+      { emoji: '✍️', label: "2 Real Examples", prompt: `Give me 2 practical, everyday example sentences with ${targetLabel} translation` },
+      {
+        emoji: targetFlag,
+        label: langConfig?.targetLang === 'bn' ? "সহজ বাংলায় বিশদ" : `${nativeLabel} Detail`,
+        prompt: langConfig?.targetLang === 'bn'
+          ? "এই শব্দের সূক্ষ্ম অর্থ ও ব্যবহার সহজ বাংলায় বিস্তারিত বুঝিয়ে দাও"
+          : `Explain the subtle nuance and usage of this word clearly in ${targetLabel} (${nativeLabel})`
+      },
       { emoji: '⚠️', label: "Common Pitfalls", prompt: "What are the most common mistakes learners make with this word?" }
     ];
 
@@ -2289,7 +2306,13 @@ export class PopupView {
       { emoji: '💡', label: "Explain simply", prompt: "Break down the core message in super easy everyday English" },
       { emoji: '🧩', label: "Grammar & Tone", prompt: "Explain the grammatical structure and rhetorical tone used here" },
       { emoji: '🗣️', label: "Conversational Rewrite", prompt: "How would a native speaker rephrase this in casual speech or friendly email?" },
-      { emoji: '🇧🇩', label: "সহজ বাংলা ভাবার্থ", prompt: "এই বক্তব্যটির অন্তর্নিহিত ভাব ও তাৎপর্য সহজ বাংলায় বুঝিয়ে দাও" },
+      {
+        emoji: targetFlag,
+        label: langConfig?.targetLang === 'bn' ? "সহজ বাংলা ভাবার্থ" : `${nativeLabel} Meaning`,
+        prompt: langConfig?.targetLang === 'bn'
+          ? "এই বক্তব্যটির অন্তর্নিহিত ভাব ও তাৎপর্য সহজ বাংলায় বুঝিয়ে দাও"
+          : `Explain the underlying nuance and message of this statement clearly in ${targetLabel} (${nativeLabel})`
+      },
       { emoji: '✍️', label: "Practice Variation", prompt: "Give me a similar sentence with this same structure to practice with" },
       { emoji: '❓', label: "Why this phrasing?", prompt: "Why did the author use this specific phrasing instead of simpler words?" }
     ];
@@ -2602,10 +2625,10 @@ export class PopupView {
               ${this.formatClaudeMessage(f.answer)}
             </div>
 
-            <!-- Warm Bengali Insight Card -->
+            <!-- Warm Target Language Insight Card -->
             ${f.bengaliSummary ? `
               <div class="lf-qa-bengali-card">
-                <div class="lf-qa-bengali-label">🇧🇩 সহজ বাংলা সারসংক্ষেপ:</div>
+                <div class="lf-qa-bengali-label">${getLanguageConfig(this.targetLanguage)?.flagEmoji || '🇧🇩'} ${escapeHtml(getLanguageConfig(this.targetLanguage)?.targetLang === 'bn' ? 'সহজ বাংলা সারসংক্ষেপ:' : `${getLanguageConfig(this.targetLanguage)?.targetNativeHeader || 'Summary'}:`)}</div>
                 <div class="lf-qa-bengali-text">${escapeHtml(f.bengaliSummary)}</div>
               </div>
             ` : ''}
@@ -2876,7 +2899,7 @@ export class PopupView {
 
         <div class="lf-bengali-box" style="margin-bottom: 8px; padding: 10px 12px; border-radius: 8px;">
           <div class="lf-bengali-box-header" style="font-size: var(--lf-font-sublabel, 12px); text-transform: uppercase; font-weight: 700; margin-bottom: 3px;">
-            🇧🇩 সম্পূর্ণ বাংলা অর্থ (Full Bengali):
+            ${getLanguageConfig(this.targetLanguage)?.targetLang === 'bn' ? '🇧🇩 সম্পূর্ণ বাংলা অর্থ (Full Bengali):' : `${getLanguageConfig(this.targetLanguage)?.flagEmoji || '🌐'} ${escapeHtml(getLanguageConfig(this.targetLanguage)?.targetNativeHeader || 'Translation')} (${escapeHtml(getLanguageConfig(this.targetLanguage)?.targetLabel || 'Target')}):`}
           </div>
           <div class="lf-easy-bengali-text" style="font-size: var(--lf-font-bengali, 18.5px); font-weight: 600; line-height: 1.45;">
             ${escapeHtml(a.bengaliTranslation)}
