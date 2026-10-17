@@ -19,6 +19,7 @@ import {
 import { getLanguageConfig } from '../config/languages';
 import { clampPositionToViewport } from './positioning';
 import { playPronunciation } from '../services/audio/voiceService';
+import { getValidatedWhyThisMatters } from '../services/connectors/matcher';
 
 export interface PopupCallbacks {
   onClose: () => void;
@@ -1042,6 +1043,7 @@ export class PopupView {
     }
 
     const bCount = this.currentStageB?.senses?.length;
+    const whyMatters = getValidatedWhyThisMatters(this.currentContextSentence || a.selectedText, a.whyItMatters);
 
     this.element.innerHTML = `
       <div class="lf-header">
@@ -1112,6 +1114,23 @@ export class PopupView {
               ${escapeHtml(a.contextMeaning)}
             </div>
           </div>
+
+          <!-- 3.5 Why This Matters (Discourse Connector Analysis) -->
+          ${whyMatters ? `
+            <div class="lf-why-matters-box" style="margin-bottom: 10px; padding: 10px 12px; background: rgba(147, 51, 234, 0.08); border-left: 3px solid #9333ea; border-radius: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #9333ea; display: flex; align-items: center; gap: 4px;">
+                  💡 Why This Matters (${escapeHtml(whyMatters.connector.categoryLabel)}):
+                </span>
+                <button type="button" class="lf-looks-wrong-btn" title="Report inaccurate connector or why it matters analysis" style="background: none; border: none; font-size: 10.5px; color: var(--text-muted, #6e6e73); cursor: pointer; text-decoration: underline;">
+                  Looks wrong?
+                </button>
+              </div>
+              <div style="font-size: 12.5px; color: var(--lf-text, #1d1d1f); line-height: 1.45;">
+                <strong style="color: #9333ea;">"${escapeHtml(whyMatters.connector.text)}"</strong>: ${escapeHtml(whyMatters.explanation)}
+              </div>
+            </div>
+          ` : ''}
 
           <!-- 4. Natural Example -->
           <div class="lf-example-box" style="margin-bottom: 8px; padding-left: 8px; border-left: 2px solid rgba(0, 113, 227, 0.4); font-size: var(--lf-font-example, 14px); font-style: italic; display: ${a.example ? 'block' : 'none'};">
@@ -1270,6 +1289,10 @@ export class PopupView {
       s.clauses,
       s.bengaliTranslation
     );
+    const sentenceWhyMatters = getValidatedWhyThisMatters(
+      s.selectedText,
+      s.clauses?.find((c) => Boolean(c.whyItMatters))?.whyItMatters || (s as any).whyItMatters
+    );
 
     this.element.innerHTML = `
       <div class="lf-header">
@@ -1325,6 +1348,23 @@ export class PopupView {
 
           <!-- B. Phrase-by-Phrase Explanation -->
           ${this.renderPhraseBreakdownHtml(phrases)}
+
+          <!-- Why This Matters for Sentence -->
+          ${sentenceWhyMatters ? `
+            <div class="lf-why-matters-box" style="margin-bottom: 12px; padding: 10px 12px; background: rgba(147, 51, 234, 0.08); border-left: 3px solid #9333ea; border-radius: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #9333ea; display: flex; align-items: center; gap: 4px;">
+                  💡 Why This Matters (${escapeHtml(sentenceWhyMatters.connector.categoryLabel)}):
+                </span>
+                <button type="button" class="lf-looks-wrong-btn" title="Report inaccurate connector or why it matters analysis" style="background: none; border: none; font-size: 10.5px; color: var(--text-muted, #6e6e73); cursor: pointer; text-decoration: underline;">
+                  Looks wrong?
+                </button>
+              </div>
+              <div style="font-size: 12.5px; color: var(--lf-text, #1d1d1f); line-height: 1.45;">
+                <strong style="color: #9333ea;">"${escapeHtml(sentenceWhyMatters.connector.text)}"</strong>: ${escapeHtml(sentenceWhyMatters.explanation)}
+              </div>
+            </div>
+          ` : ''}
 
           <!-- C. Full Target Language -->
           <div class="lf-bengali-box" style="margin-bottom: 12px; padding: 10px 12px; border-radius: 8px;">
@@ -2852,6 +2892,13 @@ export class PopupView {
       await this.loadStageB();
     });
 
+    el.querySelector('.lf-looks-wrong-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showFeedbackModal = true;
+      this.render({ preserveScroll: true });
+    });
+
     el.querySelector('.lf-report-trigger-btn')?.addEventListener('click', () => {
       this.showFeedbackModal = !this.showFeedbackModal;
       this.feedbackSuccess = false;
@@ -3019,6 +3066,13 @@ export class PopupView {
         this.isSentenceAnalysisExpanded = true;
         this.render();
       }
+    });
+
+    el.querySelector('.lf-looks-wrong-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showFeedbackModal = true;
+      this.render({ preserveScroll: true });
     });
 
     el.querySelector('.lf-report-trigger-btn')?.addEventListener('click', () => {

@@ -69,6 +69,7 @@ export interface SyntacticClause {
   example?: string;
   examplePattern?: string;
   explanationBengali: string;
+  whyItMatters?: string;
 }
 
 export interface SentenceStructureMapBranch {
@@ -212,6 +213,8 @@ export interface StageAExplanation {
   transitivityOrPattern?: string;
   wordForms?: string[];
   literalVsFigurative?: string;
+  whyItMatters?: string;
+  discourseRole?: string;
 }
 
 export interface SenseSynonym {
