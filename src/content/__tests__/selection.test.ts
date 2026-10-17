@@ -85,6 +85,61 @@ describe('Selection & Editable Element Detection', () => {
     sel.removeAllRanges();
   });
 
+  it('allows getSelectionData on text inside HTML textarea and inputs when user selects text', () => {
+    const textarea = document.createElement('textarea');
+    textarea.value = 'Explain the profound implications of artificial intelligence in education.';
+    document.body.appendChild(textarea);
+    textarea.focus();
+
+    // Select "profound implications" (chars 12 to 33)
+    textarea.setSelectionRange(12, 33);
+
+    const data = getSelectionData();
+    expect(data).not.toBeNull();
+    expect(data?.cleanText).toBe('profound implications');
+    expect(data?.selectionType).toBe('phrase');
+
+    document.body.removeChild(textarea);
+  });
+
+  it('allows getSelectionData inside ShadowRoot components (Google Gemini scenario)', () => {
+    const hostEl = document.createElement('div');
+    hostEl.id = 'gemini-response-host';
+    document.body.appendChild(hostEl);
+
+    const shadowRoot = hostEl.attachShadow({ mode: 'open' });
+    const messageP = document.createElement('p');
+    messageP.textContent = 'Notwithstanding these initial obstacles, the experiment succeeded.';
+    shadowRoot.appendChild(messageP);
+
+    // Mock shadowRoot.getSelection
+    const textNode = messageP.firstChild!;
+    const mockRange = {
+      startContainer: textNode,
+      endContainer: textNode,
+      startOffset: 0,
+      endOffset: 15, // "Notwithstanding"
+      getBoundingClientRect: () => ({ top: 50, bottom: 70, left: 10, right: 120, width: 110, height: 20 }),
+      getClientRects: () => []
+    } as unknown as Range;
+
+    const mockSelection = {
+      isCollapsed: false,
+      rangeCount: 1,
+      toString: () => 'Notwithstanding',
+      getRangeAt: () => mockRange
+    } as unknown as Selection;
+
+    (shadowRoot as any).getSelection = () => mockSelection;
+
+    const data = getSelectionData(messageP);
+    expect(data).not.toBeNull();
+    expect(data?.cleanText).toBe('Notwithstanding');
+    expect(data?.selectionType).toBe('word');
+
+    document.body.removeChild(hostEl);
+  });
+
   describe('detectSelectionType', () => {
     it('accurately detects single words', () => {
       expect(detectSelectionType('scrutiny')).toBe('word');

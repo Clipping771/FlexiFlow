@@ -189,24 +189,108 @@ export function extractSurroundingContext(range: Range): { sentence: string; par
   return { sentence, paragraph };
 }
 
-export function getSelectionData(): SelectionData | null {
-  const selection = window.getSelection();
-  if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+export function getInputElementSelection(): SelectionData | null {
+  try {
+    const activeEl = document.activeElement;
+    if (!activeEl) return null;
+    const isInput = activeEl instanceof HTMLInputElement && /^(?:text|search|url|tel|password)$/i.test(activeEl.type);
+    const isTextArea = activeEl instanceof HTMLTextAreaElement;
+    if (!isInput && !isTextArea) return null;
+
+    const inputEl = activeEl as HTMLInputElement | HTMLTextAreaElement;
+    const start = inputEl.selectionStart;
+    const end = inputEl.selectionEnd;
+    if (start === null || end === null || start === end) return null;
+
+    const rawText = inputEl.value.slice(Math.min(start, end), Math.max(start, end));
+    const text = rawText.trim();
+    if (!text) return null;
+
+    const cleanText = text.replace(/^["'“”‘`([{]+|[)"'“”’`\]}.,;:!?]+$/g, '').trim();
+    if (!cleanText) return null;
+
+    let rect = typeof inputEl.getBoundingClientRect === 'function' ? inputEl.getBoundingClientRect() : null;
+    if (!rect || (rect.width === 0 && rect.height === 0)) {
+      rect = {
+        top: 100,
+        bottom: 120,
+        left: 100,
+        right: 200,
+        width: 100,
+        height: 20
+      } as DOMRect;
+    }
+
+    const selectionType = detectSelectionType(cleanText);
+
+    return {
+      text,
+      cleanText,
+      selectionType,
+      contextSentence: cleanText,
+      nearbyParagraph: inputEl.value.slice(0, 500),
+      rect
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function getDeepSelection(target?: EventTarget | null): { selection: Selection | null; range: Range | null } {
+  try {
+    // 1. If target is inside a ShadowRoot (e.g. Google Gemini Web Components), get selection from that ShadowRoot
+    if (target && typeof (target as any).getRootNode === 'function') {
+      const rootNode = (target as any).getRootNode();
+      if (rootNode && rootNode !== document && typeof (rootNode as any).getSelection === 'function') {
+        const shadowSel = (rootNode as any).getSelection() as Selection | null;
+        if (shadowSel && !shadowSel.isCollapsed && shadowSel.toString().trim()) {
+          const range = shadowSel.rangeCount > 0 ? shadowSel.getRangeAt(0) : null;
+          return { selection: shadowSel, range };
+        }
+      }
+    }
+
+    // 2. Check activeElement shadow root chain
+    let active: Element | null = document.activeElement;
+    while (active && active.shadowRoot) {
+      if (typeof (active.shadowRoot as any).getSelection === 'function') {
+        const shadowSel = (active.shadowRoot as any).getSelection() as Selection | null;
+        if (shadowSel && !shadowSel.isCollapsed && shadowSel.toString().trim()) {
+          const range = shadowSel.rangeCount > 0 ? shadowSel.getRangeAt(0) : null;
+          return { selection: shadowSel, range };
+        }
+      }
+      active = active.shadowRoot.activeElement;
+    }
+
+    // 3. Fallback to standard window selection
+    const winSel = window.getSelection();
+    const range = winSel && winSel.rangeCount > 0 ? winSel.getRangeAt(0) : null;
+    return { selection: winSel, range };
+  } catch {
+    const winSel = window.getSelection();
+    const range = winSel && winSel.rangeCount > 0 ? winSel.getRangeAt(0) : null;
+    return { selection: winSel, range };
+  }
+}
+
+export function getSelectionData(target?: EventTarget | null): SelectionData | null {
+  // 1. First check if selection is inside an active HTML input or textarea
+  const inputData = getInputElementSelection();
+  if (inputData) {
+    return inputData;
+  }
+
+  // 2. Check deep selection (including ShadowRoot in web components like Gemini)
+  const { selection, range } = getDeepSelection(target);
+  if (!selection || selection.isCollapsed || !range) {
     return null;
   }
 
-  const range = selection.getRangeAt(0);
   const text = selection.toString().trim();
   if (!text) return null;
 
-  // Ensure selection is not inside editable element or extension-owned UI
-  if (
-    isEditableElement(range.startContainer.parentElement) ||
-    isEditableElement(range.endContainer.parentElement)
-  ) {
-    return null;
-  }
-
+  // Ensure selection is not inside extension-owned UI
   const host = document.getElementById('lexiflow-host');
   if (host && (host.contains(range.startContainer) || host.contains(range.endContainer))) {
     return null;
@@ -222,7 +306,9 @@ export function getSelectionData(): SelectionData | null {
     if (clientRects.length > 0) {
       rect = clientRects[0];
     } else {
-      const parent = range.startContainer.parentElement;
+      const parent = range.startContainer.nodeType === Node.ELEMENT_NODE
+        ? (range.startContainer as Element)
+        : range.startContainer.parentElement;
       if (parent && typeof parent.getBoundingClientRect === 'function') {
         rect = parent.getBoundingClientRect();
       }

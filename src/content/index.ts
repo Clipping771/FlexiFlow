@@ -51,6 +51,7 @@ class ContentScriptManager {
   private isPopupPositioned: boolean = false;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private lastErrorMessage: string | null = null;
+  private lastPointerTarget: EventTarget | null = null;
 
   private userSettings: UserSettings = DEFAULT_SETTINGS;
 
@@ -301,9 +302,10 @@ class ContentScriptManager {
   }
 
   private setupEventListeners(): void {
-    // 1. Mouse Down Handler (Track dragging state & outside clicks)
-    document.addEventListener('mousedown', (e) => {
+    // 1. Mouse & Pointer Down Handler (Track dragging state & outside clicks)
+    const onPointerDown = (e: MouseEvent | PointerEvent) => {
       this.isMouseDown = true;
+      this.lastPointerTarget = e.target;
       if (e.detail > 1) return; // Prevent dismissal during double click sequence
       if (this.popupView && this.popupView.isPinnedMode()) return; // Keep pinned popup open
 
@@ -312,11 +314,12 @@ class ContentScriptManager {
         this.hidePopup();
         this.hideTrigger();
       }
-    }, true);
+    };
 
-    // 2. Mouse Up Handler (Selection finalized via mouse drag)
-    document.addEventListener('mouseup', (e) => {
+    // 2. Mouse & Pointer Up Handler (Selection finalized via mouse drag or touch)
+    const onPointerUp = (e: MouseEvent | PointerEvent) => {
       this.isMouseDown = false;
+      this.lastPointerTarget = e.target;
       const target = e.target as Element;
 
       // Do not re-trigger selection check if user clicked inside our own popup or trigger
@@ -324,30 +327,21 @@ class ContentScriptManager {
         return;
       }
 
-      const sel = window.getSelection();
-      // If user merely clicked inside an editable element without selecting text, ignore
-      if (isEditableElement(target) && (!sel || sel.isCollapsed || !sel.toString().trim())) {
-        return;
-      }
-
-      if (sel && !sel.isCollapsed && sel.toString().trim()) {
-        this.isUserDismissed = false;
-      }
-
+      this.isUserDismissed = false;
       // Small debounce to allow browser selection range to settle
       this.scheduleSelectionCheck(60);
-    }, true);
+    };
+
+    document.addEventListener('mousedown', onPointerDown, true);
+    window.addEventListener('pointerdown', onPointerDown, true);
+
+    document.addEventListener('mouseup', onPointerUp, true);
+    window.addEventListener('pointerup', onPointerUp, true);
 
     // 3. Double Click Handler (Instant Single-Word Selection)
     document.addEventListener('dblclick', (e) => {
       if (this.isSiteDisabled()) return;
-      const target = e.target as Element;
-      // If user double-clicked inside an editable element without outer selection, ignore
-      const sel = window.getSelection();
-      if (isEditableElement(target) && (!sel || sel.isCollapsed || !sel.toString().trim())) {
-        return;
-      }
-
+      this.lastPointerTarget = e.target;
       this.isDoubleClicked = true;
       this.isUserDismissed = false;
       this.lastAnalyzedText = '';
@@ -359,18 +353,8 @@ class ContentScriptManager {
       // Do not interrupt active mouse drag
       if (this.isMouseDown) return;
 
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-        this.lastAnalyzedText = '';
-        this.isUserDismissed = false;
-        if (!this.popupView?.isPinnedMode()) {
-          this.hideTrigger();
-        }
-        return;
-      }
-
-      // Debounce keyboard & programmatic selection changes (120ms responsive stabilization)
-      this.scheduleSelectionCheck(120);
+      // Debounce keyboard & programmatic selection changes (80ms responsive stabilization)
+      this.scheduleSelectionCheck(80);
     });
 
     // 5. Key Up Handler (Keyboard selection gestures)
@@ -526,23 +510,7 @@ class ContentScriptManager {
     if (this.isMouseDown) return;
     if (this.isSiteDisabled()) return;
 
-    // Guard: only ignore if the selection itself is inside an editable element
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0);
-      const startEl = range.startContainer.nodeType === Node.ELEMENT_NODE
-        ? (range.startContainer as Element)
-        : range.startContainer.parentElement;
-      const endEl = range.endContainer.nodeType === Node.ELEMENT_NODE
-        ? (range.endContainer as Element)
-        : range.endContainer.parentElement;
-
-      if (isEditableElement(startEl) || isEditableElement(endEl)) {
-        return;
-      }
-    }
-
-    const data = getSelectionData();
+    const data = getSelectionData(this.lastPointerTarget);
     if (!data || !data.cleanText) return;
 
     // Disregard massive full-page selections (e.g. Ctrl+A over 5000 chars)
