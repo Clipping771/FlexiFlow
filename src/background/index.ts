@@ -550,6 +550,38 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             break;
           }
 
+          case 'GET_FEEDBACK_REPORTS': {
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+              const existing = (await chrome.storage.local.get('lexiflow_feedback_reports')) as Record<string, any> || {};
+              const reports: WrongMeaningReport[] = Array.isArray(existing.lexiflow_feedback_reports)
+                ? existing.lexiflow_feedback_reports
+                : [];
+              sendResponse({ success: true, data: reports });
+            } else {
+              sendResponse({ success: true, data: [] });
+            }
+            break;
+          }
+
+          case 'EXPORT_FEEDBACK_REPORTS': {
+            let reports: WrongMeaningReport[] = [];
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+              const existing = (await chrome.storage.local.get('lexiflow_feedback_reports')) as Record<string, any> || {};
+              reports = Array.isArray(existing.lexiflow_feedback_reports)
+                ? existing.lexiflow_feedback_reports
+                : [];
+            }
+            const exportPayload = {
+              format: 'lexiflow_feedback_reports_export',
+              version: 1,
+              exportedAt: new Date().toISOString(),
+              totalReports: reports.length,
+              reports
+            };
+            sendResponse({ success: true, data: JSON.stringify(exportPayload, null, 2) });
+            break;
+          }
+
           default:
             sendResponse({ success: false, error: `Unknown message type: ${type}` });
         }

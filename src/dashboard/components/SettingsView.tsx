@@ -108,6 +108,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [modalError, setModalError] = useState<string | null>(null);
   const [deleteConfirmCode, setDeleteConfirmCode] = useState<string | null>(null);
   const [telemetryInfo, setTelemetryInfo] = useState<{ rawCount: number; daysCount: number } | null>(null);
+  const [feedbackReportsCount, setFeedbackReportsCount] = useState<number>(0);
 
   useEffect(() => {
     if (typeof chrome !== 'undefined' && chrome.runtime) {
@@ -117,6 +118,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             rawCount: res.data.events?.length || 0,
             daysCount: Object.keys(res.data.dailyAggregates || {}).length
           });
+        }
+      });
+
+      chrome.runtime.sendMessage({ type: 'GET_FEEDBACK_REPORTS' }, (res) => {
+        if (res?.success && Array.isArray(res.data)) {
+          setFeedbackReportsCount(res.data.length);
         }
       });
     }
@@ -134,6 +141,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           a.click();
           URL.revokeObjectURL(url);
           setStatus('Telemetry logs exported successfully.');
+          setTimeout(() => setStatus(null), 3000);
+        }
+      });
+    }
+  };
+
+  const handleExportFeedbackReports = async () => {
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.sendMessage({ type: 'EXPORT_FEEDBACK_REPORTS' }, (res) => {
+        if (res?.success && res.data) {
+          const blob = new Blob([res.data], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `lexiflow_feedback_reports_${new Date().toISOString().slice(0, 10)}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+          setStatus('Feedback reports exported successfully.');
           setTimeout(() => setStatus(null), 3000);
         }
       });
@@ -1427,7 +1452,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               onClick={handleExportTelemetry}
             >
-              📥 Export Event Logs (JSON)
+              📊 Export Telemetry Logs (JSON)
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              onClick={handleExportFeedbackReports}
+            >
+              📑 Export Feedback Reports (JSON)
+              {feedbackReportsCount > 0 && (
+                <span style={{ fontSize: '11px', background: 'rgba(0, 113, 227, 0.12)', color: 'var(--blue)', padding: '1px 6px', borderRadius: '10px' }}>
+                  {feedbackReportsCount}
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -1438,7 +1476,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               🗑️ Clear Event Logs
             </button>
             <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-              Exported as clean, anonymous JSON separate from feedback reports.
+              Exported as clean JSON blobs without tracking page URLs.
             </span>
           </div>
         </div>

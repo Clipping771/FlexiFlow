@@ -1229,7 +1229,7 @@ export class PopupView {
         ` : ''}
 
         <!-- Inline Report Form across all tabs -->
-        ${this.showFeedbackModal ? this.renderFeedbackForm(a.selectedText) : ''}
+        ${this.showFeedbackModal ? this.renderFeedbackForm(a.selectedText, this.currentContextSentence) : ''}
       </div>
 
       <div class="lf-footer">
@@ -1404,7 +1404,7 @@ export class PopupView {
         ` : ''}
 
         <!-- Inline Report Form across all sentence tabs -->
-        ${this.showFeedbackModal ? this.renderFeedbackForm(s.selectedText) : ''}
+        ${this.showFeedbackModal ? this.renderFeedbackForm(s.selectedText, s.selectedText) : ''}
       </div>
 
       <div class="lf-footer">
@@ -1526,7 +1526,7 @@ export class PopupView {
         ${this.showAskAI ? this.renderAskAIPanel('paragraph', p.selectedText) : ''}
 
         <!-- Inline Report Form -->
-        ${this.showFeedbackModal ? this.renderFeedbackForm(p.selectedText) : ''}
+        ${this.showFeedbackModal ? this.renderFeedbackForm(p.selectedText, p.selectedText) : ''}
 
         <!-- Expandable Paragraph Details -->
         <div id="lf-para-expanded-section" role="region" aria-label="Paragraph Details" style="display: ${this.isSentenceAnalysisExpanded ? 'block' : 'none'};">
@@ -2278,7 +2278,7 @@ export class PopupView {
     `;
   }
 
-  private renderFeedbackForm(selectedText: string): string {
+  private renderFeedbackForm(selectedText: string, contextSentence?: string): string {
     if (this.feedbackSuccess) {
       return `
         <div class="lf-feedback-box" style="background: rgba(16, 185, 129, 0.15); border-color: #10b981;">
@@ -2289,10 +2289,12 @@ export class PopupView {
       `;
     }
 
+    const effectiveContext = contextSentence || this.currentContextSentence;
+
     return `
       <div class="lf-feedback-box">
         <div style="font-size: 12px; font-weight: 700; color: #f87171; margin-bottom: 6px;">
-          Report Issue with "${escapeHtml(selectedText)}"
+          Report Issue / রিপোর্ট বা পরামর্শ
         </div>
         <select class="lf-feedback-reason" style="width: 100%; border: 0.5px solid rgba(0,0,0,0.2); border-radius: 6px; padding: 4px; font-size: 12px; margin-bottom: 6px;">
           <option value="wrong_context_meaning">Wrong meaning for this context</option>
@@ -2302,6 +2304,22 @@ export class PopupView {
           <option value="other">Other issue</option>
         </select>
         <textarea class="lf-feedback-note" placeholder="Optional details..." rows="2" style="width: 100%; border: 0.5px solid rgba(0,0,0,0.2); border-radius: 6px; padding: 4px; font-size: 11.5px; margin-bottom: 6px; resize: none;"></textarea>
+
+        <!-- Privacy Opt-In Checkbox -->
+        <div class="lf-feedback-optin" style="margin-bottom: 6px; padding: 6px 8px; background: rgba(0,0,0,0.03); border-radius: 6px; font-size: 11px;">
+          <label style="display: flex; align-items: flex-start; gap: 6px; cursor: pointer; color: var(--lf-text, #1d1d1f);">
+            <input type="checkbox" class="lf-feedback-optin-checkbox" style="margin-top: 2px;" />
+            <span>Include selected text and sentence context to help diagnose and fix this issue</span>
+          </label>
+        </div>
+
+        <!-- Diagnostic Preview (only visible when opted in) -->
+        <div class="lf-feedback-preview" style="display: none; margin-bottom: 8px; padding: 6px 8px; background: rgba(0, 113, 227, 0.08); border: 1px dashed rgba(0, 113, 227, 0.35); border-radius: 6px; font-size: 11px; line-height: 1.35;">
+          <strong style="display: block; margin-bottom: 3px; color: #0071e3;">Preview of diagnostic data to be included:</strong>
+          <div><strong>Text:</strong> "${escapeHtml(selectedText)}"</div>
+          ${effectiveContext ? `<div><strong>Context:</strong> "${escapeHtml(effectiveContext)}"</div>` : ''}
+        </div>
+
         <div style="display: flex; justify-content: flex-end; gap: 6px;">
           <button class="lf-btn-action secondary lf-feedback-cancel-btn" style="padding: 3px 8px; font-size: 11px;">Cancel</button>
           <button class="lf-btn-action lf-feedback-submit-btn" style="padding: 3px 10px; font-size: 11px;">Submit Report</button>
@@ -2845,15 +2863,26 @@ export class PopupView {
       this.render();
     });
 
+    el.querySelector('.lf-feedback-optin-checkbox')?.addEventListener('change', (e) => {
+      const isChecked = (e.target as HTMLInputElement).checked;
+      const previewEl = el.querySelector('.lf-feedback-preview') as HTMLElement | null;
+      if (previewEl) {
+        previewEl.style.display = isChecked ? 'block' : 'none';
+      }
+    });
+
     el.querySelector('.lf-feedback-submit-btn')?.addEventListener('click', async () => {
       const reasonEl = el.querySelector('.lf-feedback-reason') as HTMLSelectElement;
       const noteEl = el.querySelector('.lf-feedback-note') as HTMLTextAreaElement;
+      const optinEl = el.querySelector('.lf-feedback-optin-checkbox') as HTMLInputElement | null;
+      const isOptedIn = Boolean(optinEl?.checked);
+
       if (this.callbacks.onReportWrongMeaning && this.currentStageA) {
         const report: WrongMeaningReport = {
           id: `rep_${Date.now()}`,
           timestamp: new Date().toISOString(),
-          selectedText: this.currentStageA.selectedText,
-          contextSentence: this.currentContextSentence,
+          selectedText: isOptedIn ? this.currentStageA.selectedText : '[Redacted - User Opt-out]',
+          contextSentence: isOptedIn ? this.currentContextSentence : undefined,
           reason: reasonEl?.value || 'wrong_meaning',
           userNote: noteEl?.value?.trim() || ''
         };
@@ -3003,15 +3032,26 @@ export class PopupView {
       this.render();
     });
 
+    el.querySelector('.lf-feedback-optin-checkbox')?.addEventListener('change', (e) => {
+      const isChecked = (e.target as HTMLInputElement).checked;
+      const previewEl = el.querySelector('.lf-feedback-preview') as HTMLElement | null;
+      if (previewEl) {
+        previewEl.style.display = isChecked ? 'block' : 'none';
+      }
+    });
+
     el.querySelector('.lf-feedback-submit-btn')?.addEventListener('click', async () => {
       const reasonEl = el.querySelector('.lf-feedback-reason') as HTMLSelectElement;
       const noteEl = el.querySelector('.lf-feedback-note') as HTMLTextAreaElement;
+      const optinEl = el.querySelector('.lf-feedback-optin-checkbox') as HTMLInputElement | null;
+      const isOptedIn = Boolean(optinEl?.checked);
+
       if (this.callbacks.onReportWrongMeaning) {
         const report: WrongMeaningReport = {
           id: `rep_${Date.now()}`,
           timestamp: new Date().toISOString(),
-          selectedText: s.selectedText,
-          contextSentence: s.selectedText,
+          selectedText: isOptedIn ? s.selectedText : '[Redacted - User Opt-out]',
+          contextSentence: isOptedIn ? s.selectedText : undefined,
           reason: reasonEl?.value || 'wrong_sentence_translation',
           userNote: noteEl?.value?.trim() || ''
         };
@@ -3163,15 +3203,26 @@ export class PopupView {
       this.render();
     });
 
+    el.querySelector('.lf-feedback-optin-checkbox')?.addEventListener('change', (e) => {
+      const isChecked = (e.target as HTMLInputElement).checked;
+      const previewEl = el.querySelector('.lf-feedback-preview') as HTMLElement | null;
+      if (previewEl) {
+        previewEl.style.display = isChecked ? 'block' : 'none';
+      }
+    });
+
     el.querySelector('.lf-feedback-submit-btn')?.addEventListener('click', async () => {
       const reasonEl = el.querySelector('.lf-feedback-reason') as HTMLSelectElement;
       const noteEl = el.querySelector('.lf-feedback-note') as HTMLTextAreaElement;
+      const optinEl = el.querySelector('.lf-feedback-optin-checkbox') as HTMLInputElement | null;
+      const isOptedIn = Boolean(optinEl?.checked);
+
       if (this.callbacks.onReportWrongMeaning) {
         const report: WrongMeaningReport = {
           id: `rep_${Date.now()}`,
           timestamp: new Date().toISOString(),
-          selectedText: p.selectedText,
-          contextSentence: p.selectedText,
+          selectedText: isOptedIn ? p.selectedText : '[Redacted - User Opt-out]',
+          contextSentence: isOptedIn ? p.selectedText : undefined,
           reason: reasonEl?.value || 'wrong_paragraph_translation',
           userNote: noteEl?.value?.trim() || ''
         };
