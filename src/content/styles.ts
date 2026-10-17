@@ -2384,4 +2384,615 @@ export const POPUP_STYLES = `
     -webkit-backdrop-filter: none !important;
   }
 }
+
+/* ========================================================
+   FEATURE A: AI HIGHLIGHT TOOLBAR & SUMMARY DRAWER STYLES
+   ======================================================== */
+.lexiflow-highlight-toolbar-container {
+  display: none !important;
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  z-index: 2147483646;
+  pointer-events: none;
+}
+
+.lf-hl-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(28, 28, 30, 0.92);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 6px 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  color: #ffffff;
+  user-select: none;
+}
+
+.lf-hl-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lf-hl-sparkle {
+  font-size: 14px;
+}
+
+.lf-hl-title {
+  color: #f5f5f7;
+  letter-spacing: -0.01em;
+}
+
+.lf-hl-badge {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #a1a1a6;
+  font-weight: 500;
+}
+
+.lf-hl-badge.active {
+  background: rgba(0, 113, 227, 0.25);
+  color: #2997ff;
+  font-weight: 600;
+}
+
+.lf-hl-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.lf-hl-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lf-hl-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  color: #f5f5f7;
+  padding: 5px 12px;
+  border-radius: 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.18s ease;
+}
+
+.lf-hl-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.lf-hl-btn.primary {
+  background: #0071e3;
+  color: #ffffff;
+  border-color: #0071e3;
+  font-weight: 600;
+}
+
+.lf-hl-btn.primary:hover {
+  background: #0077ed;
+  box-shadow: 0 2px 10px rgba(0, 113, 227, 0.4);
+}
+
+.lf-hl-btn.active {
+  background: rgba(0, 113, 227, 0.3);
+  color: #2997ff;
+  border-color: rgba(41, 151, 255, 0.5);
+}
+
+.lf-hl-btn-icon {
+  background: rgba(255, 255, 255, 0.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  color: #f5f5f7;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s ease;
+}
+
+.lf-hl-btn-icon:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.lf-hl-btn-icon.danger:hover {
+  background: rgba(255, 69, 58, 0.3);
+  color: #ff453a;
+}
+
+.lf-hl-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 2px 4px;
+  border-radius: 16px;
+}
+
+.lf-hl-counter {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #2997ff;
+  min-width: 24px;
+  text-align: center;
+}
+
+.lf-hl-filters {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lf-hl-chip {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #86868b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.lf-hl-chip.selected {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.lf-hl-colors {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 2px;
+}
+
+.lf-hl-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.lf-hl-color-dot.color-yellow { background-color: #facc15; }
+.lf-hl-color-dot.color-blue   { background-color: #3b82f6; }
+.lf-hl-color-dot.color-green  { background-color: #22c55e; }
+.lf-hl-color-dot.color-pink   { background-color: #ec4899; }
+.lf-hl-color-dot.color-purple { background-color: #a855f7; }
+
+.lf-hl-color-dot:hover {
+  transform: scale(1.25);
+}
+
+.lf-hl-color-dot.active {
+  border-color: #ffffff;
+  transform: scale(1.2);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+}
+
+/* Summary Drawer */
+.lf-hl-summary-card {
+  width: 360px;
+  max-height: 480px;
+  background: rgba(28, 28, 30, 0.96);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: lf-fade-up 0.22s ease-out;
+}
+
+@keyframes lf-fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.lf-hl-summary-header {
+  padding: 14px 16px 10px;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.lf-hl-summary-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #f5f5f7;
+  margin-bottom: 2px;
+}
+
+.lf-hl-summary-subtitle {
+  font-size: 11.5px;
+  color: #86868b;
+  line-height: 1.35;
+}
+
+.lf-hl-summary-list {
+  padding: 8px 12px;
+  overflow-y: auto;
+  max-height: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lf-hl-summary-item {
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lf-hl-summary-item:hover {
+  background: rgba(0, 113, 227, 0.15);
+  border-color: rgba(0, 113, 227, 0.35);
+  transform: translateX(2px);
+}
+
+.lf-hl-summary-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.lf-hl-summary-term {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  color: #ffffff;
+}
+
+.lf-hl-type-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.lf-hl-type-tag.type-word { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+.lf-hl-type-tag.type-phrase { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+.lf-hl-type-tag.type-idiom { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+
+.lf-hl-diff-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: capitalize;
+}
+
+.lf-hl-diff-badge.diff-easy { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+.lf-hl-diff-badge.diff-medium { background: rgba(234, 179, 8, 0.15); color: #facc15; }
+.lf-hl-diff-badge.diff-hard { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+
+.lf-hl-summary-meaning {
+  font-size: 12px;
+  color: #d1d1d6;
+  margin-bottom: 2px;
+  line-height: 1.35;
+}
+
+.lf-hl-summary-bengali {
+  font-size: 12.5px;
+  color: #30d158;
+  font-weight: 500;
+}
+
+/* ========================================================
+   FEATURE B: 9-LAYER GRAMMAR & CLAUSES UPGRADE STYLES
+   ======================================================== */
+.lf-grammar-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0071e3;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-grammar-section-title,
+.lexiflow-popup.theme-dark .lf-grammar-section-title {
+  color: #2997ff;
+}
+
+.lf-structure-card {
+  background: rgba(0, 113, 227, 0.05);
+  border: 1px solid rgba(0, 113, 227, 0.15);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-structure-card,
+.lexiflow-popup.theme-dark .lf-structure-card {
+  background: rgba(41, 151, 255, 0.08);
+  border-color: rgba(41, 151, 255, 0.2);
+}
+
+.lf-structure-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.lf-structure-type-pill {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #0071e3;
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.lf-structure-expl {
+  font-size: 13px;
+  color: #3a3a3c;
+  line-height: 1.45;
+  margin-bottom: 4px;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-structure-expl,
+.lexiflow-popup.theme-dark .lf-structure-expl {
+  color: #e5e5ea;
+}
+
+.lf-structure-expl-bn {
+  font-size: 13.5px;
+  color: #0071e3;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-structure-expl-bn,
+.lexiflow-popup.theme-dark .lf-structure-expl-bn {
+  color: #2997ff;
+}
+
+/* Layer 4: Structure Map Visual Tree */
+.lf-structure-map-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 12px;
+  border: 1px dashed rgba(0, 0, 0, 0.12);
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-structure-map-tree,
+.lexiflow-popup.theme-dark .lf-structure-map-tree {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.lf-map-node {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-map-node,
+.lexiflow-popup.theme-dark .lf-map-node {
+  background: rgba(44, 44, 46, 0.9);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.lf-map-node.is-main {
+  border-left: 3.5px solid #0071e3;
+}
+
+.lf-map-relation-pill {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 113, 227, 0.1);
+  color: #0071e3;
+  white-space: nowrap;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-map-relation-pill,
+.lexiflow-popup.theme-dark .lf-map-relation-pill {
+  background: rgba(41, 151, 255, 0.2);
+  color: #2997ff;
+}
+
+/* Layer 5: Grammar Rule Cards (7-Item formula) */
+.lf-rule-card {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  transition: box-shadow 0.15s ease;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-rule-card,
+.lexiflow-popup.theme-dark .lf-rule-card {
+  background: rgba(36, 36, 38, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.lf-rule-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1d1d1f;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-rule-name,
+.lexiflow-popup.theme-dark .lf-rule-name {
+  color: #ffffff;
+}
+
+.lf-rule-formula-box {
+  background: rgba(255, 149, 0, 0.08);
+  border-left: 3px solid #ff9500;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #d97706;
+  margin: 6px 0;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-rule-formula-box,
+.lexiflow-popup.theme-dark .lf-rule-formula-box {
+  background: rgba(255, 159, 10, 0.15);
+  color: #ff9f0a;
+}
+
+.lf-rule-confusion-box {
+  background: rgba(255, 59, 48, 0.06);
+  border-left: 3px solid #ff3b30;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #b91c1c;
+  margin-top: 6px;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-rule-confusion-box,
+.lexiflow-popup.theme-dark .lf-rule-confusion-box {
+  background: rgba(255, 69, 58, 0.12);
+  color: #ff453a;
+}
+
+/* Layer 6: Connectors */
+.lf-connector-box {
+  background: rgba(52, 199, 89, 0.06);
+  border: 1px solid rgba(52, 199, 89, 0.2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-connector-box,
+.lexiflow-popup.theme-dark .lf-connector-box {
+  background: rgba(48, 209, 88, 0.1);
+  border-color: rgba(48, 209, 88, 0.25);
+}
+
+/* Layer 9: Practice Quiz Card */
+.lf-practice-box {
+  background: linear-gradient(135deg, rgba(0, 113, 227, 0.08) 0%, rgba(175, 82, 222, 0.08) 100%);
+  border: 1px solid rgba(0, 113, 227, 0.2);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-top: 14px;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-practice-box,
+.lexiflow-popup.theme-dark .lf-practice-box {
+  background: linear-gradient(135deg, rgba(41, 151, 255, 0.12) 0%, rgba(191, 90, 242, 0.12) 100%);
+  border-color: rgba(41, 151, 255, 0.3);
+}
+
+.lf-practice-q {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1d1d1f;
+  margin-bottom: 10px;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-practice-q,
+.lexiflow-popup.theme-dark .lf-practice-q {
+  color: #ffffff;
+}
+
+.lf-practice-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.lf-practice-opt-btn {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12.5px;
+  cursor: pointer;
+  color: #1d1d1f;
+  transition: all 0.15s ease;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-practice-opt-btn,
+.lexiflow-popup.theme-dark .lf-practice-opt-btn {
+  background: rgba(44, 44, 46, 0.9);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f5f5f7;
+}
+
+.lf-practice-opt-btn:hover {
+  background: rgba(0, 113, 227, 0.12);
+  border-color: #0071e3;
+}
+
+.lf-practice-answer-reveal {
+  background: rgba(52, 199, 89, 0.1);
+  border-left: 3px solid #34c759;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-practice-answer-reveal,
+.lexiflow-popup.theme-dark .lf-practice-answer-reveal {
+  background: rgba(48, 209, 88, 0.15);
+  border-color: #30d158;
+}
 `;

@@ -1,4 +1,4 @@
-import { UserSettings, StageAExplanation, StageBDetailedVocabulary, SelectionType, LinguisticAnalysisResult } from '../../types';
+import { UserSettings, StageAExplanation, StageBDetailedVocabulary, SelectionType, LinguisticAnalysisResult, HighlightExtractionResult } from '../../types';
 import { SettingsService } from '../storage/settings';
 import { registerCustomLanguages, getLanguageConfig } from '../../config/languages';
 import { AnthropicProvider } from './anthropicProvider';
@@ -10,6 +10,7 @@ import { TwoStageCacheService } from './cache';
 import { CacheManager } from '../cache';
 import { hashString } from '../cache/normalization';
 import { AIProvider } from './types';
+import { HighlightIntelligenceService } from './highlightIntelligence';
 
 export class AIService {
   private static cache = new Map<string, unknown>();
@@ -62,12 +63,18 @@ export class AIService {
           );
         }
         break;
-      case 'ollama':
+      case 'ollama': {
+        const ep = userSettings.apiEndpoint?.trim() || 'http://127.0.0.1:11434';
+        const model = (userSettings.selectedModel && userSettings.selectedModel !== 'llama3.2')
+          ? userSettings.selectedModel
+          : 'gemma4:31b-cloud';
+        console.log(`[LexiFlow AIService] Instantiating OllamaProvider with endpoint: ${ep}, model: ${model}`);
         return new OllamaProvider(
-          userSettings.apiEndpoint || 'http://localhost:11434',
-          userSettings.selectedModel || 'llama3.2',
+          ep,
+          model,
           userSettings.targetLanguage || 'bn'
         );
+      }
       default:
         break;
     }
@@ -155,6 +162,50 @@ export class AIService {
     return CacheManager.getInstance().executeDeduplicated(key, async () => {
       const provider = await this.getProvider(userSettings);
       return provider.analyze(text, selectionType, contextSentence, paragraphContext);
+    });
+  }
+
+  static async extractHighlights(
+    rawText: string,
+    pageTitle?: string
+  ): Promise<HighlightExtractionResult> {
+    const userSettings = await SettingsService.getSettings();
+    const targetLang = userSettings.targetLanguage || 'bn';
+    const providerName = userSettings.aiProvider || 'mock';
+    const isOllama = providerName === 'ollama';
+    const hasApiKey = Boolean(userSettings.apiKey?.trim());
+    const isLiveAI = (isOllama || hasApiKey) && providerName !== 'mock';
+    const key = `extractHighlights:${hashString(rawText.slice(0, 15000))}::${targetLang}::${providerName}::${isLiveAI ? 'ai' : 'offline'}`;
+
+    return CacheManager.getInstance().executeDeduplicated(key, async () => {
+      const provider = await this.getProvider(userSettings);
+
+      console.log(`[LexiFlow AIService] extractHighlights starting with provider: "${providerName}", isLiveAI: ${isLiveAI}`);
+
+      // 1. If an actual AI provider is configured and available (cloud with API key OR local Ollama)
+      if (isLiveAI && provider.extractHighlights) {
+        try {
+          const aiResult = await provider.extractHighlights(rawText, pageTitle);
+          if (aiResult && Array.isArray(aiResult.items) && aiResult.items.length > 0) {
+            const processed = HighlightIntelligenceService.processCandidates(aiResult, rawText);
+            processed.sourceMode = 'ai_reasoning';
+            console.log(`[LexiFlow AIService] AI extraction succeeded with ${processed.items.length} items (provider: ${providerName})`);
+            return processed;
+          } else {
+            console.warn(`[LexiFlow AIService] AI provider ${providerName} returned 0 items.`);
+          }
+        } catch (err) {
+          console.warn(`[LexiFlow AIService] ${providerName} extractHighlights failed, using curated offline fallback:`, err);
+        }
+      }
+
+      // 2. Honest curated offline fallback when AI provider is unconfigured, mock, or failed
+      console.log(`[LexiFlow AIService] Using curated offline fallback for highlights`);
+      const mock = new MockAIProvider(targetLang);
+      const rawMock = await mock.extractHighlights(rawText, pageTitle);
+      const processedMock = HighlightIntelligenceService.processCandidates(rawMock, rawText);
+      processedMock.sourceMode = 'curated_offline_fallback';
+      return processedMock;
     });
   }
 

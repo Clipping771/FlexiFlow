@@ -138,4 +138,50 @@ describe('OllamaProvider error handling & safeParseJSON integration', () => {
     expect(result.contextualMeaning).toBe('Able to withstand shock.');
     expect(result.bengaliTranslation).toBe('সহনশীল');
   });
+
+  it('OllamaProvider implements extractHighlights and parses raw model output with markdown fences', async () => {
+    const mockHighlights = {
+      items: [
+        {
+          id: 'hl_1',
+          text: 'landmark treaty',
+          type: 'phrase',
+          contextSentence: 'Global leaders signed a landmark treaty on AI safety.',
+          easyEnglish: 'An important agreement in history.',
+          easyBengali: 'যুগান্তকারী চুক্তি',
+          reason: 'Pivotal diplomatic collocation',
+          difficulty: 'medium',
+          learningValueScore: 0.9,
+          isArticleCore: true
+        }
+      ],
+      pageTitle: 'AI Treaty',
+      articleSummary: 'Leaders sign treaty.'
+    };
+
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/api/chat')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            message: {
+              role: 'assistant',
+              content: `\`\`\`json\n${JSON.stringify(mockHighlights)}\n\`\`\``
+            }
+          })
+        };
+      }
+      return { ok: false, status: 404 };
+    });
+
+    const provider = new OllamaProvider('http://127.0.0.1:11434', 'gemma4:31b-cloud');
+    const result = await provider.extractHighlights('Global leaders signed a landmark treaty on AI safety.', 'AI Treaty');
+
+    expect(result.items.length).toBe(1);
+    expect(result.items[0].text).toBe('landmark treaty');
+    expect(result.items[0].learningValueScore).toBe(0.9);
+    expect(result.sourceMode).toBe('ai_reasoning');
+  });
 });
+

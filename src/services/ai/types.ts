@@ -6,7 +6,8 @@ import {
   FollowUpResponse,
   ArticleAnalysisResult,
   StageAExplanation,
-  StageBDetailedVocabulary
+  StageBDetailedVocabulary,
+  HighlightExtractionResult
 } from '../../types';
 
 export interface AIProvider {
@@ -31,4 +32,5 @@ export interface AIProvider {
   assistWriting(text: string, goal: WritingGoal): Promise<WritingAssistResult>;
   askFollowUp(text: string, context: string, question: string): Promise<FollowUpResponse>;
   analyzeArticle?(rawText: string, title?: string, mode?: string, signal?: AbortSignal): Promise<ArticleAnalysisResult>;
+  extractHighlights?(rawText: string, pageTitle?: string, signal?: AbortSignal): Promise<HighlightExtractionResult>;
 }

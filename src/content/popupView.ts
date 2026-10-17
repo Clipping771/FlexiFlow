@@ -914,7 +914,11 @@ export class PopupView {
           contextMeaning: w.whyFitsContext || w.contextualMeaning || 'Meaning in this sentence.',
           example: w.examples?.[0],
           confidence: 'high',
-          contextualSenseId: 'sense_1'
+          contextualSenseId: 'sense_1',
+          grammaticalRole: w.grammaticalRole,
+          grammaticalNote: w.grammaticalNote,
+          transitivityOrPattern: w.transitivityOrPattern,
+          wordForms: w.wordForms
         },
         contextSentence,
         nearbyParagraph,
@@ -929,13 +933,16 @@ export class PopupView {
         {
           selectedText: p.selectedText,
           lemma: p.selectedText.toLowerCase(),
-          partOfSpeech: 'phrase',
+          partOfSpeech: p.phraseType || 'phrase',
           easyEnglish: p.simpleEnglishExplanation || p.overallMeaning || 'Phrase meaning',
           easyBengali: p.bengaliTranslation || 'বাংলা অর্থ',
           contextMeaning: p.whyFitsContext || p.overallMeaning || 'Meaning in this sentence.',
           example: p.examples?.[0],
           confidence: 'high',
-          contextualSenseId: 'sense_1'
+          contextualSenseId: 'sense_1',
+          grammaticalRole: p.grammaticalStructure,
+          literalVsFigurative: p.literalVsFigurative,
+          grammaticalNote: p.componentsBreakdown
         },
         contextSentence,
         nearbyParagraph,
@@ -1082,6 +1089,54 @@ export class PopupView {
           <div class="lf-example-box" style="margin-bottom: 8px; padding-left: 8px; border-left: 2px solid rgba(0, 113, 227, 0.4); font-size: var(--lf-font-example, 14px); font-style: italic; display: ${a.example ? 'block' : 'none'};">
             <span class="lf-example-text">"${escapeHtml(a.example || '')}"</span>
             <div class="lf-example-bengali" style="font-style: normal; font-size: var(--lf-font-context, 13px); margin-top: 2px; display: ${a.exampleBengali ? 'block' : 'none'};">(${escapeHtml(a.exampleBengali || '')})</div>
+          </div>
+
+          <!-- 4.5. Mandatory Grammar Breakdown for Word / Phrase -->
+          <div class="lf-word-grammar-card" style="margin-bottom: 10px; padding: 10px 12px; background: rgba(0, 113, 227, 0.05); border: 1px solid rgba(0, 113, 227, 0.18); border-radius: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+              <span style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; color: #0071e3; letter-spacing: 0.04em;">
+                🔬 Grammar Breakdown:
+              </span>
+              <span style="font-size: 11px; padding: 2px 7px; border-radius: 4px; background: rgba(0, 113, 227, 0.12); color: #0071e3; font-weight: 600;">
+                ${escapeHtml(a.partOfSpeech || 'Word')}
+              </span>
+            </div>
+            ${a.grammaticalRole ? `
+              <div style="font-size: 13px; color: var(--lf-text, #1d1d1f); margin-bottom: 4px; line-height: 1.4;">
+                <strong style="color: #0071e3;">Role in Sentence:</strong> ${escapeHtml(a.grammaticalRole)}
+              </div>
+            ` : `
+              <div style="font-size: 12.5px; color: var(--lf-text, #1d1d1f); margin-bottom: 4px; line-height: 1.4;">
+                <strong style="color: #0071e3;">Grammatical Role:</strong> Functions as a <strong>${escapeHtml(a.partOfSpeech || 'lexical item')}</strong> in this context.
+              </div>
+            `}
+            ${a.transitivityOrPattern ? `
+              <div style="font-size: 12.5px; color: var(--lf-text-muted, #6e6e73); margin-bottom: 4px; line-height: 1.4;">
+                <strong>Pattern:</strong> <code style="background: rgba(0,0,0,0.04); padding: 1px 4px; border-radius: 3px;">${escapeHtml(a.transitivityOrPattern)}</code>
+              </div>
+            ` : ''}
+            ${a.literalVsFigurative ? `
+              <div style="font-size: 12.5px; color: #d97706; margin-bottom: 4px; line-height: 1.4;">
+                <strong>Literal vs Figurative:</strong> ${escapeHtml(a.literalVsFigurative)}
+              </div>
+            ` : ''}
+            ${a.grammaticalNote ? `
+              <div style="font-size: 12px; color: var(--lf-text-muted, #6e6e73); line-height: 1.4;">
+                ${escapeHtml(a.grammaticalNote)}
+              </div>
+            ` : ''}
+            ${a.wordForms && a.wordForms.length > 0 ? `
+              <div style="font-size: 11.5px; color: var(--lf-text-muted, #6e6e73); margin-top: 5px;">
+                <strong>Word Forms:</strong> ${escapeHtml(a.wordForms.join(' • '))}
+              </div>
+            ` : ''}
+            ${this.parentSentenceAnalysis ? `
+              <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed rgba(0, 113, 227, 0.2); display: flex; justify-content: flex-end;">
+                <button type="button" class="lf-sentence-link-btn" id="lf-view-parent-sentence-btn" style="background: none; border: none; color: #0071e3; font-size: 11.5px; font-weight: 600; cursor: pointer; padding: 2px 4px; text-decoration: underline;">
+                  View Full Sentence Grammar X-Ray →
+                </button>
+              </div>
+            ` : ''}
           </div>
 
           <!-- 5. Quick AI Instant Actions -->
@@ -1586,12 +1641,278 @@ export class PopupView {
     const vocab = s.difficultVocabulary || [];
     const clauses = s.clauses || [];
     const highlights = s.grammaticalHighlights || [];
+    const structure = s.sentenceStructure;
+    const structureMap = s.structureMap;
+    const grammarRules = s.grammarRules || [];
+    const connectors = s.connectors || [];
+    const wordGrammar = s.wordLevelGrammar || [];
+    const mistakes = s.commonMistakesAndAlternatives;
+    const practice = s.practice;
 
     return `
       <div style="margin-top: 10px; padding-top: 10px; border-top: 0.5px solid rgba(0, 0, 0, 0.08);">
+        <!-- LAYER 1: Sentence Overview & Classification -->
+        ${(s.mainMessage || structure) ? `
+          <div class="lf-structure-card">
+            <div class="lf-structure-header">
+              <span class="lf-structure-type-pill">${escapeHtml((structure?.type || 'Complex Sentence').toUpperCase())}</span>
+              <strong style="font-size: 13px; color: var(--text-main, #1d1d1f);">Sentence Structure Overview</strong>
+            </div>
+            ${s.mainMessage ? `
+              <div style="margin-bottom: 6px; font-size: 13px; line-height: 1.45;">
+                <span style="font-weight: 600; color: #0071e3;">Core Message:</span> ${escapeHtml(s.mainMessage)}
+              </div>
+            ` : ''}
+            ${structure?.explanation ? `
+              <div class="lf-structure-expl">
+                💡 ${escapeHtml(structure.explanation)}
+              </div>
+            ` : ''}
+            ${structure?.explanationBengali ? `
+              <div class="lf-structure-expl-bn">
+                ${escapeHtml(structure.explanationBengali)}
+              </div>
+            ` : ''}
+          </div>
+        ` : ''}
+
+        <!-- LAYER 4: Sentence Structure Map (Visual Hierarchy) -->
+        ${(structureMap?.nodes && structureMap.nodes.length > 0) ? `
+          <div style="margin-bottom: 14px;">
+            <div class="lf-grammar-section-title">
+              <span>🗺️ Sentence Structure Map:</span>
+            </div>
+            <div class="lf-structure-map-tree">
+              <div class="lf-map-node is-main">
+                <span class="lf-map-relation-pill" style="background: rgba(0, 113, 227, 0.2); color: #0071e3;">MAIN ROOT</span>
+                <div style="font-size: 12.5px; font-weight: 600; color: var(--text-main, #1d1d1f);">
+                  "${escapeHtml(structureMap.mainClause || s.selectedText)}"
+                </div>
+              </div>
+              ${structureMap.nodes.filter(n => n.relationType !== 'main').map(node => `
+                <div class="lf-map-node" style="margin-left: 14px;">
+                  <span class="lf-map-relation-pill">${escapeHtml(node.relationType.toUpperCase())}</span>
+                  <div>
+                    <div style="font-size: 12px; font-style: italic; color: #48484a;">"${escapeHtml(node.clauseOrElement)}"</div>
+                    <div style="font-size: 11.5px; color: #0071e3; margin-top: 2px;">↳ ${escapeHtml(node.explanation)}</div>
+                    ${node.bengaliExplanation ? `<div style="font-size: 11px; color: #86868b;">${escapeHtml(node.bengaliExplanation)}</div>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- LAYER 3: Deep Clause Analysis -->
+        ${clauses.length > 0 ? `
+          <div style="margin-bottom: 14px;">
+            <div class="lf-grammar-section-title">
+              <span>🧩 Syntactic Structure &amp; Clause Breakdown (${clauses.length} clauses):</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              ${clauses.map((c) => `
+                <div class="lf-clause-item" style="padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.06);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px; margin-bottom: 4px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span class="lf-pos" style="font-size: 9.5px; padding: 2px 6px;">${escapeHtml((c.type || 'Clause').toUpperCase())}</span>
+                      <strong style="font-size: 12px; color: var(--text-main, #1d1d1f);">${escapeHtml(c.role || 'Clause')}</strong>
+                    </div>
+                    ${c.standalone ? `
+                      <span style="font-size: 10.5px; color: #86868b; background: rgba(0,0,0,0.04); padding: 1px 6px; border-radius: 4px;">
+                        Standalone: ${escapeHtml(String(c.standalone))}
+                      </span>
+                    ` : ''}
+                  </div>
+                  <div class="lf-clause-text" style="font-size: 13px; font-style: italic; margin-bottom: 4px; color: #3a3a3c;">
+                    "${escapeHtml(c.text)}"
+                  </div>
+                  ${c.typeExplanation ? `
+                    <div style="font-size: 11.5px; color: #6e6e73; margin-bottom: 3px;">
+                      💡 <span style="font-weight: 500;">Type:</span> ${escapeHtml(c.typeExplanation)}
+                    </div>
+                  ` : ''}
+                  ${c.subjectAndVerb ? `
+                    <div style="font-size: 11.5px; color: #0071e3; margin-bottom: 3px;">
+                      🎯 <span style="font-weight: 500;">Grammar Core:</span> ${escapeHtml(c.subjectAndVerb)}
+                    </div>
+                  ` : ''}
+                  ${c.questionAnswered ? `
+                    <div style="font-size: 11.5px; color: #86868b; margin-bottom: 3px;">
+                      ❓ <span style="font-weight: 500;">Question Answered:</span> ${escapeHtml(c.questionAnswered)}
+                    </div>
+                  ` : ''}
+                  ${c.explanationBengali ? `
+                    <div class="lf-clause-bengali" style="font-size: 12px; font-weight: 500; color: #0071e3; margin-top: 4px; border-top: 0.5px solid rgba(0,0,0,0.05); padding-top: 3px;">
+                      ${escapeHtml(c.explanationBengali)}
+                    </div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- LAYER 5: Important Grammar Rules (7-item Formula) -->
+        ${grammarRules.length > 0 ? `
+          <div style="margin-bottom: 14px;">
+            <div class="lf-grammar-section-title">
+              <span>📖 Core Grammar Rules Applied:</span>
+            </div>
+            ${grammarRules.map((r) => `
+              <div class="lf-rule-card">
+                <div class="lf-rule-name">
+                  <span>📌</span><span>${escapeHtml(r.ruleName)}</span>
+                </div>
+                <div style="font-size: 12.5px; color: #3a3a3c; line-height: 1.4; margin-bottom: 4px;">
+                  ${escapeHtml(r.whatIsIt)}
+                </div>
+                ${r.whereIsIt ? `
+                  <div style="font-size: 12px; color: #6e6e73; margin-bottom: 4px;">
+                    <span style="font-weight: 600;">Where in sentence:</span> <em>"${escapeHtml(r.whereIsIt)}"</em>
+                  </div>
+                ` : ''}
+                ${r.whyUsed ? `
+                  <div style="font-size: 12px; color: #0071e3; margin-bottom: 4px;">
+                    <span style="font-weight: 600;">Why it is used:</span> ${escapeHtml(r.whyUsed)}
+                  </div>
+                ` : ''}
+                ${r.reusablePattern ? `
+                  <div class="lf-rule-formula-box">
+                    Formula: ${escapeHtml(r.reusablePattern)}
+                  </div>
+                ` : ''}
+                ${r.example?.english ? `
+                  <div style="font-size: 12px; color: #48484a; margin-top: 4px; padding-left: 6px; border-left: 2px solid #0071e3;">
+                    "${escapeHtml(r.example.english)}" — <span style="color: #86868b;">${escapeHtml(r.example.easyEnglish)}</span>
+                    <div style="color: #0071e3; font-weight: 500; font-size: 11.5px;">${escapeHtml(r.example.bengali)}</div>
+                  </div>
+                ` : ''}
+                ${r.commonConfusion ? `
+                  <div class="lf-rule-confusion-box">
+                    ⚠️ <strong>Common Mistake:</strong> ${escapeHtml(r.commonConfusion)}
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+
+        <!-- LAYER 6: Connectors & Meaning Relationships -->
+        ${connectors.length > 0 ? `
+          <div style="margin-bottom: 14px;">
+            <div class="lf-grammar-section-title">
+              <span>🔗 Logical Connectors & Relationships:</span>
+            </div>
+            ${connectors.map((cn) => `
+              <div class="lf-connector-box">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                  <strong style="font-size: 13px; color: #34c759;">"${escapeHtml(cn.connector)}"</strong>
+                  <span style="font-size: 11px; font-weight: 700; color: #34c759; text-transform: uppercase;">${escapeHtml(cn.logicalRelationship)}</span>
+                </div>
+                <div style="font-size: 12px; color: #3a3a3c; margin-bottom: 3px;">
+                  ${escapeHtml(cn.meaning)}
+                </div>
+                ${cn.grammaticalPattern ? `
+                  <div style="font-size: 11.5px; font-family: monospace; color: #2e7d32; margin-bottom: 3px;">
+                    Pattern: ${escapeHtml(cn.grammaticalPattern)}
+                  </div>
+                ` : ''}
+                ${cn.contrastWithSimilar ? `
+                  <div style="font-size: 11.5px; color: #6e6e73; font-style: italic;">
+                    💡 ${escapeHtml(cn.contrastWithSimilar)}
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+
+        <!-- LAYER 7: Word-Level Grammar in Context -->
+        ${wordGrammar.length > 0 ? `
+          <div style="margin-bottom: 14px;">
+            <div class="lf-grammar-section-title">
+              <span>🔤 Word-Level Grammar Roles:</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;">
+              ${wordGrammar.map((wg) => `
+                <div style="padding: 8px 10px; border-radius: 8px; background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.06);">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+                    <strong style="font-size: 12.5px; color: #0071e3;">${escapeHtml(wg.word)}</strong>
+                    <span style="font-size: 10px; color: #86868b;">${escapeHtml(wg.partOfSpeech)}</span>
+                  </div>
+                  <div style="font-size: 11.5px; color: #3a3a3c;">${escapeHtml(wg.syntacticRole)}</div>
+                  ${wg.usageNotes ? `<div style="font-size: 11px; color: #86868b; margin-top: 2px;">${escapeHtml(wg.usageNotes)}</div>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- LAYER 8: Common Mistakes & Natural Alternatives -->
+        ${mistakes ? `
+          <div style="margin-bottom: 14px; padding: 10px 12px; border-radius: 10px; background: rgba(255, 149, 0, 0.06); border: 1px solid rgba(255, 149, 0, 0.2);">
+            <div style="font-size: 12px; font-weight: 700; color: #d97706; text-transform: uppercase; margin-bottom: 4px;">
+              ⚠️ Common Student Misconceptions:
+            </div>
+            ${mistakes.commonMistake ? `
+              <div style="font-size: 12px; color: #b91c1c; margin-bottom: 4px;">
+                ${escapeHtml(mistakes.commonMistake)}
+              </div>
+            ` : ''}
+            ${mistakes.correctedExample ? `
+              <div style="font-size: 12px; color: #15803d; margin-bottom: 4px;">
+                ✓ ${escapeHtml(mistakes.correctedExample)}
+              </div>
+            ` : ''}
+            ${mistakes.naturalAlternative ? `
+              <div style="font-size: 12.5px; color: #1d1d1f; font-weight: 500; margin-top: 4px; border-top: 0.5px solid rgba(255, 149, 0, 0.15); padding-top: 4px;">
+                <span style="color: #0071e3; font-weight: 600;">More Natural Alternative:</span> "${escapeHtml(mistakes.naturalAlternative)}"
+              </div>
+            ` : ''}
+            ${mistakes.nuanceDifference ? `
+              <div style="font-size: 11.5px; color: #6e6e73; margin-top: 2px;">
+                ${escapeHtml(mistakes.nuanceDifference)}
+              </div>
+            ` : ''}
+          </div>
+        ` : ''}
+
+        <!-- LAYER 9: Learn & Practise Interactive Card -->
+        ${practice ? `
+          <div class="lf-practice-box">
+            <div style="font-size: 11.5px; font-weight: 700; color: #af52de; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;">
+              ✍️ Learn & Practise Pattern:
+            </div>
+            <div style="font-size: 12px; font-family: monospace; font-weight: 600; color: #0071e3; margin-bottom: 8px;">
+              Pattern: ${escapeHtml(practice.reusablePattern)}
+            </div>
+            <div class="lf-practice-q">
+              ${escapeHtml(practice.practiceQuestion)}
+            </div>
+            ${practice.options && practice.options.length > 0 ? `
+              <div class="lf-practice-options">
+                ${practice.options.map((opt) => `
+                  <button type="button" class="lf-practice-opt-btn" data-answer="${escapeHtml(practice.answer)}">
+                    ${escapeHtml(opt)}
+                  </button>
+                `).join('')}
+              </div>
+            ` : ''}
+            <div style="display: flex; justify-content: flex-end;">
+              <button type="button" class="lf-btn-action secondary lf-practice-reveal-btn" style="font-size: 11.5px; padding: 4px 10px;">
+                👁️ Check Answer
+              </button>
+            </div>
+            <div class="lf-practice-answer-reveal" style="display: none;">
+              <strong>Correct Answer:</strong> ${escapeHtml(practice.answer)}
+              <div style="margin-top: 2px; color: #3a3a3c;">${escapeHtml(practice.explanation)}</div>
+            </div>
+          </div>
+        ` : ''}
+
         <!-- Difficult Words & Useful Vocabulary -->
         ${vocab.length > 0 ? `
-          <div style="margin-bottom: 12px;">
+          <div style="margin-top: 14px; margin-bottom: 12px;">
             <strong style="font-size: 11.5px; color: #0071e3; text-transform: uppercase; display: block; margin-bottom: 6px;">
               🔍 Difficult Words & Key Terms (${vocab.length}):
             </strong>
@@ -1611,36 +1932,11 @@ export class PopupView {
           </div>
         ` : ''}
 
-        <!-- Syntactic Clauses -->
-        ${clauses.length > 0 ? `
-          <div style="margin-bottom: 12px;">
-            <strong class="lf-syntactic-title" style="font-size: 11.5px; text-transform: uppercase; display: block; margin-bottom: 6px;">
-              🧩 Syntactic Structure (${clauses.length} clauses):
-            </strong>
-            ${clauses.map((c) => `
-              <div class="lf-clause-item">
-                <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
-                  <span class="lf-pos" style="font-size: 9.5px; padding: 1px 5px;">${escapeHtml((c.type || 'Clause').toUpperCase())}</span>
-                  <span class="lf-clause-role" style="font-size: 11px; font-weight: 600;">${escapeHtml(c.role || 'Role')}</span>
-                </div>
-                <div class="lf-clause-text" style="font-size: 12.5px; font-style: italic; margin-bottom: 2px;">
-                  "${escapeHtml(c.text)}"
-                </div>
-                ${c.explanationBengali ? `
-                  <div class="lf-clause-bengali" style="font-size: 11.5px;">
-                    ${escapeHtml(c.explanationBengali)}
-                  </div>
-                ` : ''}
-              </div>
-            `).join('')}
-          </div>
-        ` : ''}
-
-        <!-- Grammatical Highlights -->
+        <!-- Grammatical Highlights (Summary Bullets) -->
         ${highlights.length > 0 ? `
-          <div style="margin-bottom: 10px;">
+          <div style="margin-top: 12px;">
             <strong style="font-size: 11.5px; color: #6e6e73; text-transform: uppercase; display: block; margin-bottom: 4px;">
-              💡 Grammatical Highlights:
+              💡 Summary Highlights:
             </strong>
             <ul style="padding-left: 16px; margin: 0; font-size: 12px; color: #424245; line-height: 1.5;">
               ${highlights.map((h) => `<li>${escapeHtml(h)}</li>`).join('')}
@@ -2381,6 +2677,19 @@ export class PopupView {
       }
     });
 
+    el.querySelector('#lf-view-parent-sentence-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (this.parentSentenceAnalysis) {
+        this.showSentence(
+          this.parentSentenceAnalysis,
+          this.currentContextSentence,
+          this.currentNearbyParagraph,
+          this.isSaved
+        );
+      }
+    });
+
     el.querySelector('.lf-pin-btn')?.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -2709,6 +3018,28 @@ export class PopupView {
         if (word && this.callbacks.onSelectWord) {
           this.parentSentenceAnalysis = s;
           this.callbacks.onSelectWord(word, s.selectedText);
+        }
+      });
+    });
+
+    el.querySelectorAll('.lf-practice-reveal-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const reveal = el.querySelector('.lf-practice-answer-reveal') as HTMLElement;
+        if (reveal) {
+          reveal.style.display = reveal.style.display === 'none' ? 'block' : 'none';
+        }
+      });
+    });
+
+    el.querySelectorAll('.lf-practice-opt-btn').forEach((optBtn) => {
+      optBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const reveal = el.querySelector('.lf-practice-answer-reveal') as HTMLElement;
+        if (reveal) {
+          reveal.style.display = 'block';
         }
       });
     });

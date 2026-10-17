@@ -3,7 +3,8 @@ import {
   LinguisticAnalysisResult,
   WritingGoal,
   WritingAssistResult,
-  FollowUpResponse
+  FollowUpResponse,
+  HighlightExtractionResult
 } from '../../types';
 import { getLanguageConfig } from '../../config/languages';
 import {
@@ -12,7 +13,8 @@ import {
   SentenceAnalysisSchema,
   ParagraphAnalysisSchema,
   WritingAssistSchema,
-  FollowUpResponseSchema
+  FollowUpResponseSchema,
+  HighlightExtractionResultSchema
 } from './schemas';
 import { AIProvider } from './types';
 import { safeParseJSON } from './safeJson';
@@ -40,67 +42,125 @@ export class OllamaProvider implements AIProvider {
   private async callOllama(prompt: string): Promise<string> {
     const formattedPrompt = `${prompt}\nRespond with JSON only adhering strictly to schema.`;
 
-    // 1. Primary attempt: /api/chat (supported by all modern chat/instruct models like d1, deepseek-r1, llama3, gemma)
-    let chatRes: Response | null = null;
-    try {
-      chatRes = await fetch(`${this.endpoint}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [{ role: 'user', content: formattedPrompt }],
-          format: 'json',
-          stream: false
-        })
-      });
-    } catch {
+    // Try primary endpoint, with automatic fallback between localhost and 127.0.0.1
+    const candidateEndpoints = [this.endpoint];
+    if (this.endpoint.includes('localhost')) {
+      candidateEndpoints.push(this.endpoint.replace('localhost', '127.0.0.1'));
+    } else if (this.endpoint.includes('127.0.0.1')) {
+      candidateEndpoints.push(this.endpoint.replace('127.0.0.1', 'localhost'));
+    }
+
+    let lastError: any = null;
+
+    for (const ep of candidateEndpoints) {
+      try {
+        console.log(`[LexiFlow Ollama] Dispatching request to endpoint: ${ep}, active model: ${this.model}`);
+        
+        // 1. Primary attempt: /api/chat
+        let chatRes = await fetch(`${ep}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: this.model,
+            messages: [{ role: 'user', content: formattedPrompt }],
+            format: 'json',
+            stream: false
+          })
+        });
+
+        // If model not found (e.g. 404 or error text), try auto-detecting installed model from /api/tags
+        if (!chatRes.ok && (chatRes.status === 404 || chatRes.status === 400)) {
+          const errText = await chatRes.text().catch(() => '');
+          if (errText.includes('not found') || chatRes.status === 404) {
+            console.warn(`[LexiFlow Ollama] Model "${this.model}" not found at ${ep}. Attempting model auto-discovery from /api/tags...`);
+            const discovered = await this.autoDiscoverModel(ep);
+            if (discovered && discovered !== this.model) {
+              console.log(`[LexiFlow Ollama] Discovered and switched to active model: "${discovered}"`);
+              this.model = discovered;
+              chatRes = await fetch(`${ep}/api/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  model: this.model,
+                  messages: [{ role: 'user', content: formattedPrompt }],
+                  format: 'json',
+                  stream: false
+                })
+              });
+            }
+          }
+        }
+
+        if (chatRes.ok) {
+          this.endpoint = ep; // lock on working endpoint
+          const data = await chatRes.json();
+          const content = data?.message?.content || data?.response;
+          if (content) return content;
+        }
+
+        // 2. Secondary fallback: /api/generate
+        let genRes = await fetch(`${ep}/api/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: this.model,
+            prompt: formattedPrompt,
+            format: 'json',
+            stream: false
+          })
+        });
+
+        if (genRes.ok) {
+          this.endpoint = ep;
+          const data = await genRes.json();
+          return data.response;
+        }
+
+        const failedRes = (!chatRes.ok && chatRes.status !== 404) ? chatRes : genRes;
+        if (failedRes.status === 401) {
+          throw new Error('Run `ollama signin` in a terminal (only needed for -cloud models).');
+        }
+        if (failedRes.status === 403) {
+          throw new Error('Ollama blocked the request.');
+        }
+
+        let errText = '';
+        try {
+          const errJson = await failedRes.json();
+          errText = errJson?.error || JSON.stringify(errJson);
+        } catch {
+          errText = await failedRes.text().catch(() => '');
+        }
+        lastError = new Error(`Local Ollama error (${failedRes.status}): ${errText || failedRes.statusText}`);
+      } catch (err: any) {
+        lastError = err;
+      }
+    }
+
+    if (
+      !lastError ||
+      lastError.name === 'TypeError' ||
+      /fetch|connect|econnrefused/i.test(lastError.message || '')
+    ) {
       throw new Error('Ollama is not running. Open the Ollama app and try again.');
     }
 
-    if (chatRes.ok) {
-      const data = await chatRes.json();
-      const content = data?.message?.content || data?.response;
-      if (content) return content;
-    }
+    throw lastError;
+  }
 
-    // 2. Secondary fallback: /api/generate (for legacy base completion models)
-    let genRes: Response | null = null;
+  private async autoDiscoverModel(endpoint: string): Promise<string | null> {
     try {
-      genRes = await fetch(`${this.endpoint}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: this.model,
-          prompt: formattedPrompt,
-          format: 'json',
-          stream: false
-        })
-      });
+      const res = await fetch(`${endpoint}/api/tags`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.models) && data.models.length > 0) {
+          return data.models[0].name;
+        }
+      }
     } catch {
-      throw new Error('Ollama is not running. Open the Ollama app and try again.');
+      // ignore
     }
-
-    if (genRes.ok) {
-      const data = await genRes.json();
-      return data.response;
-    }
-
-    // If both failed, surface the most informative error
-    const failedRes = (!chatRes.ok && chatRes.status !== 404) ? chatRes : genRes;
-    if (failedRes.status === 401) {
-      throw new Error('Run `ollama signin` in a terminal (only needed for -cloud models).');
-    }
-    if (failedRes.status === 403) {
-      throw new Error('Ollama blocked the request.');
-    }
-    let errText = '';
-    try {
-      const errJson = await failedRes.json();
-      errText = errJson?.error || JSON.stringify(errJson);
-    } catch {
-      errText = await failedRes.text().catch(() => '');
-    }
-    throw new Error(`Local Ollama error (${failedRes.status}): ${errText || failedRes.statusText}`);
+    return null;
   }
 
   async analyze(
@@ -253,5 +313,82 @@ Return a valid raw JSON object strictly adhering to this schema:
 }`;
     const raw = await this.callOllama(prompt);
     return FollowUpResponseSchema.parse(safeParseJSON(raw));
+  }
+
+  async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
+    const lang = getLanguageConfig(this.targetLang);
+    console.log(`[LexiFlow Ollama] Extracting highlights using model: "${this.model}" at ${this.endpoint}`);
+
+    const prompt = `You are LexiFlow AI, an elite university reading instructor and bilingual language acquisition tutor.
+Your mission is to identify the words, collocations, phrasal verbs, idioms, and discourse connectors that provide the GREATEST PEDAGOGICAL LEARNING VALUE for an English learner reading this specific article.
+
+Analyze the article holistically to understand its topic, central thesis, and argument flow before selecting items.
+
+SELECTION CRITERIA (Prioritize in this order):
+1. CENTRAL-IDEA VOCABULARY: Key terms and concepts essential to comprehending the author's primary arguments and claims.
+2. HIGH-VALUE DOMAIN & JOURNALISTIC VOCABULARY: Precise academic, professional, or domain-relevant words with high transferable utility across future reading situations (CEFR B2-C1).
+3. MULTIWORD EXPRESSIONS & PHRASES: Idioms, phrasal verbs, and natural collocations where meaning resides in the whole phrase rather than individual words (e.g., "go beyond", "in the wake of"). Select the ENTIRE phrase, never just a single word!
+4. CONTEXT-DEPENDENT MEANINGS: Words whose meaning in this article differs from their standard everyday meaning.
+5. DISCOURSE CONNECTORS: Structural connectors that signal contrast, concession, cause, or qualification (e.g., "notwithstanding").
+
+WHAT TO STRICTLY AVOID & PENALIZE:
+- Trivial, everyday words with zero learning value (e.g., "wearing", "make", "piece", "good", "people", "start", "discover").
+- Obscure, archaic words.
+- Single words that are part of a larger multiword phrase.
+- Over-highlighting: Only select terms with genuine learning value.
+
+EVERY ITEM MUST BE GROUNDED IN THE ARTICLE:
+- "text": The exact word or phrase verbatim as it appears in the text.
+- "contextSentence": The complete sentence from the text containing this item.
+- "type": "word" | "phrase" | "idiom".
+- "easyEnglish": Clear, learner-friendly English explanation.
+- "easyBengali": Natural ${lang.targetLabel} translation (${lang.promptTargetInstruction}).
+- "reason": Pedagogical reason explaining why this item is valuable to learn from this article.
+- "difficulty": "easy" | "medium" | "hard".
+- "learningValueScore": Floating number from 0.0 to 1.0 ranking its educational value.
+- "isArticleCore": boolean (true if directly related to the article's central message).
+
+Return raw JSON strictly adhering to this schema:
+{
+  "items": [
+    {
+      "id": "hl_1",
+      "text": "Exact word or phrase from text",
+      "type": "word",
+      "contextSentence": "Full sentence from the text where it appears",
+      "easyEnglish": "Very clear, everyday English definition in 1 short sentence",
+      "easyBengali": "Natural ${lang.targetLabel} translation",
+      "reason": "Why this item is useful for learners to acquire",
+      "difficulty": "easy" | "medium" | "hard",
+      "learningValueScore": 0.85,
+      "isArticleCore": true
+    }
+  ],
+  "pageTitle": "${pageTitle || 'Webpage Article'}",
+  "articleSummary": "Brief 1-sentence summary of the article's core thesis"
+}
+
+Article:
+"""
+${rawText.slice(0, 15000)}
+"""`;
+
+    const raw = await this.callOllama(prompt);
+    let parsed: any;
+    try {
+      parsed = safeParseJSON(raw);
+    } catch (err) {
+      console.warn('[LexiFlow Ollama] extractHighlights JSON parse error, raw was:', raw.slice(0, 200));
+      parsed = { items: [] };
+    }
+
+    const items = Array.isArray(parsed?.items) ? parsed.items : [];
+    return HighlightExtractionResultSchema.parse({
+      items,
+      pageTitle: pageTitle || parsed?.pageTitle || 'Webpage Vocabulary',
+      totalAnalyzedWords: rawText.split(/\s+/).filter(Boolean).length,
+      sourceMode: 'ai_reasoning',
+      articleSummary: parsed?.articleSummary
+    });
   }
 }

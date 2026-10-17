@@ -3,6 +3,9 @@ import { getSelectionData, isEditableElement } from './selection';
 import { POPUP_STYLES } from './styles';
 import { PopupView } from './popupView';
 import { TriggerView } from './triggerView';
+import { DOMHighlighter } from './highlighter';
+import { HighlightToolbar } from './highlightToolbar';
+import { MainArticleExtractor } from './articleExtractor';
 import {
   SelectionType,
   LinguisticAnalysisResult,
@@ -13,7 +16,8 @@ import {
   UserSettings,
   StageAExplanation,
   StageBDetailedVocabulary,
-  WrongMeaningReport
+  WrongMeaningReport,
+  HighlightExtractionResult
 } from '../types';
 import { DEFAULT_SETTINGS } from '../services/storage/settings';
 import { registerCustomLanguages } from '../config/languages';
@@ -27,6 +31,8 @@ class ContentScriptManager {
   private shadowRoot: ShadowRoot | null = null;
   private popupView: PopupView | null = null;
   private triggerView: TriggerView | null = null;
+  private highlighter: DOMHighlighter | null = null;
+  private highlightToolbar: HighlightToolbar | null = null;
 
   private currentText: string = '';
   private currentSelectionType: SelectionType = 'word';
@@ -50,6 +56,7 @@ class ContentScriptManager {
 
   init(): void {
     this.createShadowContainer();
+    this.setupHighlighter();
     this.loadSettings();
     this.setupEventListeners();
   }
@@ -76,6 +83,145 @@ class ContentScriptManager {
 
     // Mount to documentElement for maximum stability against body transforms
     (document.documentElement || document.body).appendChild(this.shadowHost);
+  }
+
+  private setupHighlighter(): void {
+    this.highlighter = new DOMHighlighter({
+      onHighlightClick: (event) => {
+        this.isUserDismissed = false;
+        this.lastAnalyzedText = event.item.text;
+        const selType: SelectionType = event.item.type === 'word' ? 'word' : 'phrase';
+        this.executeAnalysis(
+          event.item.text,
+          selType,
+          event.item.contextSentence,
+          '',
+          event.rect
+        );
+      }
+    });
+
+    this.highlightToolbar = new HighlightToolbar({
+      onAnalyzePage: async () => {
+        await this.runPageHighlightAnalysis();
+      },
+      onClearHighlights: () => {
+        this.highlighter?.clearHighlights();
+        this.updateHighlightToolbar();
+      },
+      onNext: () => {
+        const res = this.highlighter?.nextHighlight();
+        if (res && this.highlightToolbar) {
+          this.highlightToolbar.updateState({ currentIndex: res.index });
+        }
+      },
+      onPrev: () => {
+        const res = this.highlighter?.prevHighlight();
+        if (res && this.highlightToolbar) {
+          this.highlightToolbar.updateState({ currentIndex: res.index });
+        }
+      },
+      onColorChange: (color) => {
+        this.userSettings.highlightColor = color;
+        this.highlighter?.setColor(color);
+        this.sendMessage('UPDATE_SETTINGS', { highlightColor: color }).catch(() => {});
+      },
+      onFilterChange: (filters) => {
+        this.userSettings.highlightFilters = filters;
+        this.highlighter?.setFilters(filters);
+        this.updateHighlightToolbar();
+        this.sendMessage('UPDATE_SETTINGS', { highlightFilters: filters }).catch(() => {});
+      },
+      onSelectSummaryItem: (item) => {
+        this.isUserDismissed = false;
+        this.lastAnalyzedText = item.text;
+        const dummyRect = {
+          top: window.innerHeight / 3,
+          bottom: window.innerHeight / 3 + 20,
+          left: window.innerWidth / 2 - 50,
+          right: window.innerWidth / 2 + 50,
+          width: 100,
+          height: 20
+        } as DOMRect;
+        this.executeAnalysis(item.text, item.type === 'word' ? 'word' : 'phrase', item.contextSentence, '', dummyRect);
+      }
+    });
+
+    if (this.shadowRoot) {
+      this.shadowRoot.appendChild(this.highlightToolbar.getElement());
+      // Keep floating toolbar hidden by default so it does NOT block the reader's article text
+      this.highlightToolbar.getElement().style.display = 'none';
+    }
+  }
+
+  private async runPageHighlightAnalysis(): Promise<HighlightExtractionResult | null> {
+    if (this.isSiteDisabled()) return null;
+    if (!this.highlighter) return null;
+
+    this.highlightToolbar?.setLoading(true);
+
+    // 1. Isolate the main article body (entire piece, full text)
+    const article = MainArticleExtractor.findMainArticle();
+    let cleanExcerpt = (article?.cleanText || '').slice(0, 15000);
+    const title = article?.title || document.title;
+    let targetContainer: HTMLElement | undefined = article?.container;
+
+    // Fallback: If no specialized article container detected, collect substantive paragraphs from body
+    if (!cleanExcerpt || cleanExcerpt.trim().length < 30) {
+      const substantiveParas = Array.from(document.querySelectorAll('p'))
+        .filter((p) => {
+          const txt = (p.textContent || '').trim();
+          if (txt.length < 25) return false;
+          // Ignore inside headers, footers, navs
+          if (p.closest('header, footer, nav, aside, [role="navigation"], #lexiflow-host')) return false;
+          return true;
+        });
+
+      if (substantiveParas.length > 0) {
+        cleanExcerpt = substantiveParas.map((p) => p.textContent?.trim()).join('\n\n').slice(0, 15000);
+        targetContainer = document.body;
+      }
+    }
+
+    if (!cleanExcerpt || cleanExcerpt.trim().length < 30) {
+      console.warn('[LexiFlow] Page highlighting skipped: No substantive article text found (<30 characters).');
+      this.highlightToolbar?.setLoading(false);
+      return null;
+    }
+
+    try {
+      console.log(`[LexiFlow] Requesting highlight extraction for: "${title}" (${cleanExcerpt.length} chars)`);
+      const res = await this.sendMessage<HighlightExtractionResult>('IDENTIFY_PAGE_HIGHLIGHTS', {
+        rawText: cleanExcerpt,
+        pageTitle: title
+      });
+
+      if (res && Array.isArray(res.items) && res.items.length > 0) {
+        const color = this.userSettings.highlightColor || 'yellow';
+        const filters = this.userSettings.highlightFilters || { words: true, phrases: true, idioms: true };
+        // Highlight inside detected article container or body fallback
+        this.highlighter.highlightItems(res.items, color, filters, targetContainer);
+        this.updateHighlightToolbar();
+      }
+      return res || null;
+    } catch (err) {
+      console.warn('[LexiFlow] Page highlighting error:', err);
+      return null;
+    } finally {
+      this.highlightToolbar?.setLoading(false);
+    }
+  }
+
+  private updateHighlightToolbar(): void {
+    if (!this.highlightToolbar || !this.highlighter) return;
+    const count = this.highlighter.getCount();
+    const items = this.highlighter.getDiscoveredItems();
+    this.highlightToolbar.updateState({
+      color: this.userSettings.highlightColor || 'yellow',
+      filters: this.userSettings.highlightFilters || { words: true, phrases: true, idioms: true },
+      count,
+      discoveredItems: items
+    });
   }
 
   private async loadSettings(): Promise<void> {
@@ -125,6 +271,15 @@ class ContentScriptManager {
     this.popupView.setTargetLanguage(this.userSettings.targetLanguage || 'bn');
     if (this.isPopupPositioned) {
       this.updatePosition(false);
+    }
+
+    if (this.highlightToolbar) {
+      // Keep floating toolbar hidden so it never blocks the reader's article text
+      this.highlightToolbar.getElement().style.display = 'none';
+      this.highlightToolbar.updateState({
+        color: this.userSettings.highlightColor || 'yellow',
+        filters: this.userSettings.highlightFilters || { words: true, phrases: true, idioms: true }
+      });
     }
   }
 
@@ -270,6 +425,88 @@ class ContentScriptManager {
           this.isUserDismissed = false;
           this.executeAnalysis(text, 'word', '', '', dummyRect);
           sendResponse?.({ success: true });
+          return;
+        }
+
+        if (message.type === 'GET_PAGE_HIGHLIGHT_STATE') {
+          const article = MainArticleExtractor.findMainArticle();
+          const count = this.highlighter?.getCount() || { total: 0, words: 0, phrases: 0, idioms: 0, visible: 0 };
+          sendResponse?.({
+            success: true,
+            data: {
+              isSiteDisabled: this.isSiteDisabled(),
+              articleTitle: article?.title || document.title,
+              hasMainArticle: Boolean(article && article.paragraphs.length > 0),
+              count,
+              currentIndex: (this.highlighter as any)?.currentIndex ?? -1,
+              items: this.highlighter?.getDiscoveredItems() || [],
+              color: this.userSettings.highlightColor || 'yellow',
+              filters: this.userSettings.highlightFilters || { words: true, phrases: true, idioms: true }
+            }
+          });
+          return true;
+        }
+
+        if (message.type === 'TRIGGER_HIGHLIGHT_ARTICLE') {
+          this.runPageHighlightAnalysis().then((res) => {
+            const count = this.highlighter?.getCount() || { total: 0, words: 0, phrases: 0, idioms: 0, visible: 0 };
+            const discovered = this.highlighter?.getDiscoveredItems() || [];
+            sendResponse?.({
+              success: Boolean(res && discovered.length > 0),
+              data: {
+                count,
+                items: discovered,
+                sourceMode: res?.sourceMode
+              },
+              error: !res
+                ? 'No editorial article body found on this webpage (requires at least 30 characters).'
+                : (discovered.length === 0 ? 'Article analyzed, but 0 terms met the learning value threshold.' : undefined)
+            });
+          });
+          return true;
+        }
+
+        if (message.type === 'NAVIGATE_PAGE_HIGHLIGHT') {
+          const dir = message.payload?.direction;
+          const res = dir === 'prev' ? this.highlighter?.prevHighlight() : this.highlighter?.nextHighlight();
+          sendResponse?.({ success: true, data: res });
+          return;
+        }
+
+        if (message.type === 'UPDATE_PAGE_HIGHLIGHT_SETTINGS') {
+          if (message.payload?.color) {
+            this.userSettings.highlightColor = message.payload.color;
+            this.highlighter?.setColor(message.payload.color);
+          }
+          if (message.payload?.filters) {
+            this.userSettings.highlightFilters = message.payload.filters;
+            this.highlighter?.setFilters(message.payload.filters);
+          }
+          this.updateHighlightToolbar();
+          const count = this.highlighter?.getCount();
+          sendResponse?.({ success: true, data: { count } });
+          return;
+        }
+
+        if (message.type === 'CLEAR_PAGE_HIGHLIGHTS') {
+          this.highlighter?.clearHighlights();
+          this.updateHighlightToolbar();
+          sendResponse?.({ success: true });
+          return;
+        }
+
+        if (message.type === 'SCROLL_TO_HIGHLIGHT_ITEM') {
+          const text = (message.payload?.text || '').toLowerCase().trim();
+          const visible = this.highlighter?.getVisibleMarks() || [];
+          const match = visible.find((m) => (m.textContent || '').toLowerCase().trim() === text);
+          if (match) {
+            if (typeof match.scrollIntoView === 'function') {
+              match.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            (this.highlighter as any)?.setActiveMark(match);
+          }
+          sendResponse?.({ success: Boolean(match) });
+          return;
         }
       });
     }

@@ -33,7 +33,10 @@ import {
   BookOpen,
   Layers,
   Copy,
-  ArrowLeft
+  ArrowLeft,
+  ChevronUp,
+  ChevronDown,
+  RotateCcw
 } from 'lucide-react';
 import { playPronunciation } from '../services/audio/voiceService';
 import './popup.css';
@@ -296,19 +299,57 @@ export const App: React.FC = () => {
   // History stack for in-popup word lookups
   const [lookupHistory, setLookupHistory] = useState<string[]>([]);
 
+  // Page AI Article Highlighting Studio state
+  const [activeTabId, setActiveTabId] = useState<number | null>(null);
+  const [highlightState, setHighlightState] = useState<{
+    isSiteDisabled: boolean;
+    articleTitle?: string;
+    hasMainArticle: boolean;
+    count: { total: number; visible: number; words: number; phrases: number; idioms: number };
+    currentIndex: number;
+    items: Array<{
+      id?: string;
+      text: string;
+      type: 'word' | 'phrase' | 'idiom';
+      contextSentence?: string;
+      easyEnglish?: string;
+      easyBengali?: string;
+      contextualMeaning?: string;
+      bengaliMeaning?: string;
+    }>;
+    color: string;
+    filters: { words: boolean; phrases: boolean; idioms: boolean };
+  } | null>(null);
+  const [highlightLoading, setHighlightLoading] = useState(false);
+  const [showVocabDrawer, setShowVocabDrawer] = useState(false);
+  const [highlightFeedback, setHighlightFeedback] = useState<{ message: string; type: 'info' | 'error' | 'success' } | null>(null);
+
   useEffect(() => {
-    // 0. Query active browser tab domain
+    // 0. Query active browser tab domain and highlight state
     if (typeof chrome !== 'undefined' && chrome.tabs?.query) {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs && tabs[0]?.url) {
-          try {
-            const parsed = new URL(tabs[0].url);
-            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-              const host = parsed.hostname.replace(/^www\./, '');
-              setCurrentDomain(host);
+        if (tabs && tabs[0]?.id) {
+          const tabId = tabs[0].id;
+          setActiveTabId(tabId);
+          if (tabs[0].url) {
+            try {
+              const parsed = new URL(tabs[0].url);
+              if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                const host = parsed.hostname.replace(/^www\./, '');
+                setCurrentDomain(host);
+                // Fetch page highlight state from content script
+                chrome.tabs.sendMessage(tabId, { type: 'GET_PAGE_HIGHLIGHT_STATE' }, (res) => {
+                  if (chrome.runtime?.lastError) {
+                    return;
+                  }
+                  if (res?.success && res.data) {
+                    setHighlightState(res.data);
+                  }
+                });
+              }
+            } catch {
+              // ignore non-http tabs
             }
-          } catch {
-            // ignore non-http tabs
           }
         }
       });
@@ -717,6 +758,122 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleTriggerHighlight = () => {
+    setHighlightFeedback(null);
+    if (!activeTabId) {
+      setHighlightFeedback({
+        message: 'No active article tab found. Please open an article or news webpage.',
+        type: 'info'
+      });
+      return;
+    }
+    setHighlightLoading(true);
+    chrome.tabs.sendMessage(activeTabId, { type: 'TRIGGER_HIGHLIGHT_ARTICLE' }, (res) => {
+      setHighlightLoading(false);
+      if (chrome.runtime?.lastError) {
+        setHighlightFeedback({
+          message: 'Could not connect to the webpage. Please refresh the page tab and try again.',
+          type: 'error'
+        });
+        return;
+      }
+      if (res?.success && res.data) {
+        const count = res.data.count?.total || res.data.items?.length || 0;
+        setHighlightFeedback({
+          message: `Highlighted ${count} key vocabulary items across the article!`,
+          type: 'success'
+        });
+        setHighlightState((prev) =>
+          prev
+            ? {
+                ...prev,
+                count: res.data.count,
+                items: res.data.items,
+                currentIndex: res.data.count?.visible > 0 ? 0 : -1
+              }
+            : {
+                isSiteDisabled: false,
+                hasMainArticle: true,
+                count: res.data.count,
+                currentIndex: 0,
+                items: res.data.items,
+                color: 'yellow',
+                filters: { words: true, phrases: true, idioms: true }
+              }
+        );
+      } else {
+        setHighlightFeedback({
+          message: res?.error || 'No editorial article body found on this page (or text is under 30 characters).',
+          type: 'info'
+        });
+      }
+    });
+  };
+
+  const handleNavigateHighlight = (direction: 'prev' | 'next') => {
+    if (!activeTabId) return;
+    chrome.tabs.sendMessage(activeTabId, { type: 'NAVIGATE_PAGE_HIGHLIGHT', payload: { direction } }, (res) => {
+      if (res?.success && res.data) {
+        setHighlightState((prev) => (prev ? { ...prev, currentIndex: res.data.index } : null));
+      }
+    });
+  };
+
+  const handleChangeHighlightColor = (color: string) => {
+    if (!activeTabId) return;
+    setHighlightState((prev) => (prev ? { ...prev, color } : null));
+    chrome.tabs.sendMessage(activeTabId, { type: 'UPDATE_PAGE_HIGHLIGHT_SETTINGS', payload: { color } });
+  };
+
+  const handleToggleFilter = (filterKey: 'words' | 'phrases' | 'idioms') => {
+    if (!activeTabId || !highlightState) return;
+    const nextFilters = {
+      ...highlightState.filters,
+      [filterKey]: !highlightState.filters[filterKey]
+    };
+    setHighlightState({
+      ...highlightState,
+      filters: nextFilters
+    });
+    chrome.tabs.sendMessage(
+      activeTabId,
+      {
+        type: 'UPDATE_PAGE_HIGHLIGHT_SETTINGS',
+        payload: { filters: nextFilters }
+      },
+      (res) => {
+        if (res?.success && res.data?.count) {
+          setHighlightState((prev) => (prev ? { ...prev, count: res.data.count } : null));
+        }
+      }
+    );
+  };
+
+  const handleClearHighlights = () => {
+    if (!activeTabId) return;
+    chrome.tabs.sendMessage(activeTabId, { type: 'CLEAR_PAGE_HIGHLIGHTS' }, () => {
+      setHighlightState((prev) =>
+        prev
+          ? {
+              ...prev,
+              count: { total: 0, words: 0, phrases: 0, idioms: 0, visible: 0 },
+              items: [],
+              currentIndex: -1
+            }
+          : null
+      );
+      setShowVocabDrawer(false);
+    });
+  };
+
+  const handleScrollToItem = (itemText: string) => {
+    if (!activeTabId) return;
+    chrome.tabs.sendMessage(activeTabId, {
+      type: 'SCROLL_TO_HIGHLIGHT_ITEM',
+      payload: { text: itemText }
+    });
+  };
+
   const isSentenceMode = result?.selectionType === 'sentence';
   const sentenceResult = result as SentenceAnalysisResult | null;
   const wordResult = result as WordAnalysisResult | null;
@@ -828,20 +985,214 @@ export const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Guide card when no search is active and not loading */}
+      {/* Smart Article Reader & AI Highlights Studio (Replaces static guide card) */}
       {!result && !loading && (
-        <div className="popup-guide-card">
-          <div className="popup-guide-icon">
-            <Sparkles size={18} />
+        <div className="popup-studio-card">
+          {/* Studio Header */}
+          <div className="studio-header">
+            <div className="studio-brand">
+              <div className="studio-icon-badge">
+                <Sparkles size={16} />
+              </div>
+              <div>
+                <div className="studio-title-row">
+                  <span className="studio-title">AI Article Highlights</span>
+                  {highlightState && highlightState.count.total > 0 && (
+                    <span className="studio-badge-pill">
+                      {highlightState.count.visible} of {highlightState.count.total} active
+                    </span>
+                  )}
+                </div>
+                <div className="studio-subtext">
+                  {highlightState?.articleTitle
+                    ? `Scope: ${highlightState.articleTitle.slice(0, 32)}${highlightState.articleTitle.length > 32 ? '...' : ''}`
+                    : 'Scope: Main article text only (noise-filtered)'}
+                </div>
+              </div>
+            </div>
+
+            {highlightState && highlightState.count.total > 0 && (
+              <button
+                type="button"
+                className="studio-btn-icon-clear"
+                title="Clear Highlights"
+                onClick={handleClearHighlights}
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
-          <div className="popup-guide-title">
-            {isCurrentSiteEnabled ? 'Active & Ready on this page' : 'Paused on this website'}
-          </div>
-          <div className="popup-guide-desc">
-            {isCurrentSiteEnabled
-              ? 'Select any word or sentence on the page to instantly view definitions, pronunciation & translations.'
-              : `LexiFlow reading companion is disabled on ${currentDomain || 'this site'}. Toggle the slider above to re-enable.`}
-          </div>
+
+          {/* Status Content */}
+          {!isCurrentSiteEnabled ? (
+            <div className="studio-paused-notice">
+              LexiFlow reading companion is paused on {currentDomain || 'this site'}. Toggle the slider above to re-enable.
+            </div>
+          ) : highlightLoading ? (
+            <div className="studio-loading-state">
+              <div className="studio-spinner" />
+              <div className="studio-loading-text">
+                <div className="studio-loading-title">Analyzing Main Article Body...</div>
+                <div className="studio-loading-desc">Filtering page headers, footers & sidebars to extract key vocabulary</div>
+              </div>
+            </div>
+          ) : !highlightState || highlightState.count.total === 0 ? (
+            <div className="studio-ready-body">
+              <p className="studio-ready-desc">
+                Identifies the <strong>core editorial article</strong> on this page, ignoring navigation, headers, footers, and ads. Automatically extracts and highlights learning-worthy vocabulary, collocations, and idioms with instant explanations.
+              </p>
+              {highlightFeedback && (
+                <div className={`studio-feedback-banner ${highlightFeedback.type}`}>
+                  <span>{highlightFeedback.type === 'error' ? '⚠️' : highlightFeedback.type === 'success' ? '✨' : 'ℹ️'}</span>
+                  <span>{highlightFeedback.message}</span>
+                </div>
+              )}
+              <button
+                type="button"
+                className="studio-btn-primary-highlight"
+                onClick={handleTriggerHighlight}
+              >
+                <Sparkles size={15} />
+                <span>Highlight Main Article</span>
+              </button>
+            </div>
+          ) : (
+            <div className="studio-active-controls">
+              {highlightFeedback && (
+                <div className={`studio-feedback-banner ${highlightFeedback.type}`} style={{ marginBottom: '8px' }}>
+                  <span>{highlightFeedback.type === 'error' ? '⚠️' : highlightFeedback.type === 'success' ? '✨' : 'ℹ️'}</span>
+                  <span>{highlightFeedback.message}</span>
+                </div>
+              )}
+              {/* Navigation Bar */}
+              <div className="studio-nav-bar">
+                <div className="studio-nav-arrows">
+                  <button
+                    type="button"
+                    className="studio-nav-btn"
+                    title="Previous Highlight (Shift+Tab)"
+                    onClick={() => handleNavigateHighlight('prev')}
+                  >
+                    <ChevronUp size={14} />
+                    <span>Prev</span>
+                  </button>
+                  <span className="studio-nav-counter">
+                    {(highlightState.currentIndex ?? -1) >= 0 ? highlightState.currentIndex + 1 : 1} / {highlightState.count.visible || highlightState.count.total}
+                  </span>
+                  <button
+                    type="button"
+                    className="studio-nav-btn"
+                    title="Next Highlight (Tab)"
+                    onClick={() => handleNavigateHighlight('next')}
+                  >
+                    <span>Next</span>
+                    <ChevronDown size={14} />
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  className={`studio-drawer-toggle ${showVocabDrawer ? 'active' : ''}`}
+                  onClick={() => setShowVocabDrawer(!showVocabDrawer)}
+                  title="View discovered terms"
+                >
+                  <BookOpen size={13} />
+                  <span>Vocab ({highlightState.items?.length || highlightState.count.total})</span>
+                </button>
+              </div>
+
+              {/* Color Swatches & Filter Pills */}
+              <div className="studio-settings-row">
+                <div className="studio-color-group" title="Select Highlight Color">
+                  {(['yellow', 'blue', 'green', 'pink', 'purple'] as const).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={`studio-color-dot ${highlightState.color === c ? 'selected' : ''}`}
+                      data-color={c}
+                      onClick={() => handleChangeHighlightColor(c)}
+                      aria-label={`Highlight Color ${c}`}
+                    />
+                  ))}
+                </div>
+
+                <div className="studio-filter-group">
+                  <button
+                    type="button"
+                    className={`studio-filter-pill ${highlightState.filters.words ? 'active' : ''}`}
+                    onClick={() => handleToggleFilter('words')}
+                    title="Toggle Words"
+                  >
+                    Words
+                  </button>
+                  <button
+                    type="button"
+                    className={`studio-filter-pill ${highlightState.filters.phrases ? 'active' : ''}`}
+                    onClick={() => handleToggleFilter('phrases')}
+                    title="Toggle Phrases"
+                  >
+                    Phrases
+                  </button>
+                  <button
+                    type="button"
+                    className={`studio-filter-pill ${highlightState.filters.idioms ? 'active' : ''}`}
+                    onClick={() => handleToggleFilter('idioms')}
+                    title="Toggle Idioms"
+                  >
+                    Idioms
+                  </button>
+                </div>
+              </div>
+
+              {/* Collapsible Vocabulary Drawer */}
+              {showVocabDrawer && highlightState.items && highlightState.items.length > 0 && (
+                <div className="studio-vocab-drawer">
+                  <div className="studio-vocab-header">
+                    <div className="studio-vocab-header-left">
+                      <span className="studio-vocab-header-title">Vocabulary In Article</span>
+                      <span className="studio-vocab-count-badge">{highlightState.items.length}</span>
+                    </div>
+                    <span className="studio-vocab-header-hint">Tap word to jump ↗</span>
+                  </div>
+                  <div className="studio-vocab-list">
+                    {highlightState.items.map((it, idx) => {
+                      const meaning = it.easyBengali || it.bengaliMeaning || it.easyEnglish || it.contextualMeaning;
+                      return (
+                        <div
+                          key={idx}
+                          className="studio-vocab-item"
+                          onClick={() => handleScrollToItem(it.text)}
+                          title={`Click to scroll to "${it.text}" in the article`}
+                        >
+                          <div className="studio-vocab-item-top">
+                            <span className="studio-vocab-item-text">{it.text}</span>
+                            <span className={`studio-vocab-tag ${it.type}`}>{it.type}</span>
+                          </div>
+                          {meaning && (
+                            <div className="studio-vocab-item-meaning">
+                              {meaning}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Bottom Re-scan row */}
+              <div className="studio-bottom-actions">
+                <button
+                  type="button"
+                  className="studio-btn-rescan"
+                  onClick={handleTriggerHighlight}
+                >
+                  <RotateCcw size={12} />
+                  <span>Re-scan Article Body</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

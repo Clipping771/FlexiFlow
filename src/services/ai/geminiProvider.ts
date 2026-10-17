@@ -5,7 +5,8 @@ import {
   WritingAssistResult,
   FollowUpResponse,
   StageAExplanation,
-  StageBDetailedVocabulary
+  StageBDetailedVocabulary,
+  HighlightExtractionResult
 } from '../../types';
 import {
   WordAnalysisSchema,
@@ -15,7 +16,8 @@ import {
   WritingAssistSchema,
   FollowUpResponseSchema,
   StageAContextualSchema,
-  StageBDetailedVocabularySchema
+  StageBDetailedVocabularySchema,
+  HighlightExtractionResultSchema
 } from './schemas';
 import { validateStageA, validateStageB } from './validation';
 import { AIProvider } from './types';
@@ -389,35 +391,118 @@ Return JSON adhering to PhraseAnalysisSchema:
       const raw = await this.callGemini(sys, `Phrase: ${text}\nContext: ${contextSentence || ''}`, 650);
       return PhraseAnalysisSchema.parse(safeParseJSON(raw));
     } else if (type === 'sentence') {
-      const sys = `Analyze this sentence for a learner. Divide the sentence into meaningful English phrases or clauses in their original order.
-Do not split into arbitrary single words. For every phrase provide the exact phrase, very simple everyday English, and natural easy ${lang.targetLabel} (${lang.promptTargetInstruction}).
-Return JSON adhering to SentenceAnalysisSchema:
+      const sys = `You are a master English linguistics and pedagogy professor. Deconstruct this English sentence into a student-friendly 9-layer learning breakdown.
+Strict educational instructions:
+1. Explain WHAT it means in very simple, beginner-friendly everyday English (Layer 1).
+2. Explain in natural, clear ${lang.targetLabel} (${lang.promptTargetInstruction}).
+3. Divide into meaningful phrases/clauses in original order with grammatical function, connection, and why it matters (Layer 2).
+4. Identify ALL significant clauses with type, subject & verb, role, what question it answers, dependency, standalone capability, and example (Layer 3).
+5. Build a Sentence Structure Map showing how clauses connect (Layer 4).
+6. Detail Important Grammar Rules present in the sentence using: what is it, where is it, why used, how it works, reusable formula, and common confusion (Layer 5).
+7. Explain logical connectors (e.g. despite, although, because, however) and contrast with similar terms (Layer 6).
+8. Provide word-level grammar for key words (Layer 7).
+9. Highlight common student mistakes, corrected examples, and natural alternatives (Layer 8).
+10. Provide a reusable sentence pattern, practice question, options, answer, and explanation (Layer 9).
+
+Return raw JSON adhering to SentenceAnalysisSchema:
 {
   "selectedText": "${text}",
   "selectionType": "sentence",
-  "plainEnglishParaphrase": "Very easy plain English paraphrase",
-  "overallMeaning": "Overall meaning",
+  "plainEnglishParaphrase": "Very easy plain English paraphrase in short everyday words",
+  "overallMeaning": "Core message",
+  "mainMessage": "What the author is fundamentally saying in 1-2 simple sentences",
+  "sentenceStructure": {
+    "type": "simple" | "compound" | "complex" | "compound-complex",
+    "explanation": "Why it is classified this way in simple English",
+    "explanationBengali": "বাংলায় সহজ ব্যাখ্যা"
+  },
   "bengaliTranslation": "Complete natural ${lang.targetLabel} translation (${lang.promptTargetInstruction})",
   "phraseBreakdown": [
     {
-      "phrase": "Exact meaningful phrase from sentence",
-      "easyEnglish": "Very simple everyday English explanation in short sentences.",
-      "easyBengali": "Natural easy ${lang.targetLabel} explanation or translation (${lang.promptTargetInstruction})"
+      "phrase": "Exact phrase from sentence",
+      "easyEnglish": "Very simple everyday English explanation.",
+      "easyBengali": "Natural ${lang.targetLabel} explanation",
+      "grammaticalFunction": "Role performed by this chunk",
+      "connection": "How it connects to other parts",
+      "whyItMatters": "What information it contributes",
+      "simplerExample": "A short simpler example using same structure"
     }
   ],
   "clauses": [
     {
-      "text": "Clause text",
-      "type": "main" | "subordinate" | "relative" | "participial" | "conditional",
+      "text": "Exact clause text",
+      "type": "main" | "subordinate" | "relative" | "participial" | "conditional" | "noun",
+      "typeExplanation": "Simple explanation of this clause type",
+      "subjectAndVerb": "Subject: X, Verb: Y",
       "role": "Syntactic role",
+      "questionAnswered": "What question does it answer?",
+      "dependsOn": "Which clause it depends on",
+      "standalone": "Yes / No with reason",
+      "example": "Short example demonstrating same pattern",
       "explanationBengali": "Clause explanation in ${lang.targetLabel}"
     }
   ],
-  "grammaticalHighlights": ["feature 1"],
+  "structureMap": {
+    "mainClause": "The main independent clause",
+    "nodes": [
+      {
+        "clauseOrElement": "Clause text",
+        "relationType": "main" | "contrast" | "condition" | "reason" | "description",
+        "connectsTo": "Root or Main clause",
+        "explanation": "Simple explanation of relationship",
+        "bengaliExplanation": "বাংলা ব্যাখ্যা"
+      }
+    ]
+  },
+  "grammarRules": [
+    {
+      "ruleName": "Rule name (e.g. Preposition of Contrast: Despite + Noun Phrase)",
+      "whatIsIt": "Simple definition",
+      "whereIsIt": "Exact words in sentence",
+      "whyUsed": "Purpose in this specific sentence",
+      "howItWorks": "Beginner-friendly mechanism",
+      "reusablePattern": "Reusable formula/pattern",
+      "example": { "english": "Example", "easyEnglish": "Simple meaning", "bengali": "বাংলা অর্থ" },
+      "commonConfusion": "Common student misunderstanding or contrast"
+    }
+  ],
+  "connectors": [
+    {
+      "connector": "Connector word",
+      "meaning": "Meaning",
+      "grammaticalPattern": "Pattern e.g. Despite + Noun vs Although + Clause",
+      "logicalRelationship": "Relationship type",
+      "whyAppropriate": "Why used here",
+      "contrastWithSimilar": "Contrast with similar words"
+    }
+  ],
+  "wordLevelGrammar": [
+    {
+      "word": "Key word",
+      "partOfSpeech": "Part of speech in context",
+      "syntacticRole": "Syntactic role in this sentence",
+      "wordForms": ["form1", "form2"],
+      "usageNotes": "Transitive/intransitive notes or dependent prepositions"
+    }
+  ],
+  "commonMistakesAndAlternatives": {
+    "commonMistake": "Typical learner error",
+    "correctedExample": "Corrected example",
+    "naturalAlternative": "Natural alternative construction",
+    "nuanceDifference": "How the alternative shifts tone or emphasis"
+  },
+  "practice": {
+    "reusablePattern": "Transferable pattern",
+    "practiceQuestion": "Interactive question for student",
+    "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+    "answer": "Correct answer",
+    "explanation": "Why it is correct"
+  },
+  "grammaticalHighlights": ["Feature 1", "Feature 2"],
   "difficultVocabulary": [{"word": "word", "meaningInContext": "meaning", "bengali": "${lang.targetNativeHeader}"}],
-  "toneAndRegister": "Tone"
+  "toneAndRegister": "Formal / Academic / Conversational"
 }`;
-      const raw = await this.callGemini(sys, `Sentence: ${text}`, 3000);
+      const raw = await this.callGemini(sys, `Sentence: ${text}`, 3500);
       return SentenceAnalysisSchema.parse(safeParseJSON(raw));
     } else {
       const sys = `Analyze this paragraph for a learner. Divide the text into meaningful English phrases or clauses in original order.
@@ -485,5 +570,64 @@ Return JSON adhering to FollowUpResponseSchema:
 }`;
     const raw = await this.callGemini(sys, `Text: ${text}\nContext: ${context}\nQuestion: ${question}`, 850);
     return FollowUpResponseSchema.parse(safeParseJSON(raw));
+  }
+
+  async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
+    const lang = getLanguageConfig(this.targetLang);
+    const sys = `You are LexiFlow AI, an elite university reading instructor and bilingual language acquisition tutor.
+Your mission is NOT to simply highlight words or detect rare vocabulary. You are an expert Reading Tutor identifying the words, collocations, phrasal verbs, idioms, and discourse connectors that provide the GREATEST PEDAGOGICAL LEARNING VALUE for an English learner reading this specific article.
+
+Analyze the article holistically to understand its topic, central thesis, and argument flow before selecting items.
+
+SELECTION CRITERIA (Prioritize in this order):
+1. CENTRAL-IDEA VOCABULARY: Key terms and concepts essential to comprehending the author's primary arguments and claims.
+2. HIGH-VALUE DOMAIN & JOURNALISTIC VOCABULARY: Precise academic, professional, or domain-relevant words with high transferable utility across future reading situations (CEFR B2-C1).
+3. MULTIWORD EXPRESSIONS & PHRASES: Idioms, phrasal verbs, and natural collocations where meaning resides in the whole phrase rather than individual words (e.g., "go beyond", "fall short of", "pave the way"). Select the ENTIRE phrase, never just a single word from it!
+4. CONTEXT-DEPENDENT MEANINGS: Words whose meaning in this article differs from their standard everyday meaning (e.g., "pop" meaning stand out vibrantly, "drape" as a noun style).
+5. DISCOURSE CONNECTORS: Structural connectors that signal contrast, concession, cause, or qualification (e.g., "notwithstanding", "on the contrary", "in contrast").
+
+WHAT TO STRICTLY AVOID & PENALIZE:
+- Trivial, everyday words with zero learning value (e.g., "wearing", "make", "piece", "good", "people", "start", "discover").
+- Obscure, archaic, or hyper-specialized words that learners will likely never encounter again.
+- Highlighting individual words that are part of a larger phrase (e.g., do NOT highlight "beyond" if the phrase is "goes beyond").
+- Over-highlighting: Do NOT force a highlight into every sentence. Only select terms with genuine learning value. If an article only has 6-8 worthwhile candidates, return only those 6-8.
+- Redundant synonyms that teach the same concept.
+
+EVERY ITEM MUST BE GROUNDED IN THE ARTICLE:
+- "text": The exact word or phrase verbatim as it appears in the text.
+- "contextSentence": The complete sentence from the text containing this item.
+- "type": "word" | "phrase" | "idiom".
+- "easyEnglish": Clear, learner-friendly English explanation tailored to its exact contextual meaning.
+- "easyBengali": Natural ${lang.targetLabel} translation (${lang.promptTargetInstruction}).
+- "reason": Pedagogical reason explaining why this item is valuable to learn from this article.
+- "difficulty": "easy" | "medium" | "hard".
+- "learningValueScore": Floating number from 0.0 to 1.0 ranking its educational value.
+- "isArticleCore": boolean (true if directly related to the article's central message).
+
+Return raw JSON adhering to HighlightExtractionResultSchema:
+{
+  "items": [
+    {
+      "id": "hl_1",
+      "text": "Exact word or phrase from text",
+      "type": "word" | "phrase" | "idiom",
+      "contextSentence": "Full sentence from the text where it appears",
+      "easyEnglish": "Very clear, everyday English definition in 1 short sentence",
+      "easyBengali": "Natural ${lang.targetLabel} translation (${lang.promptTargetInstruction})",
+      "reason": "Why this item is useful for learners to acquire",
+      "difficulty": "easy" | "medium" | "hard",
+      "learningValueScore": 0.85,
+      "isArticleCore": true,
+      "grammaticalNote": "Brief grammatical role or pattern"
+    }
+  ],
+  "pageTitle": "${pageTitle || 'Webpage'}",
+  "articleSummary": "1-2 sentence overview of the article's core theme"
+}`;
+    const raw = await this.callGemini(sys, `Article Content:\n${rawText.slice(0, 15000)}`, 3500);
+    const parsed = safeParseJSON(raw);
+    const validated = HighlightExtractionResultSchema.parse(parsed);
+    validated.sourceMode = 'ai_reasoning';
+    return validated;
   }
 }

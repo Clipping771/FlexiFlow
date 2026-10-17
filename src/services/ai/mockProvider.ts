@@ -10,19 +10,31 @@ import {
   ParagraphAnalysisResult,
   StageAExplanation,
   StageBDetailedVocabulary,
-  StageBSense
+  StageBSense,
+  HighlightExtractionResult,
+  HighlightVocabularyItem,
+  SyntacticClause,
+  SentenceStructureMap,
+  GrammarRuleDetail,
+  ConnectorRelationship,
+  WordLevelGrammarDetail,
+  MistakeAndAlternative,
+  GrammarPractice
 } from '../../types';
 import { BengaliService } from '../bengali';
+import { DictionaryService } from '../dictionary';
 import {
   WordAnalysisSchema,
   PhraseAnalysisSchema,
   SentenceAnalysisSchema,
   ParagraphAnalysisSchema,
   WritingAssistSchema,
-  FollowUpResponseSchema
+  FollowUpResponseSchema,
+  HighlightExtractionResultSchema
 } from './schemas';
 import { getLanguageConfig } from '../../config/languages';
 import { AIProvider } from './types';
+import { HighlightIntelligenceService } from './highlightIntelligence';
 
 export class MockAIProvider implements AIProvider {
   name = 'mock';
@@ -182,12 +194,17 @@ export class MockAIProvider implements AIProvider {
         ? `Used in the sentence to clarify the exact condition or state.`
         : `Fits natural English usage.`,
       partOfSpeech: 'word',
-      grammaticalNote: `Functions as a modifier within the sentence.`,
-      collocations: [`strictly ${word}`, `quite ${word}`],
+      grammaticalRole: contextSentence
+        ? `Functions in this sentence context as a primary lexical unit modifying or naming a core element.`
+        : `Base lexical entry.`,
+      grammaticalNote: `Functions as an essential semantic component within the clause.`,
+      transitivityOrPattern: `Can take direct objects or prepositional modifiers depending on sentence predicate.`,
+      wordForms: [word.toLowerCase(), `${word.toLowerCase()}s`, `${word.toLowerCase()}ed`, `${word.toLowerCase()}ing`],
+      collocations: [`strictly ${word}`, `quite ${word}`, `deeply ${word}`],
       examples: contextSentence
         ? [`"${contextSentence.slice(0, 100)}..."`]
         : [`Technically, the requirements were fulfilled correctly.`],
-      synonyms: [],
+      synonyms: ['accurate', 'precise'],
       antonyms: [],
       registerAndTone: 'Standard English'
     };
@@ -209,6 +226,9 @@ export class MockAIProvider implements AIProvider {
       whyFitsContext: contextSentence
         ? `Used in "${contextSentence.slice(0, 60)}..." to establish concise, natural rhythm.`
         : `Standard native phrasing.`,
+      grammaticalStructure: phrase.split(/\s+/).length > 2
+        ? 'Prepositional / Verb Phrase Construction'
+        : 'Head Word + Complement',
       componentsBreakdown: `Combines words to form an established idiomatic meaning.`,
       examples: [
         `The committee decided to follow through with the recommendations.`,
@@ -219,19 +239,57 @@ export class MockAIProvider implements AIProvider {
     return PhraseAnalysisSchema.parse(raw);
   }
 
-  private decomposeIntoPhraseBreakdown(text: string): Array<{ phrase: string; easyEnglish: string; easyBengali: string }> {
+  private decomposeIntoPhraseBreakdown(text: string): Array<{
+    phrase: string;
+    easyEnglish: string;
+    easyBengali: string;
+    grammaticalFunction?: string;
+    connection?: string;
+    whyItMatters?: string;
+    simplerExample?: string;
+  }> {
     const clean = text.trim();
     if (!clean) return [];
 
     // Split text into meaningful phrases based on punctuation and clause boundaries
     const rawParts = clean.split(/(?:,\s*|;\s*|:\s*|\.\s+|\n+|—|–)/).map((p) => p.trim()).filter(Boolean);
-    const phrases: Array<{ phrase: string; easyEnglish: string; easyBengali: string }> = [];
+    const phrases: Array<{
+      phrase: string;
+      easyEnglish: string;
+      easyBengali: string;
+      grammaticalFunction?: string;
+      connection?: string;
+      whyItMatters?: string;
+      simplerExample?: string;
+    }> = [];
 
-    for (const part of rawParts) {
+    for (let i = 0; i < rawParts.length; i++) {
+      const part = rawParts[i];
       if (!part) continue;
       const words = part.split(/\s+/).filter(Boolean);
 
-      // If a segment is long (> 10 words), break into smaller natural phrase chunks
+      let gmFunc = i === 0 ? 'Introductory clause or contextual modifier' : (i === rawParts.length - 1 ? 'Concluding clause or terminal modifier' : 'Central predication or mediating phrase');
+      let connection = i === 0 ? 'Prepares the context for the main action that follows' : 'Directly connects to and qualifies the preceding clause';
+      let whyItMatters = 'Adds essential clarity, conditions, or consequences to the sentence';
+      let simplerEx = 'Even in tough times, they stayed committed.';
+
+      if (/despite|although|even though|in spite/i.test(part)) {
+        gmFunc = 'Adverbial phrase of concession (introduces contrast)';
+        connection = 'Contrasts against the main claim in the following clause';
+        whyItMatters = 'Explains the obstacle that did not stop the outcome';
+        simplerEx = 'Despite the rain, we won.';
+      } else if (/without/i.test(part)) {
+        gmFunc = 'Prepositional phrase with gerund (manner / negative condition)';
+        connection = 'Explains how the action was maintained without harm';
+        whyItMatters = 'Shows that standards were not compromised';
+        simplerEx = 'She passed without making any mistakes.';
+      } else if (/maintained|sustained|achieved|target|production/i.test(part)) {
+        gmFunc = 'Independent main clause (Subject + Transitive Verb + Object)';
+        connection = 'Acts as the grammatical and semantic backbone of the entire sentence';
+        whyItMatters = 'Conveys the primary event or assertion';
+        simplerEx = 'The company met its goal.';
+      }
+
       if (words.length > 10) {
         const mid = Math.ceil(words.length / 2);
         const chunk1 = words.slice(0, mid).join(' ');
@@ -240,21 +298,33 @@ export class MockAIProvider implements AIProvider {
           phrases.push({
             phrase: chunk1,
             easyEnglish: `What "${chunk1}" means simply: ${this.explainChunkEnglish(chunk1)}.`,
-            easyBengali: this.explainChunkBengali(chunk1)
+            easyBengali: this.explainChunkBengali(chunk1),
+            grammaticalFunction: gmFunc,
+            connection,
+            whyItMatters,
+            simplerExample: simplerEx
           });
         }
         if (chunk2) {
           phrases.push({
             phrase: chunk2,
             easyEnglish: `What "${chunk2}" means simply: ${this.explainChunkEnglish(chunk2)}.`,
-            easyBengali: this.explainChunkBengali(chunk2)
+            easyBengali: this.explainChunkBengali(chunk2),
+            grammaticalFunction: 'Complementary modifier',
+            connection: 'Completes the clause idea',
+            whyItMatters,
+            simplerExample: simplerEx
           });
         }
       } else {
         phrases.push({
           phrase: part,
           easyEnglish: `What "${part}" means simply: ${this.explainChunkEnglish(part)}.`,
-          easyBengali: this.explainChunkBengali(part)
+          easyBengali: this.explainChunkBengali(part),
+          grammaticalFunction: gmFunc,
+          connection,
+          whyItMatters,
+          simplerExample: simplerEx
         });
       }
     }
@@ -323,35 +393,316 @@ export class MockAIProvider implements AIProvider {
   }
 
   private analyzeSentence(sentence: string): SentenceAnalysisResult {
-    const phraseBreakdown = this.decomposeIntoPhraseBreakdown(sentence);
+    const clean = sentence.trim();
+    const phraseBreakdown = this.decomposeIntoPhraseBreakdown(clean);
+    const lower = clean.toLowerCase();
+
+    // Layer 1: Sentence Structure Overview
+    const hasSubordinator = /(although|even though|because|since|if|unless|while|whereas|despite|after|before|when|which|that|who)\b/i.test(clean);
+    const hasCoordinator = /,\s*(and|but|or|so|yet|for|nor)\b/i.test(clean);
+
+    let structureType: 'simple' | 'compound' | 'complex' | 'compound-complex' = 'simple';
+    let structureExplEng = 'A simple sentence containing one independent subject-verb clause.';
+    let structureExplBn = 'একটি সাধারণ বাক্য (Simple Sentence) যাতে একটিমাত্র স্বাধীন খণ্ডবাক্য (Independent clause) রয়েছে।';
+
+    if (hasSubordinator && hasCoordinator) {
+      structureType = 'compound-complex';
+      structureExplEng = 'Compound-complex sentence: contains at least two independent clauses and one or more dependent clauses.';
+      structureExplBn = 'যৌগিক-জটিল বাক্য (Compound-Complex Sentence): এতে দুই বা ততোধিক প্রধান খণ্ডবাক্য এবং অন্তত একটি নির্ভরশীল খণ্ডবাক্য যুক্ত রয়েছে।';
+    } else if (hasSubordinator) {
+      structureType = 'complex';
+      structureExplEng = 'Complex sentence: combines an independent main clause with a dependent subordinate clause or modifier.';
+      structureExplBn = 'জটিল বাক্য (Complex Sentence): এতে একটি প্রধান খণ্ডবাক্য ও এক বা একাধিক নির্ভরশীল বা শর্তবাচক খণ্ডবাক্য রয়েছে।';
+    } else if (hasCoordinator) {
+      structureType = 'compound';
+      structureExplEng = 'Compound sentence: joins two or more independent clauses using a coordinating conjunction.';
+      structureExplBn = 'যৌগিক বাক্য (Compound Sentence): দুটি স্বাধীন খণ্ডবাক্য সংযোজক অব্যয় দিয়ে যুক্ত রয়েছে।';
+    }
+
+    // Layer 3: Deep Clause Analysis
+    const clauses: SyntacticClause[] = [];
+    const parts = clean.split(/(?:,\s*(?=[a-z])|;\s*)/i).map(p => p.trim()).filter(Boolean);
+
+    if (parts.length >= 2) {
+      const firstIsSub = /(despite|although|even though|if|because|while|when|after|before|since)\b/i.test(parts[0]);
+      if (firstIsSub) {
+        clauses.push({
+          text: parts[0],
+          type: 'subordinate',
+          typeExplanation: 'Dependent adverbial construction supplying contextual contrast, condition, or background.',
+          subjectAndVerb: parts[0].includes(' ') ? `Introductory marker: "${parts[0].split(/\s+/)[0]}" with contextual modifier` : undefined,
+          role: 'Adverbial Context / Concession',
+          questionAnswered: 'Under what background condition or obstacle did the main action occur?',
+          dependsOn: 'The main independent clause that follows',
+          standalone: 'No, it relies on the subsequent clause to complete the thought',
+          example: 'Despite the heavy rain, the match continued.',
+          explanationBengali: 'নির্ভরশীল খণ্ডবাক্য যা মূল ঘটনার প্রেক্ষাপট ও বিপরীত শর্ত তুলে ধরে।'
+        });
+        clauses.push({
+          text: parts.slice(1).join(', '),
+          type: 'main',
+          typeExplanation: 'Independent clause that contains the primary subject and verb and expresses a complete thought.',
+          subjectAndVerb: 'Contains the core subject performing the main finite verb action',
+          role: 'Primary Proposition (Main Clause)',
+          questionAnswered: 'What is the primary action or claim being made?',
+          dependsOn: 'None (grammatical core of the sentence)',
+          standalone: 'Yes, it forms a complete grammatical sentence on its own',
+          example: 'The team completed the mission successfully.',
+          explanationBengali: 'প্রধান স্বাধীন খণ্ডবাক্য যা বাক্যের মূল বক্তব্যটি স্বয়ংসম্পূর্ণভাবে প্রকাশ করে।'
+        });
+      } else {
+        clauses.push({
+          text: parts[0],
+          type: 'main',
+          typeExplanation: 'Independent clause establishing the central assertion.',
+          subjectAndVerb: 'Core subject and predicate',
+          role: 'Primary Proposition (Main Clause)',
+          questionAnswered: 'What happened or what is the main statement?',
+          dependsOn: 'None',
+          standalone: 'Yes, it can stand independently as a complete thought',
+          example: 'She made the final decision.',
+          explanationBengali: 'মূল স্বাধীন খণ্ডবাক্য যা বক্তব্যের ভিত্তি তৈরি করে।'
+        });
+        clauses.push({
+          text: parts.slice(1).join(', '),
+          type: 'subordinate',
+          typeExplanation: 'Supporting clause or modifier adding qualification, condition, or limitation.',
+          subjectAndVerb: 'Subordinate elements and qualifiers',
+          role: 'Syntactic Modifier / Extension',
+          questionAnswered: 'What additional condition or detail qualifies the action?',
+          dependsOn: 'The preceding main clause',
+          standalone: 'No, it depends on the preceding main clause',
+          example: 'without losing any quality.',
+          explanationBengali: 'সহায়ক খণ্ডবাক্য বা শর্তবাচক অংশ যা মূল বক্তব্যকে আরও স্পষ্ট করে।'
+        });
+      }
+    } else {
+      clauses.push({
+        text: clean,
+        type: 'main',
+        typeExplanation: 'Complete independent clause expressing a unified assertion.',
+        subjectAndVerb: 'Subject + Finite Verb + Complement/Object',
+        role: 'Complete Main Clause',
+        questionAnswered: 'What is the complete thought expressed?',
+        dependsOn: 'None',
+        standalone: 'Yes, it expresses a complete thought',
+        example: clean,
+        explanationBengali: 'সম্পূর্ণ স্বাধীন খণ্ডবাক্য যা সরাসরি একটি পূর্ণাঙ্গ ভাব প্রকাশ করে।'
+      });
+    }
+
+    // Layer 4: Sentence Structure Map
+    const mainCl = clauses.find(c => c.type === 'main')?.text || clean;
+    const structureMap: SentenceStructureMap = {
+      mainClause: mainCl,
+      rootMainClause: mainCl,
+      branches: clauses.filter(c => c.type !== 'main').map(c => ({
+        clauseText: c.text,
+        relationType: (lower.includes('despite') || lower.includes('although') ? 'concession' : (lower.includes('because') ? 'reason' : 'condition')),
+        roleInSentence: c.role || 'Adverbial Modifier'
+      })),
+      nodes: clauses.map((c) => ({
+        clauseOrElement: c.text,
+        relationType: c.type === 'main' ? 'main' : (lower.includes('despite') || lower.includes('although') ? 'contrast' : (lower.includes('because') ? 'reason' : 'condition')),
+        connectsTo: c.type === 'main' ? 'Core Sentence' : mainCl,
+        explanation: c.type === 'main' ? 'The central independent message' : 'Supplies supporting contextual conditions or qualifications to the main clause',
+        bengaliExplanation: c.type === 'main' ? 'বাক্যের মূল কেন্দ্রীয় বার্তা' : 'মূল খণ্ডবাক্যের শর্ত বা প্রেক্ষাপট হিসেবে যুক্ত রয়েছে'
+      }))
+    };
+
+    // Layer 5: Important Grammar Rules
+    const grammarRules: GrammarRuleDetail[] = [];
+    if (lower.includes('despite') || lower.includes('in spite of')) {
+      grammarRules.push({
+        ruleName: 'Preposition of Contrast: Despite + Noun Phrase / -ing',
+        whatIsIt: '"Despite" is a preposition used to express contrast without using a finite subordinate clause.',
+        whereIsIt: clean.match(/despite[^,]+/i)?.[0] || 'Despite...',
+        whyUsed: 'Used by formal and journalistic writers to concisely introduce a counter-condition or obstacle before stating an accomplishment.',
+        howItWorks: '"Despite" must be followed by a noun phrase, pronoun, or gerund (-ing form), NOT by a subject + verb clause.',
+        reusablePattern: 'Despite + [Noun Phrase / Gerund], [Subject] + [Verb]...',
+        example: {
+          english: 'Despite severe weather warnings, the flight landed on schedule.',
+          easyEnglish: 'Even though the weather was very bad, the plane landed on time.',
+          bengali: 'খারাপ আবহাওয়া সত্ত্বেও বিমানটি সময়মতো অবতরণ করেছিল।'
+        },
+        commonConfusion: 'Learners often mistakenly write "Despite of", which is grammatically incorrect. "Despite" takes no "of" (contrast with "in spite of").'
+      });
+    } else if (lower.includes('although') || lower.includes('even though')) {
+      grammarRules.push({
+        ruleName: 'Concession Conjunction: Although + Full Clause',
+        whatIsIt: '"Although" is a subordinating conjunction used to link two contrasting ideas where the second idea is surprising.',
+        whereIsIt: clean.match(/(?:although|even though)[^,]+/i)?.[0] || 'Although...',
+        whyUsed: 'Provides logical nuance by acknowledging a contrary reality while maintaining the validity of the main clause.',
+        howItWorks: 'Must be followed by a complete clause containing both a subject and a finite verb.',
+        reusablePattern: 'Although + [Subject + Verb], [Main Clause Subject + Verb]...',
+        example: {
+          english: 'Although the challenge was difficult, she solved it quickly.',
+          easyEnglish: 'Even though it was hard, she solved it in a short time.',
+          bengali: 'যদিও সমস্যাটি কঠিন ছিল, সে দ্রুত এর সমাধান করেছিল।'
+        },
+        commonConfusion: 'Do not use "but" in the second clause when you start with "Although" (Avoid: "Although it rained, but we went out").'
+      });
+    }
+
+    if (lower.includes('without') && lower.includes('ing')) {
+      grammarRules.push({
+        ruleName: 'Preposition + Gerund Construction (without + -ing)',
+        whatIsIt: 'The preposition "without" followed by a gerund indicates an accompanying circumstance that was avoided or omitted.',
+        whereIsIt: clean.match(/without\s+\w+ing[^,.]*/i)?.[0] || 'without compromising...',
+        whyUsed: 'Shows that an action was carried out while successfully preventing a negative side-effect or compromise.',
+        howItWorks: 'Any preposition followed by a verb requires the verb to take the "-ing" gerund form.',
+        reusablePattern: '[Action] + without + [Verb-ing] + [Object]',
+        example: {
+          english: 'They completed the renovation without exceeding the budget.',
+          easyEnglish: 'They finished repairing the house and did not spend extra money.',
+          bengali: 'বাজেট অতিক্রম না করেই তারা সংস্কার কাজ সম্পন্ন করেছিল।'
+        },
+        commonConfusion: 'Never use a bare infinitive after "without" (e.g. avoid: "without compromise quality"). Always use the gerund form.'
+      });
+    } else {
+      grammarRules.push({
+        ruleName: 'Core Transitive Predication with Adverbial Modifiers',
+        whatIsIt: 'A standard English sentence pattern where an agent performs an action on an object with contextual qualifiers.',
+        whereIsIt: clean.slice(0, 45) + '...',
+        whyUsed: 'Conveys action and consequence with precision and clarity.',
+        howItWorks: 'The subject precedes the transitive verb, followed by direct objects and modifying prepositional phrases.',
+        reusablePattern: '[Subject] + [Transitive Verb] + [Direct Object] + [Modifier]',
+        example: {
+          english: 'The organization implemented the new policy without delay.',
+          easyEnglish: 'The group started using the new rule right away.',
+          bengali: 'সংস্থাটি কোনো বিলম্ব ছাড়াই নতুন নীতি কার্যকর করেছিল।'
+        },
+        commonConfusion: 'Ensure the subject and verb agree in number and tense throughout modifying phrases.'
+      });
+    }
+
+    // Layer 6: Connectors and Meaning Relationships
+    const connectors: ConnectorRelationship[] = [];
+    if (lower.includes('although') || lower.includes('even though')) {
+      connectors.push({
+        connector: 'Although',
+        meaning: 'Even though; in spite of the fact that something occurred.',
+        grammaticalPattern: 'Although + Subject + Verb (Subordinate Clause), Main Clause',
+        logicalRelationship: 'Concession & Contrast',
+        whyAppropriate: 'Introduces a significant obstacle or challenge that did not prevent the main result.',
+        contrastWithSimilar: '"Although" must be followed by a finite clause (Subject + Verb), whereas "Despite" takes a noun phrase or gerund.'
+      });
+    }
+    if (lower.includes('despite')) {
+      connectors.push({
+        connector: 'Despite',
+        meaning: 'In spite of; without being affected by the mentioned circumstance.',
+        grammaticalPattern: 'Despite + [Noun Phrase / -ing Gerund Phrase]',
+        logicalRelationship: 'Concession & Contrast',
+        whyAppropriate: 'Creates a concise, elegant contrast between a major obstacle and a successful outcome.',
+        contrastWithSimilar: '"Despite" takes a noun phrase, whereas "Although" requires a full clause with subject and finite verb.'
+      });
+    }
+    if (lower.includes('by ')) {
+      connectors.push({
+        connector: 'by',
+        meaning: 'Through the means, manner, or method of doing something.',
+        grammaticalPattern: 'by + [Gerund -ing / Noun Phrase]',
+        logicalRelationship: 'Means / Instrument / Method',
+        whyAppropriate: 'Explains the concrete mechanism or procedure through which the action was achieved.',
+        contrastWithSimilar: 'Contrast with "with" (which typically introduces an instrument or tool, while "by" introduces an action or method).'
+      });
+    }
+    if (lower.includes('without')) {
+      connectors.push({
+        connector: 'without',
+        meaning: 'Not having, experiencing, or accompanied by something.',
+        grammaticalPattern: 'without + [Noun / -ing Gerund]',
+        logicalRelationship: 'Negative Condition / Manner',
+        whyAppropriate: 'Highlights that high standards were rigorously maintained with zero compromise.',
+        contrastWithSimilar: 'Can be rephrased positively as "while ensuring" or negatively as "and did not sacrifice".'
+      });
+    }
+
+    // Layer 7: Word-Level Grammar in Context
+    const words = clean.split(/\s+/).map(w => w.replace(/^[^\w]+|[^\w]+$/g, '')).filter(w => w.length > 4);
+    const keyWord1 = words[0] || 'maintain';
+    const keyWord2 = words[Math.min(3, words.length - 1)] || 'standard';
+    const wordLevelGrammar: WordLevelGrammarDetail[] = [
+      {
+        word: keyWord1,
+        partOfSpeech: lower.includes('despite') && keyWord1.toLowerCase() === 'despite' ? 'Preposition' : 'Noun / Verb / Modifier',
+        syntacticRole: 'Functions as a key structural anchor or modifier in the clause',
+        wordForms: [keyWord1.toLowerCase(), `${keyWord1.toLowerCase()}s`, `${keyWord1.toLowerCase()}ed`, `${keyWord1.toLowerCase()}ing`],
+        usageNotes: 'Requires careful attention to dependent prepositions and collocation partners.'
+      },
+      {
+        word: keyWord2,
+        partOfSpeech: 'Noun / Adjective in context',
+        syntacticRole: 'Specifies the target object or condition being discussed',
+        wordForms: [keyWord2.toLowerCase(), `${keyWord2.toLowerCase()}s`],
+        usageNotes: 'Commonly paired with verbs of preservation and achievement.'
+      }
+    ];
+
+    // Layer 8: Common Mistakes & Alternative Constructions
+    const commonMistakesAndAlternatives: MistakeAndAlternative = {
+      commonMistake: lower.includes('despite')
+        ? 'Using "Despite of" instead of "Despite", or putting a full sentence clause after "despite" without "the fact that".'
+        : 'Confusing passive voice and active participle structures in long sentences.',
+      correctedExample: lower.includes('despite')
+        ? 'Incorrect: "Despite of disruptions..." ➔ Correct: "Despite disruptions..."'
+        : 'Incorrect: "The company maintained with compromise..." ➔ Correct: "maintained without compromising..."',
+      naturalAlternative: lower.includes('despite')
+        ? clean.replace(/despite/i, 'Even though there were').replace(/,\s*the/i, ', the')
+        : `Even though challenges existed, the organization successfully preserved its commitments.`,
+      nuanceDifference: 'The original phrasing is more formal and concise; the alternative is more conversational and direct for everyday speech.'
+    };
+
+    // Layer 9: Learn & Practise
+    const practice: GrammarPractice = {
+      reusablePattern: lower.includes('despite')
+        ? 'Despite + [Noun Phrase], [Subject] + [Verb] + [Object].'
+        : '[Subject] + [Verb] + [Object] + without + [Verb-ing].',
+      practiceQuestion: lower.includes('despite')
+        ? 'Fill in the blank: "______ the severe storm, the rescue team reached the village safely."'
+        : 'Fill in the blank: "She solved the difficult puzzle ______ asking for any hints."',
+      options: lower.includes('despite')
+        ? ['A) Despite of', 'B) Despite', 'C) Although of', 'D) In spite']
+        : ['A) without', 'B) with no', 'C) not', 'D) without of'],
+      answer: lower.includes('despite') ? 'B) Despite' : 'A) without',
+      explanation: lower.includes('despite')
+        ? '"Despite" directly precedes the noun phrase "the severe storm" without the preposition "of".'
+        : '"Without" is the appropriate preposition followed by the gerund "asking".'
+    };
 
     const raw: SentenceAnalysisResult = {
-      selectedText: sentence,
+      selectedText: clean,
       selectionType: 'sentence',
       plainEnglishParaphrase: `This statement emphasizes that despite potential challenges or uncertainties, an essential principle or course of action is preserved.`,
       overallMeaning: `The sentence balances contextual conditions against a primary assertive claim.`,
+      mainMessage: `Even with notable obstacles or concerns in place, the core objectives and quality were successfully upheld.`,
+      sentenceStructure: {
+        type: structureType,
+        explanation: structureExplEng,
+        explanationBengali: structureExplBn
+      },
       bengaliTranslation: `বাক্যটির মূল অর্থ: বিদ্যমান ঝুঁকি বা প্রতিকূল পরিস্থিতি সত্ত্বেও মূল লক্ষ্য এবং কার্যকারিতা সফলভাবে বজায় রাখা হয়েছে।`,
       phraseBreakdown,
-      clauses: [
-        {
-          text: sentence.length > 60 ? sentence.slice(0, 50) + '...' : sentence,
-          type: 'main',
-          role: 'Main Proposition (Independent Clause)',
-          explanationBengali: 'বাক্যের কেন্দ্রীয় মূল খণ্ডবাক্য যা মূল বক্তব্য প্রতিষ্ঠা করে।'
-        }
-      ],
+      clauses,
+      structureMap,
+      grammarRules,
+      connectors,
+      wordLevelGrammar,
+      commonMistakesAndAlternatives,
+      practice,
       grammaticalHighlights: [
-        'Complex sentence with dependent condition markers',
-        'Formal journalistic / academic tone'
+        `${structureType.toUpperCase()} sentence with dependent condition markers`,
+        'Formal journalistic / academic tone with balanced contrast'
       ],
       difficultVocabulary: [
         {
-          word: sentence.split(/\s+/)[3] || 'scrutiny',
-          meaningInContext: 'Careful examination or inspection',
-          bengali: 'পুঙ্খানুপুঙ্খ নজরদারি'
+          word: words.find(w => w.length > 7) || 'disruptions',
+          meaningInContext: 'Disturbances or interruptions to an established process',
+          bengali: 'বিঘ্ন বা প্রতিবন্ধকতা'
         }
       ],
-      toneAndRegister: 'Formal / Academic English'
+      toneAndRegister: 'Formal / Professional English'
     };
 
     return SentenceAnalysisSchema.parse(raw);
@@ -504,5 +855,139 @@ export class MockAIProvider implements AIProvider {
     };
 
     return FollowUpResponseSchema.parse(raw);
+  }
+
+  async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
+    const text = rawText || '';
+    const cleanLower = text.toLowerCase();
+    const titleLower = (pageTitle || '').toLowerCase();
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+    const items: HighlightVocabularyItem[] = [];
+    const seenTexts = new Set<string>();
+
+    const knownCuratedBank: Array<{
+      text: string;
+      type: 'word' | 'phrase' | 'idiom';
+      easyEnglish: string;
+      easyBengali: string;
+      reason: string;
+      difficulty: 'easy' | 'medium' | 'hard';
+      grammaticalNote?: string;
+    }> = [
+      // 1. Idioms & Figurative Multiword Expressions
+      { text: 'through thick and thin', type: 'idiom', easyEnglish: 'Through both good and bad times', easyBengali: 'সুখে-দুঃখে সর্বাবস্থায়', reason: 'High-frequency native English idiom for loyalty', difficulty: 'medium' },
+      { text: 'break the ice', type: 'idiom', easyEnglish: 'Make people feel more comfortable in a social setting', easyBengali: 'আড়ষ্টতা বা জড়তা ভেঙে কথা বলা শুরু করা', reason: 'Common conversational idiom', difficulty: 'medium' },
+      { text: 'bite the bullet', type: 'idiom', easyEnglish: 'Decide to do something difficult that cannot be avoided', easyBengali: 'অপ্রীতিকর কিন্তু অনিবার্য কাজ সাহসের সাথে মেনে নেওয়া', reason: 'Everyday figurative idiom', difficulty: 'medium' },
+      { text: 'at the eleventh hour', type: 'idiom', easyEnglish: 'At the last possible moment', easyBengali: 'শেষ মুহূর্তে বা একেবারে অন্তিম সময়ে', reason: 'Common journalistic and conversational idiom', difficulty: 'medium' },
+      { text: 'burn the midnight oil', type: 'idiom', easyEnglish: 'Work or study late into the night', easyBengali: 'দেরী রাত পর্যন্ত কঠোর পরিশ্রম বা পড়াশোনা করা', reason: 'Frequent academic and professional idiom', difficulty: 'medium' },
+      { text: 'goes beyond', type: 'phrase', easyEnglish: 'Exceeds or expands past normal boundaries', easyBengali: 'স্বাভাবিক সীমানা ছাড়িয়ে যাওয়া', reason: 'High-utility verb phrase expressing extension or depth', difficulty: 'medium' },
+      { text: 'go beyond', type: 'phrase', easyEnglish: 'Exceed or expand past normal boundaries', easyBengali: 'স্বাভাবিক সীমানা ছাড়িয়ে যাওয়া', reason: 'High-utility verb phrase expressing extension or depth', difficulty: 'medium' },
+      { text: 'take for granted', type: 'idiom', easyEnglish: 'Fail to appreciate properly because of familiarity', easyBengali: 'কোনো কিছুকে স্বাভাবিক ধরে নিয়ে যথাযথ মূল্যায়ন না করা', reason: 'Crucial idiomatic expression', difficulty: 'medium' },
+      { text: 'in the wake of', type: 'phrase', easyEnglish: 'Following as a result or consequence of an event', easyBengali: 'কোনো ঘটনার অব্যবহিত পরে বা ফলস্বরূপ', reason: 'Key journalistic causal discourse phrase', difficulty: 'medium' },
+      { text: 'pave the way', type: 'idiom', easyEnglish: 'Create conditions that make subsequent progress easier', easyBengali: 'ভবিষ্যতের পথ সুগম করা', reason: 'Important transferable figurative expression', difficulty: 'medium' },
+      { text: 'call into question', type: 'phrase', easyEnglish: 'Doubt or challenge the validity of something', easyBengali: 'কোনো বিষয়ের সত্যতা নিয়ে প্রশ্ন তোলা বা সন্দেহ প্রকাশ করা', reason: 'Formal journalistic and academic critique phrase', difficulty: 'hard' },
+      { text: 'at the expense of', type: 'phrase', easyEnglish: 'So as to cause harm or loss to something else', easyBengali: 'অন্য কিছুর বিনিময়ে বা ক্ষতি স্বীকার করে', reason: 'Critical discourse phrase for trade-offs', difficulty: 'medium' },
+
+      // 2. Collocations & Professional Phrases
+      { text: 'supply chain', type: 'phrase', easyEnglish: 'The network of organizations involved in producing and delivering a product', easyBengali: 'পণ্য উৎপাদন ও সরবরাহ ব্যবস্থা', reason: 'Crucial modern business and economic collocation', difficulty: 'medium' },
+      { text: 'quality standards', type: 'phrase', easyEnglish: 'Official requirements ensuring reliability and safety', easyBengali: 'মান বা গুণগত মানদণ্ড', reason: 'Essential professional phrase', difficulty: 'medium' },
+      { text: 'production targets', type: 'phrase', easyEnglish: 'Planned quotas or amounts intended to be manufactured', easyBengali: 'উৎপাদন লক্ষ্যমাত্রা', reason: 'Common workplace collocation', difficulty: 'medium' },
+      { text: 'take urgent action', type: 'phrase', easyEnglish: 'Act swiftly to address an immediate concern', easyBengali: 'জরুরি পদক্ষেপ গ্রহণ করা', reason: 'High-utility verb-noun collocation', difficulty: 'medium' },
+      { text: 'in recent months', type: 'phrase', easyEnglish: 'During the past few months', easyBengali: 'সাম্প্রতিক মাসগুলোতে', reason: 'Natural temporal discourse connector', difficulty: 'medium' },
+      { text: 'critical infrastructure', type: 'phrase', easyEnglish: 'Vital national utilities and digital systems', easyBengali: 'গুরুত্বপূর্ণ মৌলিক অবকাঠামো', reason: 'Key public policy collocation', difficulty: 'hard' },
+      { text: 'emerging technologies', type: 'phrase', easyEnglish: 'Novel and rapidly developing technical systems', easyBengali: 'নতুন উদ্ভাবনী প্রযুক্তিসমূহ', reason: 'Essential academic and tech phrase', difficulty: 'medium' },
+      { text: 'operational resilience', type: 'phrase', easyEnglish: 'The ability of an organization to withstand disruptions', easyBengali: 'কার্যকর প্রাতিষ্ঠানিক সহনশীলতা বা টিকে থাকার ক্ষমতা', reason: 'Advanced business phrase', difficulty: 'hard' },
+      { text: 'neural architecture', type: 'phrase', easyEnglish: 'The structural design of an artificial neural network', easyBengali: 'কৃত্রিম নিউরাল নেটওয়ার্কের অভ্যন্তরীণ কাঠামো', reason: 'Core technical AI concept', difficulty: 'hard' },
+      { text: 'latency bottleneck', type: 'phrase', easyEnglish: 'A point of delay that slows down system throughput', easyBengali: 'বিলম্ব বা ধীরগতির মূল প্রতিবন্ধকতা', reason: 'High-utility computer science collocation', difficulty: 'hard' },
+      { text: 'monetary policy', type: 'phrase', easyEnglish: 'Actions taken by a central bank to manage currency and interest rates', easyBengali: 'কেন্দ্রীয় ব্যাংকের মুদ্রানীতি', reason: 'Fundamental economic and finance phrase', difficulty: 'hard' },
+      { text: 'empirical evidence', type: 'phrase', easyEnglish: 'Information acquired by systematic observation or experimentation', easyBengali: 'পর্যবেক্ষণ বা পরীক্ষার মাধ্যমে অর্জিত প্রত্যক্ষ প্রমাণ', reason: 'Core academic research terminology', difficulty: 'hard' },
+      { text: 'paradigm shift', type: 'phrase', easyEnglish: 'A fundamental change in approach or underlying assumptions', easyBengali: 'মৌলিক ধ্যান-ধারণা বা দৃষ্টিভঙ্গির পরিবর্তন', reason: 'Elevated academic and intellectual expression', difficulty: 'hard' },
+      { text: 'traditional drape', type: 'phrase', easyEnglish: 'The conventional, classical method of wrapping or wearing cloth', easyBengali: 'পোশাক পরার ঐতিহ্যবাহী বা চিরাচরিত ভঙ্গি', reason: 'Context-specific cultural style collocation', difficulty: 'medium' },
+      { text: 'blouse pairings', type: 'phrase', easyEnglish: 'Stylistic combinations of blouses with matching garments', easyBengali: 'ব্লাউজের সাথে মানানসই পোশাকের যুগলবন্দী', reason: 'Contextual fashion pairing collocation', difficulty: 'medium' },
+      { text: 'look into', type: 'phrase', easyEnglish: 'Investigate or examine facts about a situation or problem', easyBengali: 'তদন্ত করা বা খতিয়ে দেখা', reason: 'High-utility transitive phrasal verb', difficulty: 'medium' },
+      { text: 'carry out', type: 'phrase', easyEnglish: 'Perform or complete a planned task or duty', easyBengali: 'সম্পাদন বা কার্যকর করা', reason: 'Frequent academic and professional phrasal verb', difficulty: 'medium' },
+
+      // 3. Discourse Connectors & High-Yield Structural Markers
+      { text: 'notwithstanding', type: 'word', easyEnglish: 'In spite of; despite the circumstance mentioned', easyBengali: 'সত্ত্বেও বা তা সত্ত্বেও', reason: 'Advanced formal connector expressing concession', difficulty: 'hard' },
+      { text: 'furthermore', type: 'word', easyEnglish: 'In addition to what has been said; additionally', easyBengali: 'অধিকন্তু বা তাছাড়া', reason: 'High-value academic additive connector', difficulty: 'medium' },
+      { text: 'consequently', type: 'word', easyEnglish: 'As a result or effect', easyBengali: 'ফলস্বরূপ বা পরিণামে', reason: 'Essential causal transition word', difficulty: 'medium' },
+
+      // 4. Academic, Domain & High-Yield Lexicon
+      { text: 'pharmaceutical', type: 'word', easyEnglish: 'Related to medicinal drugs and treatments', easyBengali: 'ঔষধ বা ওষুধ শিল্প সম্পর্কিত', reason: 'Important healthcare and industry vocabulary', difficulty: 'hard' },
+      { text: 'disruptions', type: 'word', easyEnglish: 'Obstacles or interruptions that stop a normal process', easyBengali: 'বিঘ্ন বা অপ্রত্যাশিত অচলাবস্থা', reason: 'High-utility academic and business vocabulary', difficulty: 'medium' },
+      { text: 'mitigate', type: 'word', easyEnglish: 'Make something bad less severe or harmful', easyBengali: 'হ্রাস বা উপশম করা', reason: 'Tier-2 academic vocabulary', difficulty: 'hard' },
+      { text: 'scrutiny', type: 'word', easyEnglish: 'Critical, close observation or examination', easyBengali: 'পুঙ্খানুপুঙ্খ বা চুলচেরা নিরীক্ষণ', reason: 'Key formal and journalistic vocabulary', difficulty: 'hard' },
+      { text: 'resilience', type: 'word', easyEnglish: 'Capacity to recover quickly from difficulties', easyBengali: 'স্থিতিস্থাপকতা বা ঘুরে দাঁড়ানোর ক্ষমতা', reason: 'High-impact descriptive noun', difficulty: 'medium' },
+      { text: 'sovereignty', type: 'word', easyEnglish: 'Supreme power or authority', easyBengali: 'সার্বভৌমত্ব বা পূর্ণ কর্তৃত্ব', reason: 'Advanced political science term', difficulty: 'hard' },
+      { text: 'stewardship', type: 'word', easyEnglish: 'Responsible overseeing and protection of resources', easyBengali: 'দায়িত্বশীল তদারকি ও সুরক্ষা', reason: 'Professional governance term', difficulty: 'hard' },
+      { text: 'substantiate', type: 'word', easyEnglish: 'Provide evidence to support or prove the truth of a claim', easyBengali: 'প্রমাণ বা যুক্তি দ্বারা কোনো দাবি প্রতিষ্ঠা করা', reason: 'Essential academic argument vocabulary', difficulty: 'hard' },
+      { text: 'proliferation', type: 'word', easyEnglish: 'Rapid increase or spread in numbers', easyBengali: 'দ্রুত বংশবৃদ্ধি বা ব্যাপক বিস্তার', reason: 'Formal scientific and geopolitical term', difficulty: 'hard' },
+      { text: 'unprecedented', type: 'word', easyEnglish: 'Never done, known, or experienced before', easyBengali: 'নজিরবিহীন বা অভূতপূর্ব', reason: 'High-utility journalistic descriptor', difficulty: 'medium' },
+      { text: 'liquidity', type: 'word', easyEnglish: 'The availability of liquid assets or cash in an economy', easyBengali: 'তারল্য বা নগদ অর্থের প্রাপ্যতা', reason: 'Core economic and banking concept', difficulty: 'hard' },
+      { text: 'volatility', type: 'word', easyEnglish: 'Liability to change rapidly and unpredictably', easyBengali: 'অস্থিরতা বা দ্রুত পরিবর্তনশীলতা', reason: 'Crucial financial and market vocabulary', difficulty: 'hard' },
+      { text: 'hegemony', type: 'word', easyEnglish: 'Leadership or dominance, especially by one country or group', easyBengali: 'কর্তৃত্ব বা আধিপত্য', reason: 'Key international relations term', difficulty: 'hard' },
+      { text: 'multilateral', type: 'word', easyEnglish: 'Agreed upon or participated in by three or more parties', easyBengali: 'বহুপাক্ষিক', reason: 'Diplomatic and political keyword', difficulty: 'hard' },
+      { text: 'silhouette', type: 'word', easyEnglish: 'The overall outline, shape, or contour of an outfit', easyBengali: 'পোশাকের সামগ্রিক রূপরেখা বা অবয়ব', reason: 'Key design and fashion vocabulary', difficulty: 'hard' },
+      { text: 'resonance', type: 'word', easyEnglish: 'The power to evoke enduring emotions or significance', easyBengali: 'গভীর আবেদন বা তাৎপর্য', reason: 'Literary and artistic term', difficulty: 'hard' },
+      { text: 'aesthetic', type: 'word', easyEnglish: 'A set of principles underlying taste and artistic beauty', easyBengali: 'নান্দনিক বা শিল্পসম্মত দৃষ্টিভঙ্গি', reason: 'Transferable design and cultural term', difficulty: 'medium' },
+      { text: 'minimalist', type: 'word', easyEnglish: 'Using only simple elements and sparing ornamentation', easyBengali: 'অনাড়ম্বর বা স্বল্প উপাদানভিত্তিক শৈলী', reason: 'Modern design and lifestyle term', difficulty: 'medium' },
+      { text: 'craftsmanship', type: 'word', easyEnglish: 'Skill in an occupation or trade; artistic quality', easyBengali: 'নিখুঁত কারুকাজ বা কারিগরী দক্ষতা', reason: 'High-value cultural and trade noun', difficulty: 'medium' }
+    ];
+
+    for (const cand of knownCuratedBank) {
+      const candLower = cand.text.toLowerCase();
+      const isMultiword = cand.text.includes(' ');
+      let matchedInText = false;
+      let matchIdx = -1;
+
+      if (isMultiword) {
+        matchIdx = cleanLower.indexOf(candLower);
+        matchedInText = matchIdx !== -1;
+      } else {
+        const regex = new RegExp(`\\b${cand.text}\\b`, 'i');
+        const match = text.match(regex);
+        if (match && match.index !== undefined) {
+          matchIdx = match.index;
+          matchedInText = true;
+        }
+      }
+
+      if (matchedInText && !seenTexts.has(candLower)) {
+        seenTexts.add(candLower);
+
+        // Find exact surrounding sentence
+        const matchedSentence = sentences.find((s) => s.toLowerCase().includes(candLower)) ||
+          text.slice(Math.max(0, matchIdx - 40), Math.min(text.length, matchIdx + cand.text.length + 40));
+
+        // Determine if this candidate is central to the article
+        const isArticleCore = titleLower.includes(candLower) || matchIdx < 300;
+
+        items.push({
+          id: `hl_curated_${items.length + 1}`,
+          text: cand.text,
+          type: cand.type,
+          contextSentence: matchedSentence.trim(),
+          easyEnglish: cand.easyEnglish,
+          easyBengali: cand.easyBengali,
+          reason: cand.reason,
+          difficulty: cand.difficulty,
+          grammaticalNote: cand.grammaticalNote || (cand.type === 'word' ? 'Content vocabulary grounded in article context.' : 'Idiomatic multi-word expression.'),
+          isArticleCore
+        });
+      }
+    }
+
+    const rawResult: HighlightExtractionResult = {
+      items,
+      pageTitle: pageTitle || 'Webpage Vocabulary',
+      totalAnalyzedWords: text.split(/\s+/).filter(Boolean).length,
+      sourceMode: 'curated_offline_fallback'
+    };
+
+    // Pass through HighlightIntelligenceService for ranking, grounding, and multiword hierarchy
+    const processed = HighlightIntelligenceService.processCandidates(rawResult, text);
+    processed.sourceMode = 'curated_offline_fallback';
+
+    return HighlightExtractionResultSchema.parse(processed);
   }
 }

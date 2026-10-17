@@ -14,7 +14,14 @@ export const DEFAULT_SETTINGS: UserSettings = {
   targetLanguage: 'bn',
   customLanguages: [],
   disabledSites: [],
-  isGloballyPaused: false
+  isGloballyPaused: false,
+  highlightModeEnabled: true,
+  highlightColor: 'yellow',
+  highlightFilters: {
+    words: true,
+    phrases: true,
+    idioms: true
+  }
 };
 
 const SETTINGS_KEY = 'lexiflow_user_settings';

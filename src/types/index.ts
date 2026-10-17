@@ -15,7 +15,10 @@ export interface WordAnalysisResult extends BaseAIAnalysis {
   simpleEnglishExplanation: string;
   whyFitsContext: string;
   partOfSpeech: string;
+  grammaticalRole?: string;
   grammaticalNote?: string;
+  transitivityOrPattern?: string;
+  wordForms?: string[];
   collocations: string[];
   examples: string[];
   synonyms?: string[];
@@ -30,6 +33,7 @@ export interface PhraseAnalysisResult extends BaseAIAnalysis {
   simpleEnglishExplanation?: string;
   literalVsFigurative: string;
   whyFitsContext: string;
+  grammaticalStructure?: string;
   componentsBreakdown?: string;
   examples: string[];
 }
@@ -38,19 +42,105 @@ export interface PhraseExplanation {
   phrase: string;
   easyEnglish: string;
   easyBengali: string;
+  grammaticalFunction?: string;
+  connection?: string;
+  whyItMatters?: string;
+  simplerExample?: string;
+}
+
+export interface SentenceStructureOverview {
+  type: 'simple' | 'compound' | 'complex' | 'compound-complex' | string;
+  explanation: string;
+  explanationBengali: string;
+}
+
+export interface SyntacticClause {
+  text: string;
+  type: 'main' | 'subordinate' | 'relative' | 'participial' | 'conditional' | 'noun' | 'adverbial' | string;
+  typeExplanation?: string;
+  subjectAndVerb?: string;
+  role: string;
+  questionAnswered?: string;
+  dependsOn?: string;
+  standalone?: string | boolean;
+  example?: string;
+  explanationBengali: string;
+}
+
+export interface SentenceStructureMapNode {
+  clauseOrElement: string;
+  relationType: 'main' | 'reason' | 'condition' | 'contrast' | 'description' | 'result' | 'time' | 'purpose' | 'concession' | string;
+  connectsTo: string;
+  explanation: string;
+  bengaliExplanation: string;
+}
+
+export interface SentenceStructureMap {
+  mainClause: string;
+  nodes: SentenceStructureMapNode[];
+}
+
+export interface GrammarRuleDetail {
+  ruleName: string;
+  whatIsIt: string;
+  whereIsIt: string;
+  whyUsed: string;
+  howItWorks: string;
+  reusablePattern: string;
+  example: {
+    english: string;
+    easyEnglish: string;
+    bengali: string;
+  };
+  commonConfusion?: string;
+}
+
+export interface ConnectorRelationship {
+  connector: string;
+  meaning: string;
+  grammaticalPattern: string;
+  logicalRelationship: string;
+  whyAppropriate: string;
+  contrastWithSimilar?: string;
+}
+
+export interface WordLevelGrammarDetail {
+  word: string;
+  partOfSpeech: string;
+  syntacticRole: string;
+  wordForms?: string[];
+  usageNotes?: string;
+}
+
+export interface MistakeAndAlternative {
+  commonMistake?: string;
+  correctedExample?: string;
+  naturalAlternative: string;
+  nuanceDifference?: string;
+}
+
+export interface GrammarPractice {
+  reusablePattern: string;
+  practiceQuestion: string;
+  options?: string[];
+  answer: string;
+  explanation: string;
 }
 
 export interface SentenceAnalysisResult extends BaseAIAnalysis {
   selectionType: 'sentence';
   plainEnglishParaphrase: string;
   overallMeaning: string;
+  mainMessage?: string;
+  sentenceStructure?: SentenceStructureOverview;
   phraseBreakdown: PhraseExplanation[];
-  clauses: Array<{
-    text: string;
-    type: 'main' | 'subordinate' | 'relative' | 'participial' | 'conditional' | string;
-    role: string;
-    explanationBengali: string;
-  }>;
+  clauses: SyntacticClause[];
+  structureMap?: SentenceStructureMap;
+  grammarRules?: GrammarRuleDetail[];
+  connectors?: ConnectorRelationship[];
+  wordLevelGrammar?: WordLevelGrammarDetail[];
+  commonMistakesAndAlternatives?: MistakeAndAlternative;
+  practice?: GrammarPractice;
   grammaticalHighlights: string[];
   difficultVocabulary: Array<{
     word: string;
@@ -96,6 +186,11 @@ export interface StageAExplanation {
   confidence: ConfidenceLevel;
   uncertaintyReason?: string;
   contextualSenseId: string;
+  grammaticalRole?: string;
+  grammaticalNote?: string;
+  transitivityOrPattern?: string;
+  wordForms?: string[];
+  literalVsFigurative?: string;
 }
 
 export interface SenseSynonym {
@@ -146,18 +241,19 @@ export interface WrongMeaningReport {
 }
 
 // Syntactic & Sentence X-Ray
-export interface SyntacticClause {
-  text: string;
-  type: string;
-  role: string;
-  explanationBengali: string;
-}
-
 export interface SentenceXRayResult {
   sentence: string;
   bengaliTranslation: string;
   paraphrase: string;
+  mainMessage?: string;
+  sentenceStructure?: SentenceStructureOverview;
   clauses: SyntacticClause[];
+  structureMap?: SentenceStructureMap;
+  grammarRules?: GrammarRuleDetail[];
+  connectors?: ConnectorRelationship[];
+  wordLevelGrammar?: WordLevelGrammarDetail[];
+  commonMistakesAndAlternatives?: MistakeAndAlternative;
+  practice?: GrammarPractice;
   grammaticalFeatures: string[];
   grammaticalHighlights?: string[];
   phraseBreakdown?: PhraseExplanation[];
@@ -422,6 +518,38 @@ export interface CustomLanguageConfig {
   createdAt?: string;
 }
 
+// AI Highlight Mode Types
+export type HighlightType = 'word' | 'phrase' | 'idiom';
+export type HighlightColor = 'yellow' | 'blue' | 'green' | 'pink' | 'purple';
+
+export interface HighlightFilters {
+  words: boolean;
+  phrases: boolean;
+  idioms: boolean;
+}
+
+export interface HighlightVocabularyItem {
+  id: string;
+  text: string;
+  type: HighlightType;
+  contextSentence: string;
+  easyEnglish: string;
+  easyBengali: string;
+  reason: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  grammaticalNote?: string;
+  learningValueScore?: number;
+  isArticleCore?: boolean;
+}
+
+export interface HighlightExtractionResult {
+  items: HighlightVocabularyItem[];
+  pageTitle?: string;
+  totalAnalyzedWords?: number;
+  sourceMode?: 'ai_reasoning' | 'curated_offline_fallback' | 'evaluation_fixture';
+  articleSummary?: string;
+}
+
 export interface UserSettings {
   triggerMode: 'auto_selection' | 'double_click' | 'selection_icon' | 'manual_only';
   autoAnalyzeOnSelection: boolean;
@@ -441,4 +569,8 @@ export interface UserSettings {
   articleDrafts?: ArticleDraft[];
   disabledSites?: string[];
   isGloballyPaused?: boolean;
+  // Feature A: AI Highlight Mode
+  highlightModeEnabled?: boolean;
+  highlightColor?: HighlightColor;
+  highlightFilters?: HighlightFilters;
 }

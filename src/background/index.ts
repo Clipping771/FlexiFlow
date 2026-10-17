@@ -279,6 +279,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             break;
           }
 
+          case 'IDENTIFY_PAGE_HIGHLIGHTS': {
+            const { rawText, pageTitle } = payload as { rawText: string; pageTitle?: string };
+            const result = await AIService.extractHighlights(rawText, pageTitle);
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
           case 'EXPLAIN_SENTENCE': {
             const { sentence } = payload as { sentence: string };
             const provider = await AIService.getProvider();
@@ -288,7 +295,15 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
               sentence: result.selectedText || sentence,
               bengaliTranslation: result.bengaliTranslation || '',
               paraphrase: result.plainEnglishParaphrase || result.overallMeaning || result.paraphrase || '',
+              mainMessage: result.mainMessage || result.plainEnglishParaphrase || '',
+              sentenceStructure: result.sentenceStructure || undefined,
               clauses: Array.isArray(result.clauses) ? result.clauses : [],
+              structureMap: result.structureMap || undefined,
+              grammarRules: Array.isArray(result.grammarRules) ? result.grammarRules : [],
+              connectors: Array.isArray(result.connectors) ? result.connectors : [],
+              wordLevelGrammar: Array.isArray(result.wordLevelGrammar) ? result.wordLevelGrammar : [],
+              commonMistakesAndAlternatives: result.commonMistakesAndAlternatives || undefined,
+              practice: result.practice || undefined,
               grammaticalFeatures: Array.isArray(result.grammaticalHighlights)
                 ? result.grammaticalHighlights
                 : (Array.isArray(result.grammaticalFeatures) ? result.grammaticalFeatures : []),
