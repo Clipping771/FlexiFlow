@@ -395,7 +395,7 @@ Return JSON adhering to PhraseAnalysisSchema:
 Strict educational instructions:
 1. Explain WHAT it means in very simple, beginner-friendly everyday English (Layer 1).
 2. Explain in natural, clear ${lang.targetLabel} (${lang.promptTargetInstruction}).
-3. Divide into meaningful phrases/clauses in original order with grammatical function, connection, and why it matters (Layer 2).
+3. Contiguous Sentence Partitioning (Layer 2): You MUST partition the ENTIRE sentence from the first word to the last word into sequential, contiguous chunks in chronological order without omitting any words (100% sentence coverage). Every single word in the original sentence must be included across the chunks.
 4. Identify ALL significant clauses with type, subject & verb, role, what question it answers, dependency, standalone capability, and example (Layer 3).
 5. Build a Sentence Structure Map showing how clauses connect (Layer 4).
 6. Detail Important Grammar Rules present in the sentence using: what is it, where is it, why used, how it works, reusable formula, and common confusion (Layer 5).
@@ -419,7 +419,7 @@ Return raw JSON adhering to SentenceAnalysisSchema:
   "bengaliTranslation": "Complete natural ${lang.targetLabel} translation (${lang.promptTargetInstruction})",
   "phraseBreakdown": [
     {
-      "phrase": "Exact phrase from sentence",
+      "phrase": "Contiguous sequential chunk of the sentence (in exact chronological order, covering 100% of the sentence from start to end without skipping words)",
       "easyEnglish": "Very simple everyday English explanation.",
       "easyBengali": "Natural ${lang.targetLabel} explanation",
       "grammaticalFunction": "Role performed by this chunk",

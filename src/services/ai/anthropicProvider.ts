@@ -128,6 +128,7 @@ Return a valid raw JSON object strictly adhering to this schema:
     } else if (type === 'sentence') {
       sys = `Analyze this sentence for an ESL ${lang.targetLabel} learner.
 In "bengaliTranslation" and "easyBengali", provide ${lang.promptTargetInstruction}.
+Important: In "phraseBreakdown", you MUST partition the ENTIRE sentence from the first word to the last word into sequential, contiguous chunks without skipping any words (100% sentence coverage).
 Return a valid raw JSON object strictly adhering to this schema:
 {
   "selectedText": "${text}",
@@ -137,7 +138,7 @@ Return a valid raw JSON object strictly adhering to this schema:
   "bengaliTranslation": "Complete natural ${lang.targetLabel} translation",
   "phraseBreakdown": [
     {
-      "phrase": "Exact meaningful phrase from sentence",
+      "phrase": "Sequential contiguous chunk of sentence (in chronological order, covering 100% of the sentence without skipping words)",
       "easyEnglish": "Very simple everyday English explanation.",
       "easyBengali": "Natural easy ${lang.targetLabel} explanation"
     }
