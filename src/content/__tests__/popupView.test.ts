@@ -947,4 +947,54 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     );
     expect(el.classList.contains('dragging')).toBe(false);
   });
+
+  // 21. Sentence Quick Mode immediate sentence display & rule-based connector detection
+  it('21. Sentence Quick Mode: showLoading displays selected sentence, rule-based connectors, and honest live AI loading without fabricated breakdown', () => {
+    const testSentence = 'However, the economic stimulus failed to reduce persistent unemployment across rural provinces.';
+    popup.showLoading(testSentence, 'sentence');
+    const el = popup.getElement();
+
+    // 1. Shows Sentence header immediately
+    expect(el.textContent).toContain('Sentence Analysis');
+    expect(el.textContent).toContain('SENTENCE');
+
+    // 2. Selected sentence is visible immediately
+    expect(el.textContent).toContain('However, the economic stimulus failed to reduce persistent unemployment across rural provinces.');
+
+    // 3. Rule-based connector is highlighted and detected
+    const connectorMark = el.querySelector('.lf-connector-word');
+    expect(connectorMark).not.toBeNull();
+    expect(connectorMark?.textContent).toContain('However');
+    expect(el.textContent).toContain('Contrast / Concession');
+
+    // 4. Words are interactive for individual inspection
+    const stimulusWord = el.querySelector('[data-word="stimulus"]') as HTMLElement;
+    expect(stimulusWord).not.toBeNull();
+    stimulusWord.click();
+    expect(onSelectWord).toHaveBeenCalledWith('stimulus', testSentence);
+
+    // 5. Honest AI loading indicator is present with NO fabricated phrase breakdown
+    expect(el.textContent).toContain('Analyzing phrase breakdown & Bengali translation with AI...');
+    expect(el.textContent).toContain('No fabricated offline breakdown');
+  });
+
+  // 22. Sentence Quick Mode offline & unavailable handling
+  it('22. Sentence Quick Mode: showError for sentence displays original sentence with connectors and plain honest offline message', () => {
+    const testSentence = 'Therefore, the governing council postponed the final vote on environmental regulations.';
+    popup.showError('Provider connection timed out', testSentence);
+    const el = popup.getElement();
+
+    // 1. Header shows OFFLINE badge
+    expect(el.textContent).toContain('Sentence Analysis');
+    expect(el.textContent).toContain('OFFLINE');
+
+    // 2. Sentence text and connector remain preserved
+    expect(el.textContent).toContain('Therefore, the governing council postponed the final vote');
+    expect(el.textContent).toContain('Consequence / Result');
+
+    // 3. Honest plain offline message
+    expect(el.textContent).toContain('AI Interpretation Unavailable / AI বিশ্লেষণ অনুপলব্ধ');
+    expect(el.textContent).toContain('Provider connection timed out');
+    expect(el.textContent).toContain('Deep phrase breakdown and contextual translation require an active AI provider');
+  });
 });

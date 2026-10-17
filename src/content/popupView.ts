@@ -19,7 +19,7 @@ import {
 import { getLanguageConfig } from '../config/languages';
 import { clampPositionToViewport } from './positioning';
 import { playPronunciation } from '../services/audio/voiceService';
-import { getValidatedWhyThisMatters } from '../services/connectors/matcher';
+import { getValidatedWhyThisMatters, findDiscourseConnectors, MatchedConnector } from '../services/connectors/matcher';
 
 export interface PopupCallbacks {
   onClose: () => void;
@@ -593,8 +593,100 @@ export class PopupView {
   }
 
   showLoading(text: string, type: SelectionType): void {
+    const isSentence = type === 'sentence';
     const isSentenceOrPara = type === 'sentence' || type === 'paragraph';
     const clean = text.trim();
+
+    if (isSentence) {
+      const connectors = findDiscourseConnectors(clean);
+      const isLongSentence = clean.length > 130;
+
+      this.element.innerHTML = `
+        <div class="lf-header">
+          <div class="lf-title-row">
+            <span class="lf-drag-indicator" title="Drag to reposition">⠿</span>
+            <span class="lf-heading-sentence">Sentence Analysis</span>
+            <span class="lf-pos">SENTENCE</span>
+          </div>
+          <div class="lf-actions-top">
+            ${this.renderModeToggleHtml()}
+            <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">✕</button>
+          </div>
+        </div>
+
+        <div class="lf-tabs lf-tabs-skeleton" aria-hidden="true">
+          <button type="button" class="lf-tab active" tabindex="-1">📝 Sentence</button>
+          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">✨ Ask AI</button>
+          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">🧩 Grammar</button>
+        </div>
+
+        <div class="lf-content lf-skeleton-content" id="lf-main-content" role="status" aria-live="polite">
+          <!-- A. Selected Sentence displayed immediately with rule-based connector marks -->
+          <div class="lf-sentence-card">
+            <div class="lf-section-label">
+              <span>📝 Selected Sentence:</span>
+            </div>
+            <div class="lf-sentence-text ${!this.isSentenceExpanded && isLongSentence ? 'truncated' : ''}">
+              ${this.renderSentenceWithConnectors(clean, connectors)}
+            </div>
+            <div class="lf-sentence-hint">
+              💡 Click any word in the text to inspect its dictionary meaning
+            </div>
+
+            ${connectors.length > 0 ? `
+              <div class="lf-connector-detected-card" style="margin-top: 8px; padding: 7px 10px; background: rgba(147, 51, 234, 0.08); border-left: 3px solid #9333ea; border-radius: 6px;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #9333ea; margin-bottom: 2px;">
+                  ⚡ Discourse Connector: "${escapeHtml(connectors[0].text)}" (${escapeHtml(connectors[0].categoryLabel)})
+                </div>
+                <div style="font-size: 12px; color: var(--text-main, #1d1d1f); line-height: 1.4;">
+                  ${escapeHtml(connectors[0].discourseRole)}
+                  <div style="font-size: 11px; color: var(--text-muted, #6e6e73); margin-top: 2px;">
+                    🇧🇩 ${escapeHtml(connectors[0].defaultBengaliRole)}
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- Honest live AI loading indicator (NO fabricated local phrase breakdown) -->
+          <div style="margin-top: 10px; padding: 12px; background: rgba(0, 113, 227, 0.04); border-radius: 8px; border: 1px dashed rgba(0, 113, 227, 0.25);">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <div class="lf-skeleton-pulse-dot"></div>
+              <span style="font-size: 12.5px; font-weight: 600; color: #0071e3;">
+                Analyzing phrase breakdown & Bengali translation with AI...
+              </span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted, #86868b); line-height: 1.4;">
+              Connecting to live AI provider. Real-time contextual analysis will appear here. No fabricated offline breakdown.
+            </div>
+          </div>
+        </div>
+      `;
+
+      this.element.querySelector('.lf-close-btn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.unpin();
+        this.callbacks.onClose();
+      });
+
+      this.element.querySelectorAll('.lf-sentence-word').forEach((wordEl) => {
+        wordEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const word = (wordEl as HTMLElement).getAttribute('data-word');
+          if (word && this.callbacks.onSelectWord) {
+            this.callbacks.onSelectWord(word, clean);
+          }
+        });
+      });
+
+      this.isolateInteractiveElements();
+      this.setupDragHandler();
+      this.setupResizeHandlers();
+      this.callbacks.onResize?.();
+      return;
+    }
+
     const headingHtml = isSentenceOrPara
       ? `<span class="lf-heading-sentence">${type === 'paragraph' ? 'Paragraph Intelligence' : 'Sentence Analysis'}</span>`
       : `<span class="lf-heading-word" title="${escapeHtml(clean)}">${escapeHtml(clean)}</span>`;
@@ -710,6 +802,86 @@ export class PopupView {
 
   showError(errorMessage: string, text: string): void {
     const clean = text.trim();
+    const isSentence = clean.split(/\s+/).length >= 4;
+
+    if (isSentence) {
+      const connectors = findDiscourseConnectors(clean);
+      this.element.innerHTML = `
+        <div class="lf-header">
+          <div class="lf-title-row">
+            <span class="lf-drag-indicator" title="Drag to reposition">⠿</span>
+            <span class="lf-heading-sentence">Sentence Analysis</span>
+            <span class="lf-pos" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">OFFLINE</span>
+          </div>
+          <div class="lf-actions-top">
+            <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">✕</button>
+          </div>
+        </div>
+        <div class="lf-content" id="lf-main-content">
+          <div class="lf-sentence-card">
+            <div class="lf-section-label">
+              <span>📝 Selected Sentence:</span>
+            </div>
+            <div class="lf-sentence-text">
+              ${this.renderSentenceWithConnectors(clean, connectors)}
+            </div>
+            <div class="lf-sentence-hint">
+              💡 Click any word in the text to inspect its dictionary meaning
+            </div>
+
+            ${connectors.length > 0 ? `
+              <div class="lf-connector-detected-card" style="margin-top: 8px; padding: 7px 10px; background: rgba(147, 51, 234, 0.08); border-left: 3px solid #9333ea; border-radius: 6px;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #9333ea; margin-bottom: 2px;">
+                  ⚡ Discourse Connector: "${escapeHtml(connectors[0].text)}" (${escapeHtml(connectors[0].categoryLabel)})
+                </div>
+                <div style="font-size: 12px; color: var(--text-main, #1d1d1f); line-height: 1.4;">
+                  ${escapeHtml(connectors[0].discourseRole)}
+                  <div style="font-size: 11px; color: var(--text-muted, #6e6e73); margin-top: 2px;">
+                    🇧🇩 ${escapeHtml(connectors[0].defaultBengaliRole)}
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+
+          <div style="margin-top: 10px; padding: 12px 14px; background: rgba(239, 68, 68, 0.06); border-left: 3px solid #ef4444; border-radius: 8px;">
+            <div style="font-size: 13px; font-weight: 700; color: #ef4444; margin-bottom: 4px;">
+              AI Interpretation Unavailable / AI বিশ্লেষণ অনুপলব্ধ
+            </div>
+            <div style="font-size: 12px; color: var(--text-main, #1d1d1f); margin-bottom: 6px; line-height: 1.45;">
+              ${escapeHtml(errorMessage || 'AI provider unavailable or offline.')}
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-muted, #86868b); line-height: 1.4;">
+              Deep phrase breakdown and contextual translation require an active AI provider. Rule-based connector analysis is shown above. You can click any individual word to view its offline dictionary definition.
+            </div>
+          </div>
+        </div>
+      `;
+
+      this.element.querySelector('.lf-close-btn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.unpin();
+        this.callbacks.onClose();
+      });
+
+      this.element.querySelectorAll('.lf-sentence-word').forEach((wordEl) => {
+        wordEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const word = (wordEl as HTMLElement).getAttribute('data-word');
+          if (word && this.callbacks.onSelectWord) {
+            this.callbacks.onSelectWord(word, clean);
+          }
+        });
+      });
+
+      this.isolateInteractiveElements();
+      this.setupDragHandler();
+      this.setupResizeHandlers();
+      this.callbacks.onResize?.();
+      return;
+    }
+
     const headingHtml = clean.length > 35
       ? `${escapeHtml(clean.slice(0, 32))}...`
       : escapeHtml(clean);
@@ -1339,7 +1511,7 @@ export class PopupView {
               ` : ''}
             </div>
             <div class="lf-sentence-text ${!this.isSentenceExpanded && isLongSentence ? 'truncated' : ''}">
-              ${this.renderInteractiveSentence(s.selectedText)}
+              ${this.renderSentenceWithConnectors(s.selectedText, findDiscourseConnectors(s.selectedText))}
             </div>
             <div class="lf-sentence-hint">
               💡 Click any word in the text to inspect its contextual meaning
@@ -1703,6 +1875,37 @@ export class PopupView {
       }
       const cleanWord = token.replace(/^[^\w]+|[^\w]+$/g, '');
       if (!cleanWord) return escapeHtml(token);
+      return `<span class="lf-sentence-word" data-word="${escapeHtml(cleanWord)}" title="Inspect &quot;${escapeHtml(cleanWord)}&quot;">${escapeHtml(token)}</span>`;
+    }).join('');
+  }
+
+  private renderSentenceWithConnectors(sentence: string, connectors: MatchedConnector[] = []): string {
+    if (!connectors || connectors.length === 0) {
+      return this.renderInteractiveSentence(sentence);
+    }
+
+    const tokens = sentence.split(/(\s+|[.,;:"'!?()[\]{}]+)/g);
+    let currentOffset = 0;
+
+    return tokens.map((token) => {
+      const tokenStart = currentOffset;
+      const tokenEnd = currentOffset + token.length;
+      currentOffset = tokenEnd;
+
+      if (/^\s+$/.test(token) || /^[.,;:"'!?()[\]{}]+$/.test(token)) {
+        return escapeHtml(token);
+      }
+      const cleanWord = token.replace(/^[^\w]+|[^\w]+$/g, '');
+      if (!cleanWord) return escapeHtml(token);
+
+      const matched = connectors.find(
+        (c) => tokenStart >= c.startIndex && tokenEnd <= c.endIndex
+      );
+
+      if (matched) {
+        return `<span class="lf-sentence-word lf-connector-word" data-word="${escapeHtml(cleanWord)}" style="background: rgba(147, 51, 234, 0.15); color: #9333ea; font-weight: 700; border-radius: 3px; padding: 1px 3px;" title="Discourse Connector: ${escapeHtml(matched.categoryLabel)}">${escapeHtml(token)}</span>`;
+      }
+
       return `<span class="lf-sentence-word" data-word="${escapeHtml(cleanWord)}" title="Inspect &quot;${escapeHtml(cleanWord)}&quot;">${escapeHtml(token)}</span>`;
     }).join('');
   }
