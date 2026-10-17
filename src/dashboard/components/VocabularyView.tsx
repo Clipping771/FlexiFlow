@@ -617,10 +617,8 @@ export const VocabularyView: React.FC<VocabularyViewProps> = ({
               style={{
                 width: '100%',
                 height: '160px',
-                background: 'rgba(255, 255, 255, 0.75)',
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-                border: '1px solid var(--border-color)',
+                background: 'var(--input-bg)',
+                border: '1px solid var(--input-border)',
                 borderRadius: '10px',
                 color: 'var(--text-main)',
                 padding: '12px',

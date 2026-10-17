@@ -32,7 +32,7 @@
 
   /* Accent Colors */
   --blue: #38bdf8;
-  --blue-grad: linear-gradient(135deg, #2563eb, #38bdf8);
+  --blue-grad: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
   --purple: #c084fc;
   --orange: #fbbf24;
   --red: #f87171;
@@ -54,6 +54,12 @@
   --bengali-border: #38bdf8;
   --context-bg: rgba(255, 255, 255, 0.035);
   --context-border: rgba(255, 255, 255, 0.08);
+
+  /* Form & Input Elements */
+  --input-bg: rgba(11, 16, 28, 0.75);
+  --input-border: rgba(255, 255, 255, 0.12);
+  --input-border-focus: #38bdf8;
+  --input-placeholder: #64748b;
 }
 
 [data-theme="light"] {
@@ -84,7 +90,7 @@
   --glass-blur: blur(28px) saturate(190%);
 
   --blue: #0071e3;
-  --blue-grad: linear-gradient(135deg, #0071e3, #2563eb);
+  --blue-grad: linear-gradient(180deg, #0071e3 0%, #005bb5 100%);
   --purple: #9333ea;
   --orange: #e8890c;
   --red: #e11d48;
@@ -104,6 +110,12 @@
   --bengali-border: #0071e3;
   --context-bg: rgba(0, 0, 0, 0.025);
   --context-border: rgba(0, 0, 0, 0.06);
+
+  /* Form & Input Elements */
+  --input-bg: rgba(255, 255, 255, 0.95);
+  --input-border: rgba(0, 0, 0, 0.12);
+  --input-border-focus: #0071e3;
+  --input-placeholder: #94a3b8;
 }
 
 :root {
@@ -419,9 +431,9 @@ body {
 .btn-primary {
   background: var(--blue-grad);
   color: #ffffff;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   padding: 8px 18px;
-  border-radius: var(--r-pill);
+  border-radius: 9px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -431,12 +443,12 @@ body {
   gap: 6px;
   transition: all 0.16s ease;
   letter-spacing: -0.01em;
-  box-shadow: 0 2px 10px rgba(56, 189, 248, 0.28);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(56, 189, 248, 0.42);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   filter: brightness(1.06);
 }
 
@@ -481,10 +493,10 @@ body {
 .input-search {
   flex: 1;
   min-width: 220px;
-  background: var(--fill);
-  border: 1px solid var(--line);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: var(--r-control);
-  height: 36px;
+  height: 38px;
   padding: 0 14px;
   color: var(--text-main);
   font-size: 13px;
@@ -526,6 +538,30 @@ body {
 .select-filter option {
   background: var(--win);
   color: var(--text-main);
+}
+
+/* Global Form Controls & Textareas */
+textarea {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-main);
+  border-radius: var(--r-control);
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  transition: all 0.18s ease;
+  box-sizing: border-box;
+}
+
+textarea:focus {
+  background: var(--input-bg);
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+  outline: none;
+}
+
+textarea::placeholder {
+  color: var(--input-placeholder);
 }
 
 /* ============================================================

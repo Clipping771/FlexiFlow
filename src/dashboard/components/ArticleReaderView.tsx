@@ -307,10 +307,8 @@ Therefore, achieving true grid reliability without fossil-fuel backup requires a
             style={{
               width: '100%',
               minHeight: '160px',
-              background: 'rgba(255, 255, 255, 0.7)',
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-              border: '1px solid var(--border-color)',
+              background: 'var(--input-bg)',
+              border: '1px solid var(--input-border)',
               borderRadius: '12px',
               color: 'var(--text-main)',
               padding: '14px',
