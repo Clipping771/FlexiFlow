@@ -92,6 +92,7 @@ export class PopupView {
   private currentSize: 'small' | 'medium' | 'large' | 'xlarge' = 'medium';
   private targetLanguage: string = 'bn';
   private currentTheme: 'light' | 'dark' | 'system' = 'dark';
+  private readingMode: 'quick' | 'learn' = 'quick';
 
   constructor(callbacks: PopupCallbacks) {
     this.callbacks = callbacks;
@@ -127,6 +128,32 @@ export class PopupView {
 
   getTheme(): 'light' | 'dark' | 'system' {
     return this.currentTheme;
+  }
+
+  setReadingMode(mode: 'quick' | 'learn'): void {
+    this.readingMode = mode === 'learn' ? 'learn' : 'quick';
+  }
+
+  getReadingMode(): 'quick' | 'learn' {
+    return this.readingMode;
+  }
+
+  toggleReadingMode(): void {
+    const nextMode: 'quick' | 'learn' = this.readingMode === 'learn' ? 'quick' : 'learn';
+    this.readingMode = nextMode;
+    if (this.callbacks.onUpdateSettings) {
+      this.callbacks.onUpdateSettings({ readingMode: nextMode });
+    }
+    this.render({ preserveScroll: true });
+  }
+
+  private renderModeToggleHtml(): string {
+    const isLearn = this.readingMode === 'learn';
+    return `
+      <button type="button" class="lf-btn-icon lf-reading-mode-btn ${isLearn ? 'learn-mode' : ''}" title="Reading Mode: ${isLearn ? 'Learn Mode (Click for Quick Mode)' : 'Quick Mode (Click for Learn Mode)'}" aria-label="Toggle Reading Mode">
+        ${isLearn ? '🧠 Learn' : '⚡ Quick'}
+      </button>
+    `;
   }
 
   setSize(size: 'small' | 'medium' | 'large' | 'xlarge'): void {
@@ -1030,6 +1057,7 @@ export class PopupView {
           <span class="lf-pos" title="${escapeHtml(rawPos)}">${escapeHtml(displayPos)}</span>
         </div>
         <div class="lf-actions-top">
+          ${this.renderModeToggleHtml()}
           <button class="lf-btn-icon lf-zoom-btn" title="Text size: ${this.currentSize.toUpperCase()} (Click to toggle larger text / চোখের আরাম)" aria-label="Toggle text size">
             <span style="font-weight: 800; font-size: 11px; letter-spacing: -0.5px;">A<sup>+</sup></span>
           </button>
@@ -1252,6 +1280,7 @@ export class PopupView {
           <span class="lf-pos">SENTENCE</span>
         </div>
         <div class="lf-actions-top">
+          ${this.renderModeToggleHtml()}
           <button class="lf-btn-icon lf-zoom-btn" title="Text size: ${this.currentSize.toUpperCase()} (Click to toggle larger text / চোখের আরাম)" aria-label="Toggle text size">
             <span style="font-weight: 800; font-size: 11px; letter-spacing: -0.5px;">A<sup>+</sup></span>
           </button>
@@ -1426,6 +1455,7 @@ export class PopupView {
           <span class="lf-pos">PARAGRAPH</span>
         </div>
         <div class="lf-actions-top">
+          ${this.renderModeToggleHtml()}
           <button class="lf-btn-icon lf-zoom-btn" title="Text size: ${this.currentSize.toUpperCase()} (Click to toggle larger text / চোখের আরাম)" aria-label="Toggle text size">
             <span style="font-weight: 800; font-size: 11px; letter-spacing: -0.5px;">A<sup>+</sup></span>
           </button>
@@ -2562,6 +2592,7 @@ export class PopupView {
           <span class="lf-pos">${a.selectionType.toUpperCase()}</span>
         </div>
         <div class="lf-actions-top">
+          ${this.renderModeToggleHtml()}
           <button class="lf-btn-icon lf-zoom-btn" title="Text size: ${this.currentSize.toUpperCase()} (Click to toggle larger text / চোখের আরাম)" aria-label="Toggle text size">
             <span style="font-weight: 800; font-size: 11px; letter-spacing: -0.5px;">A<sup>+</sup></span>
           </button>
@@ -2596,6 +2627,12 @@ export class PopupView {
         <button class="lf-btn-action lf-save-btn ${this.isSaved ? 'saved' : ''}">${this.isSaved ? '✓ Saved' : '+ Save'}</button>
       </div>
     `;
+
+    this.element.querySelector('.lf-reading-mode-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.toggleReadingMode();
+    });
 
     this.element.querySelector('.lf-zoom-btn')?.addEventListener('click', (e) => {
       e.preventDefault();
@@ -2650,6 +2687,12 @@ export class PopupView {
 
   private bindEventsStageA(): void {
     const el = this.element;
+
+    el.querySelector('.lf-reading-mode-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.toggleReadingMode();
+    });
 
     el.querySelector('.lf-zoom-btn')?.addEventListener('click', (e) => {
       e.preventDefault();
@@ -2855,6 +2898,12 @@ export class PopupView {
   private bindEventsSentence(s: SentenceAnalysisResult): void {
     const el = this.element;
 
+    el.querySelector('.lf-reading-mode-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.toggleReadingMode();
+    });
+
     el.querySelector('.lf-zoom-btn')?.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -3049,6 +3098,12 @@ export class PopupView {
 
   private bindEventsParagraph(p: ParagraphAnalysisResult): void {
     const el = this.element;
+
+    el.querySelector('.lf-reading-mode-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.toggleReadingMode();
+    });
 
     el.querySelector('.lf-zoom-btn')?.addEventListener('click', (e) => {
       e.preventDefault();

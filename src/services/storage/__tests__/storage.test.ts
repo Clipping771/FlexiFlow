@@ -210,4 +210,23 @@ describe('StorageService (IndexedDB & Fallback)', () => {
       expect(item2?.id).toBe('legacy_dup_2');
     });
   });
+
+  describe('readingMode setting & host localStorage isolation', () => {
+    it('defaults readingMode to quick and allows updating to learn', async () => {
+      const { SettingsService, DEFAULT_SETTINGS } = await import('../settings');
+      expect(DEFAULT_SETTINGS.readingMode).toBe('quick');
+
+      const settings = await SettingsService.getSettings();
+      expect(settings.readingMode).toBe('quick');
+
+      await SettingsService.updateSettings({ readingMode: 'learn' });
+      const updated = await SettingsService.getSettings();
+      expect(updated.readingMode).toBe('learn');
+
+      // Revert to quick
+      await SettingsService.updateSettings({ readingMode: 'quick' });
+      const reverted = await SettingsService.getSettings();
+      expect(reverted.readingMode).toBe('quick');
+    });
+  });
 });

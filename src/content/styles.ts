@@ -594,6 +594,35 @@ export const POPUP_STYLES = `
   border-color: rgba(0, 113, 227, 0.35);
 }
 
+.lf-reading-mode-btn {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(0, 113, 227, 0.08);
+  color: #0071e3;
+  border: 1px solid rgba(0, 113, 227, 0.2);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lf-reading-mode-btn.learn-mode {
+  background: rgba(147, 51, 234, 0.12);
+  color: #9333ea;
+  border-color: rgba(147, 51, 234, 0.28);
+}
+
+.lf-reading-mode-btn:hover {
+  background: rgba(0, 113, 227, 0.16);
+}
+
+.lf-reading-mode-btn.learn-mode:hover {
+  background: rgba(147, 51, 234, 0.2);
+}
+
 .lf-close-btn {
   font-weight: 700;
   font-size: 14px;
@@ -1916,6 +1945,32 @@ export const POPUP_STYLES = `
 .lexiflow-popup.theme-dark .lf-zoom-btn:hover {
   background: rgba(56, 189, 248, 0.22);
   color: #7dd3fc;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-reading-mode-btn,
+.lexiflow-popup.theme-dark .lf-reading-mode-btn {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-reading-mode-btn.learn-mode,
+.lexiflow-popup.theme-dark .lf-reading-mode-btn.learn-mode {
+  background: rgba(192, 132, 252, 0.16);
+  border-color: rgba(192, 132, 252, 0.35);
+  color: #c084fc;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-reading-mode-btn:hover,
+.lexiflow-popup.theme-dark .lf-reading-mode-btn:hover {
+  background: rgba(56, 189, 248, 0.22);
+  color: #7dd3fc;
+}
+
+.lexiflow-popup[data-theme="dark"] .lf-reading-mode-btn.learn-mode:hover,
+.lexiflow-popup.theme-dark .lf-reading-mode-btn.learn-mode:hover {
+  background: rgba(192, 132, 252, 0.26);
+  color: #e9d5ff;
 }
 
 .lexiflow-popup[data-theme="dark"] .lf-tabs,

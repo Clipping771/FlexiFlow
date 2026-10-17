@@ -594,4 +594,6 @@ export interface UserSettings {
   highlightModeEnabled?: boolean;
   highlightColor?: HighlightColor;
   highlightFilters?: HighlightFilters;
+  // LexiFlow 2.0 Reading Modes
+  readingMode?: 'quick' | 'learn';
 }

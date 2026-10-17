@@ -473,6 +473,56 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
+          {/* LexiFlow 2.0 Reading Mode */}
+          <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--line)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
+                  Reading &amp; Learning Mode:
+                </label>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Quick Mode prioritizes immediate comprehension; Learn Mode adds Why This Matters, Save with Context &amp; Active Recall
+                </div>
+              </div>
+              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                Active: <strong style={{ color: 'var(--blue)', textTransform: 'capitalize' }}>{form.readingMode === 'learn' ? 'Learn Mode' : 'Quick Mode'}</strong>
+              </span>
+            </div>
+
+            <div className="size-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+              {[
+                { id: 'quick', label: 'Quick Mode (Default)', emoji: '⚡', desc: 'Fast understanding first, contextual meaning & simple English without blocking' },
+                { id: 'learn', label: 'Learn Mode', emoji: '🧠', desc: 'Adds Why This Matters connector logic, Save with Context & Active Recall' }
+              ].map((modeOpt) => {
+                const isSelected = (form.readingMode || 'quick') === modeOpt.id;
+                return (
+                  <button
+                    key={modeOpt.id}
+                    type="button"
+                    className={`size-option-card ${isSelected ? 'selected' : ''}`}
+                    onClick={async () => {
+                      const updated = { ...form, readingMode: modeOpt.id as 'quick' | 'learn' };
+                      setForm(updated);
+                      await onSaveSettings(updated);
+                      setStatus(`Reading Mode set to ${modeOpt.label}. Synchronized across all reading sessions.`);
+                      setTimeout(() => setStatus(null), 3000);
+                    }}
+                  >
+                    <div style={{ fontSize: '20px', marginBottom: '4px' }}>
+                      {modeOpt.emoji}
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: isSelected ? 700 : 600, color: isSelected ? 'var(--blue)' : 'var(--text-main)' }}>
+                      {modeOpt.label}
+                    </span>
+                    <span style={{ fontSize: '10px', color: isSelected ? 'var(--blue)' : 'var(--text-muted)', marginTop: '3px', lineHeight: 1.3 }}>
+                      {modeOpt.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Appearance & Color Theme */}
           <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--line)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>

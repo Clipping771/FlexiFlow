@@ -269,6 +269,7 @@ class ContentScriptManager {
       registerCustomLanguages(this.userSettings.customLanguages);
     }
     this.popupView.setTargetLanguage(this.userSettings.targetLanguage || 'bn');
+    this.popupView.setReadingMode(this.userSettings.readingMode || 'quick');
     if (this.isPopupPositioned) {
       this.updatePosition(false);
     }
