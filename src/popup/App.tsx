@@ -37,7 +37,16 @@ import {
   ArrowLeft,
   ChevronUp,
   ChevronDown,
-  RotateCcw
+  RotateCcw,
+  Settings,
+  Sun,
+  Moon,
+  AlertCircle,
+  Info,
+  Globe,
+  Flame,
+  BookMarked,
+  ArrowRight
 } from 'lucide-react';
 import { playPronunciation } from '../services/audio/voiceService';
 import './popup.css';
@@ -148,6 +157,7 @@ const PopupCardHost: React.FC<PopupCardHostProps> = ({ initialWord }) => {
         view.setTheme(s.theme);
       }
       if (s.popupSize) view.setSize(s.popupSize);
+      if (s.sourceLanguage) view.setSourceLanguage(s.sourceLanguage);
       if (s.targetLanguage) view.setTargetLanguage(s.targetLanguage);
     };
 
@@ -171,7 +181,12 @@ const PopupCardHost: React.FC<PopupCardHostProps> = ({ initialWord }) => {
 
     const executeLookup = (text: string, forcedType?: SelectionType) => {
       if (!text || !text.trim()) return;
-      currentWord = text.trim();
+      // Normalize soft line breaks and hyphens across lines (typical in PDFs and column selections)
+      let normalized = text.trim();
+      normalized = normalized.replace(/(\w+)-\r?\n\s*(\w+)/g, '$1$2');
+      normalized = normalized.replace(/([^\n])\r?\n([^\n])/g, '$1 $2');
+      normalized = normalized.replace(/[ \t]+/g, ' ');
+      currentWord = normalized;
 
       const effectiveType: SelectionType = forcedType || detectSelectionType(currentWord);
 
@@ -269,6 +284,8 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
   const [dueCount, setDueCount] = useState(0);
+  const [recentVocab, setRecentVocab] = useState<VocabularyItem[]>([]);
+  const [popupTab, setPopupTab] = useState<'reading' | 'lookup' | 'library'>('reading');
   const [isSaved, setIsSaved] = useState(false);
   const [isCardMode, setIsCardMode] = useState(false);
   const [targetLang, setTargetLang] = useState('bn');
@@ -396,6 +413,7 @@ export const App: React.FC = () => {
       chrome.runtime.sendMessage({ type: 'GET_ALL_VOCAB' }, (res) => {
         if (res?.success && Array.isArray(res.data)) {
           setSavedCount(res.data.length);
+          setRecentVocab(res.data.slice(-5).reverse());
         }
       });
 
@@ -424,6 +442,7 @@ export const App: React.FC = () => {
             chrome.runtime.sendMessage({ type: 'GET_ALL_VOCAB' }, (res) => {
               if (res?.success && Array.isArray(res.data)) {
                 setSavedCount(res.data.length);
+                setRecentVocab(res.data.slice(-5).reverse());
               }
             });
             chrome.runtime.sendMessage({ type: 'GET_DUE_ITEMS' }, (res) => {
@@ -892,395 +911,533 @@ export const App: React.FC = () => {
   /* ------------------------------------------------------------- */
   return (
     <div className="popup-container">
-      {/* Header */}
-      <div className="popup-header">
-        <div className="logo-group">
-          <img
-            src="/assets/icon48.png"
-            alt="LexiFlow"
-            style={{ width: 28, height: 28, borderRadius: 7, boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }}
-          />
-          <div>
-            <div className="app-title">LexiFlow</div>
-            <div className="app-sub">Contextual Reading & Language Mastery</div>
+      {/* 1. Sleek Modern Header */}
+      <div className="hub-header">
+        <div className="hub-brand">
+          <div className="brand-logo-container">
+            <img src="/assets/icon48.png" alt="LexiFlow" className="brand-logo-img" />
+          </div>
+          <div className="brand-text-block">
+            <div className="app-title-row">
+              <span className="app-title">LexiFlow</span>
+              <span className="app-badge-pro">PRO</span>
+            </div>
+            {currentDomain ? (
+              <div
+                className={`header-site-capsule ${isCurrentSiteEnabled ? 'active' : 'paused'}`}
+                onClick={toggleCurrentSite}
+                title={`Click to ${isCurrentSiteEnabled ? 'pause' : 'activate'} on ${currentDomain}`}
+              >
+                <span className={`domain-dot ${isCurrentSiteEnabled ? 'active' : ''}`} />
+                <span className="domain-name">{currentDomain}</span>
+                <span className="domain-state-text">{isCurrentSiteEnabled ? 'ON' : 'OFF'}</span>
+              </div>
+            ) : (
+              <div className="app-sub">Contextual Reading & Mastery</div>
+            )}
           </div>
         </div>
 
-        <div className="popup-header-actions">
+        <div className="hub-header-actions">
           <button
             type="button"
-            className="popup-theme-btn"
+            className="hub-icon-btn"
             onClick={handleToggleTheme}
             title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
             aria-label="Toggle theme"
           >
-            {theme === 'dark' ? '☀️' : '🌙'}
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
           </button>
           <button
             type="button"
-            className="popup-theme-btn"
+            className="hub-icon-btn"
             onClick={openDashboard}
-            title="Open LexiFlow Dashboard & Settings"
+            title="Open LexiFlow Settings"
             aria-label="Settings"
           >
-            ⚙️
+            <Settings size={14} />
           </button>
         </div>
       </div>
 
-      {/* Inset Stat Counter Pills */}
-      <div className="stats-bar">
-        <div className="stat-item">
-          <span className="stat-val">{savedCount}</span>
-          <span className="stat-label">Saved Words</span>
-        </div>
-        <div className="stat-item">
-          <span className={`stat-val ${dueCount > 0 ? 'orange' : ''}`}>{dueCount}</span>
-          <span className="stat-label">Due for Review</span>
-        </div>
-      </div>
+      {/* 2. Top Segmented Navigation Tabs */}
+      <div className="hub-segmented-tabs">
+        <button
+          type="button"
+          className={`hub-tab-item ${popupTab === 'reading' ? 'active' : ''}`}
+          onClick={() => setPopupTab('reading')}
+        >
+          <Sparkles size={13} />
+          <span>Reading AI</span>
+        </button>
 
-      {/* Spotlight Search Box */}
-      <div className="search-box">
-        <div className="search-input-wrapper">
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Search word or sentence..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && executeSearch(searchTerm)}
-          />
-        </div>
-        <button className="btn-primary" onClick={() => executeSearch(searchTerm)} disabled={loading}>
-          {loading ? (
-            '...'
-          ) : (
-            <>
-              <Sparkles size={13} />
-              <span>Analyze</span>
-            </>
-          )}
+        <button
+          type="button"
+          className={`hub-tab-item ${popupTab === 'lookup' ? 'active' : ''}`}
+          onClick={() => setPopupTab('lookup')}
+        >
+          <Search size={13} />
+          <span>Lookup</span>
+        </button>
+
+        <button
+          type="button"
+          className={`hub-tab-item ${popupTab === 'library' ? 'active' : ''}`}
+          onClick={() => setPopupTab('library')}
+        >
+          <BookMarked size={13} />
+          <span>Library</span>
+          {dueCount > 0 && <span className="hub-tab-badge">{dueCount}</span>}
         </button>
       </div>
 
-      {/* Site Active / Paused Slider Toggle (matching eJOY style) */}
-      <div
-        className="site-toggle-card"
-        onClick={toggleCurrentSite}
-        title={`Click to ${isCurrentSiteEnabled ? 'disable' : 'enable'} LexiFlow on ${currentDomain || 'web pages'}`}
-      >
-        <div className="site-toggle-left">
-          <div className="site-toggle-text">
-            <span className="site-toggle-brand">LexiFlow in </span>
-            <span className="site-toggle-domain">{currentDomain || 'web pages'}</span>
-          </div>
-        </div>
-
-        <div
-          className={`site-slider-switch ${isCurrentSiteEnabled ? 'active' : ''}`}
-          role="switch"
-          aria-checked={isCurrentSiteEnabled}
-        >
-          <div className="site-slider-thumb" />
-        </div>
-      </div>
-
-      {/* Smart Article Reader & AI Highlights Studio (Replaces static guide card) */}
-      {!result && !loading && (
-        <div className="popup-studio-card">
-          {/* Studio Header */}
-          <div className="studio-header">
-            <div className="studio-brand">
-              <div className="studio-icon-badge">
-                <Sparkles size={16} />
-              </div>
-              <div>
-                <div className="studio-title-row">
-                  <span className="studio-title">AI Article Highlights</span>
-                  {highlightState && highlightState.count.total > 0 && (
-                    <span className="studio-badge-pill">
-                      {highlightState.count.visible} of {highlightState.count.total} active
-                    </span>
-                  )}
-                </div>
-                <div className="studio-subtext">
-                  {highlightState?.articleTitle
-                    ? `Scope: ${highlightState.articleTitle.slice(0, 32)}${highlightState.articleTitle.length > 32 ? '...' : ''}`
-                    : 'Scope: Main article text only (noise-filtered)'}
+      {/* 3. Tab Contents Area */}
+      <div className="hub-content-area">
+        {/* ======================================================== */}
+        {/* TAB 1: READING AI (Current Tab Article Companion)         */}
+        {/* ======================================================== */}
+        {popupTab === 'reading' && (
+          <div className="hub-tab-pane">
+            {/* Site status capsule banner */}
+            <div className="reading-site-banner">
+              <div className="site-banner-left">
+                <Globe size={14} className="site-banner-icon" />
+                <div className="site-banner-info">
+                  <span className="site-banner-label">Active Site:</span>
+                  <span className="site-banner-domain">{currentDomain || 'Current Web Page'}</span>
                 </div>
               </div>
-            </div>
 
-            {highlightState && highlightState.count.total > 0 && (
-              <button
-                type="button"
-                className="studio-btn-icon-clear"
-                title="Clear Highlights"
-                onClick={handleClearHighlights}
+              <div
+                className={`reading-toggle-switch ${isCurrentSiteEnabled ? 'active' : ''}`}
+                onClick={toggleCurrentSite}
+                role="switch"
+                aria-checked={isCurrentSiteEnabled}
+                title={`Click to ${isCurrentSiteEnabled ? 'disable' : 'enable'} on this site`}
               >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-
-          {/* Status Content */}
-          {!isCurrentSiteEnabled ? (
-            <div className="studio-paused-notice">
-              LexiFlow reading companion is paused on {currentDomain || 'this site'}. Toggle the slider above to re-enable.
-            </div>
-          ) : highlightLoading ? (
-            <div className="studio-loading-state">
-              <div className="studio-spinner" />
-              <div className="studio-loading-text">
-                <div className="studio-loading-title">Analyzing Main Article Body...</div>
-                <div className="studio-loading-desc">Filtering page headers, footers & sidebars to extract key vocabulary</div>
+                <div className="reading-toggle-thumb" />
               </div>
             </div>
-          ) : !highlightState || highlightState.count.total === 0 ? (
-            <div className="studio-ready-body">
-              <p className="studio-ready-desc">
-                Identifies the <strong>core editorial article</strong> on this page, ignoring navigation, headers, footers, and ads. Automatically extracts and highlights learning-worthy vocabulary, collocations, and idioms with instant explanations.
-              </p>
-              {highlightFeedback && (
-                <div className={`studio-feedback-banner ${highlightFeedback.type}`}>
-                  <span>{highlightFeedback.type === 'error' ? '⚠️' : highlightFeedback.type === 'success' ? '✨' : 'ℹ️'}</span>
-                  <span>{highlightFeedback.message}</span>
-                </div>
-              )}
-              <button
-                type="button"
-                className="studio-btn-primary-highlight"
-                onClick={handleTriggerHighlight}
-              >
-                <Sparkles size={15} />
-                <span>Highlight Main Article</span>
-              </button>
-            </div>
-          ) : (
-            <div className="studio-active-controls">
-              {highlightFeedback && (
-                <div className={`studio-feedback-banner ${highlightFeedback.type}`} style={{ marginBottom: '8px' }}>
-                  <span>{highlightFeedback.type === 'error' ? '⚠️' : highlightFeedback.type === 'success' ? '✨' : 'ℹ️'}</span>
-                  <span>{highlightFeedback.message}</span>
-                </div>
-              )}
-              {/* Navigation Bar */}
-              <div className="studio-nav-bar">
-                <div className="studio-nav-arrows">
-                  <button
-                    type="button"
-                    className="studio-nav-btn"
-                    title="Previous Highlight (Shift+Tab)"
-                    onClick={() => handleNavigateHighlight('prev')}
-                  >
-                    <ChevronUp size={14} />
-                    <span>Prev</span>
-                  </button>
-                  <span className="studio-nav-counter">
-                    {(highlightState.currentIndex ?? -1) >= 0 ? highlightState.currentIndex + 1 : 1} / {highlightState.count.visible || highlightState.count.total}
-                  </span>
-                  <button
-                    type="button"
-                    className="studio-nav-btn"
-                    title="Next Highlight (Tab)"
-                    onClick={() => handleNavigateHighlight('next')}
-                  >
-                    <span>Next</span>
-                    <ChevronDown size={14} />
-                  </button>
-                </div>
 
-                <button
-                  type="button"
-                  className={`studio-drawer-toggle ${showVocabDrawer ? 'active' : ''}`}
-                  onClick={() => setShowVocabDrawer(!showVocabDrawer)}
-                  title="View discovered terms"
-                >
-                  <BookOpen size={13} />
-                  <span>Vocab ({highlightState.items?.length || highlightState.count.total})</span>
+            {!isCurrentSiteEnabled ? (
+              <div className="reading-paused-card">
+                <Info size={16} className="paused-icon" />
+                <div className="paused-text-wrap">
+                  <div className="paused-title">LexiFlow is paused on {currentDomain || 'this site'}</div>
+                  <div className="paused-desc">Enable to access inline word popups, paragraph explanations, and article vocabulary discovery.</div>
+                </div>
+                <button type="button" className="btn-enable-site" onClick={toggleCurrentSite}>
+                  Re-enable on this site
                 </button>
               </div>
-
-              {/* Color Swatches & Filter Pills */}
-              <div className="studio-settings-row">
-                <div className="studio-color-group" title="Select Highlight Color">
-                  {(['yellow', 'blue', 'green', 'pink', 'purple'] as const).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={`studio-color-dot ${highlightState.color === c ? 'selected' : ''}`}
-                      data-color={c}
-                      onClick={() => handleChangeHighlightColor(c)}
-                      aria-label={`Highlight Color ${c}`}
-                    />
-                  ))}
-                </div>
-
-                <div className="studio-filter-group">
-                  <button
-                    type="button"
-                    className={`studio-filter-pill ${highlightState.filters.words ? 'active' : ''}`}
-                    onClick={() => handleToggleFilter('words')}
-                    title="Toggle Words"
-                  >
-                    Words
-                  </button>
-                  <button
-                    type="button"
-                    className={`studio-filter-pill ${highlightState.filters.phrases ? 'active' : ''}`}
-                    onClick={() => handleToggleFilter('phrases')}
-                    title="Toggle Phrases"
-                  >
-                    Phrases
-                  </button>
-                  <button
-                    type="button"
-                    className={`studio-filter-pill ${highlightState.filters.idioms ? 'active' : ''}`}
-                    onClick={() => handleToggleFilter('idioms')}
-                    title="Toggle Idioms"
-                  >
-                    Idioms
-                  </button>
-                </div>
+            ) : highlightLoading ? (
+              <div className="reading-scanning-card">
+                <div className="reading-scanning-spinner" />
+                <div className="reading-scanning-title">Analyzing Article Body...</div>
+                <div className="reading-scanning-desc">Filtering page headers, footers & ads to extract high-value vocabulary, idioms & collocations.</div>
               </div>
+            ) : !highlightState || highlightState.count.total === 0 ? (
+              <div className="reading-ready-hero">
+                <div className="reading-hero-scope">
+                  <span className="scope-tag">SCOPE</span>
+                  <span className="scope-title" title={highlightState?.articleTitle || ''}>
+                    {highlightState?.articleTitle ? highlightState.articleTitle : 'Core editorial body (noise-filtered)'}
+                  </span>
+                </div>
 
-              {/* Collapsible Vocabulary Drawer */}
-              {showVocabDrawer && highlightState.items && highlightState.items.length > 0 && (
-                <div className="studio-vocab-drawer">
-                  <div className="studio-vocab-header">
-                    <div className="studio-vocab-header-left">
-                      <span className="studio-vocab-header-title">Vocabulary In Article</span>
-                      <span className="studio-vocab-count-badge">{highlightState.items.length}</span>
-                    </div>
-                    <span className="studio-vocab-header-hint">Tap word to jump ↗</span>
+                <div className="reading-value-grid">
+                  <div className="value-chip">
+                    <Check size={12} className="check-icon" />
+                    <span>Auto-detects high-impact words</span>
                   </div>
-                  <div className="studio-vocab-list">
-                    {highlightState.items.map((it, idx) => {
-                      const meaning = it.easyBengali || it.bengaliMeaning || it.easyEnglish || it.contextualMeaning;
-                      return (
-                        <div
-                          key={idx}
-                          className="studio-vocab-item"
-                          onClick={() => handleScrollToItem(it.text)}
-                          title={`Click to scroll to "${it.text}" in the article`}
-                        >
-                          <div className="studio-vocab-item-top">
-                            <span className="studio-vocab-item-text">{it.text}</span>
-                            <span className={`studio-vocab-tag ${it.type}`}>{it.type}</span>
-                          </div>
-                          {meaning && (
-                            <div className="studio-vocab-item-meaning">
-                              {meaning}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                  <div className="value-chip">
+                    <Check size={12} className="check-icon" />
+                    <span>Contextual Bengali translations</span>
+                  </div>
+                  <div className="value-chip">
+                    <Check size={12} className="check-icon" />
+                    <span>Bypasses banners & sidebars</span>
                   </div>
                 </div>
-              )}
 
-              {/* Bottom Re-scan row */}
-              <div className="studio-bottom-actions">
+                {highlightFeedback && (
+                  <div className={`studio-feedback-banner ${highlightFeedback.type}`}>
+                    <span>{highlightFeedback.type === 'error' ? <AlertCircle size={14} /> : highlightFeedback.type === 'success' ? <Sparkles size={14} /> : <Info size={14} />}</span>
+                    <span>{highlightFeedback.message}</span>
+                  </div>
+                )}
+
                 <button
                   type="button"
-                  className="studio-btn-rescan"
+                  className="btn-hero-highlight"
                   onClick={handleTriggerHighlight}
                 >
-                  <RotateCcw size={12} />
-                  <span>Re-scan Article Body</span>
+                  <Sparkles size={15} />
+                  <span>Scan & Highlight Article</span>
                 </button>
               </div>
+            ) : (
+              /* Active Highlights Control Center */
+              <div className="reading-active-center">
+                <div className="active-highlight-summary">
+                  <div className="summary-left">
+                    <span className="summary-badge">ACTIVE</span>
+                    <span className="summary-text">
+                      <strong>{highlightState.count.visible}</strong> of {highlightState.count.total} active highlights
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-clear-highlights"
+                    onClick={handleClearHighlights}
+                    title="Clear highlights from page"
+                  >
+                    <X size={13} />
+                    <span>Clear</span>
+                  </button>
+                </div>
+
+                {/* Highlight Navigator */}
+                <div className="reading-nav-bar">
+                  <div className="nav-btn-group">
+                    <button
+                      type="button"
+                      className="nav-step-btn"
+                      onClick={() => handleNavigateHighlight('prev')}
+                      title="Previous term (Shift+Tab)"
+                    >
+                      <ChevronUp size={14} />
+                      <span>Prev</span>
+                    </button>
+                    <span className="nav-counter-display">
+                      {(highlightState.currentIndex ?? -1) >= 0 ? highlightState.currentIndex + 1 : 1} / {highlightState.count.visible || highlightState.count.total}
+                    </span>
+                    <button
+                      type="button"
+                      className="nav-step-btn"
+                      onClick={() => handleNavigateHighlight('next')}
+                      title="Next term (Tab)"
+                    >
+                      <span>Next</span>
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    className={`btn-vocab-drawer ${showVocabDrawer ? 'active' : ''}`}
+                    onClick={() => setShowVocabDrawer(!showVocabDrawer)}
+                  >
+                    <BookOpen size={12} />
+                    <span>Terms ({highlightState.items?.length || highlightState.count.total})</span>
+                  </button>
+                </div>
+
+                {/* Palette & Category Filters */}
+                <div className="reading-tools-row">
+                  <div className="color-swatches-group" title="Select highlight tint">
+                    {(['yellow', 'blue', 'green', 'pink', 'purple'] as const).map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className={`color-swatch-dot ${highlightState.color === c ? 'selected' : ''}`}
+                        data-color={c}
+                        onClick={() => handleChangeHighlightColor(c)}
+                        aria-label={`Color ${c}`}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="filter-pills-group">
+                    <button
+                      type="button"
+                      className={`filter-tab-pill ${highlightState.filters.words ? 'active' : ''}`}
+                      onClick={() => handleToggleFilter('words')}
+                    >
+                      Words
+                    </button>
+                    <button
+                      type="button"
+                      className={`filter-tab-pill ${highlightState.filters.phrases ? 'active' : ''}`}
+                      onClick={() => handleToggleFilter('phrases')}
+                    >
+                      Phrases
+                    </button>
+                    <button
+                      type="button"
+                      className={`filter-tab-pill ${highlightState.filters.idioms ? 'active' : ''}`}
+                      onClick={() => handleToggleFilter('idioms')}
+                    >
+                      Idioms
+                    </button>
+                  </div>
+                </div>
+
+                {/* Vocabulary Drawer */}
+                {showVocabDrawer && highlightState.items && highlightState.items.length > 0 && (
+                  <div className="reading-vocab-drawer">
+                    <div className="drawer-header-row">
+                      <span className="drawer-heading">Discovered Terms in Article</span>
+                      <span className="drawer-hint">Tap word to jump ↗</span>
+                    </div>
+                    <div className="drawer-vocab-list">
+                      {highlightState.items.map((it, idx) => {
+                        const meaning = it.easyBengali || it.bengaliMeaning || it.easyEnglish || it.contextualMeaning;
+                        return (
+                          <div
+                            key={idx}
+                            className="drawer-vocab-card"
+                            onClick={() => handleScrollToItem(it.text)}
+                            title={`Click to scroll to "${it.text}" in article`}
+                          >
+                            <div className="card-top-line">
+                              <span className="card-word-text">{it.text}</span>
+                              <span className={`card-type-tag ${it.type}`}>{it.type}</span>
+                            </div>
+                            {meaning && (
+                              <div className="card-meaning-line">{meaning}</div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Re-scan button */}
+                <div className="reading-rescan-row">
+                  <button type="button" className="btn-rescan-page" onClick={handleTriggerHighlight}>
+                    <RotateCcw size={12} />
+                    <span>Re-scan Article Body</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* TAB 2: QUICK LOOKUP (Dictionary & Instant Explainer)     */}
+        {/* ======================================================== */}
+        {popupTab === 'lookup' && (
+          <div className="hub-tab-pane">
+            {/* Modern Search Command Bar */}
+            <div className="lookup-search-bar">
+              <div className="lookup-input-box">
+                <Search size={14} className="lookup-search-icon" />
+                <input
+                  type="text"
+                  className="lookup-input-field"
+                  placeholder="Search word, idiom, or sentence..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && executeSearch(searchTerm)}
+                  autoFocus
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    className="lookup-clear-btn"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setResult(null);
+                    }}
+                    title="Clear"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                className="btn-lookup-analyze"
+                onClick={() => executeSearch(searchTerm)}
+                disabled={loading || !searchTerm.trim()}
+              >
+                {loading ? '...' : <><Sparkles size={13} /><span>Analyze</span></>}
+              </button>
             </div>
-          )}
-        </div>
-      )}
 
-      {loading && (
-        <div style={{ textAlign: 'center', padding: '24px 16px', color: '#6e6e73', fontSize: '13px' }}>
-          Interpreting with LexiFlow AI...
-        </div>
-      )}
+            {loading && (
+              <div className="lookup-loading-box">
+                <div className="reading-scanning-spinner" />
+                <span>Interpreting with LexiFlow AI...</span>
+              </div>
+            )}
 
-      {/* Result Card */}
-      {result && (
-        <div className="result-card">
-          <div className="word-header" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span className="word-title">{result.selectedText}</span>
-            <button
-              type="button"
-              title="Pronounce"
-              style={{
-                background: 'rgba(0, 0, 0, 0.05)',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                padding: '2px 6px',
-                fontSize: '13px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                lineHeight: 1
-              }}
-              onClick={() => playPronunciation(result.selectedText)}
-            >
-              🔊
-            </button>
-            <span className="word-pos">{result.selectionType.toUpperCase()}</span>
+            {/* Result View */}
+            {!loading && result && (
+              <div className="lookup-result-box">
+                <div className="result-top-row">
+                  <span className="result-term-title">{result.selectedText}</span>
+                  <button
+                    type="button"
+                    className="result-pronounce-btn"
+                    title="Listen to pronunciation"
+                    onClick={() => playPronunciation(result.selectedText)}
+                  >
+                    <Volume2 size={14} />
+                  </button>
+                  <span className="result-type-badge">{result.selectionType.toUpperCase()}</span>
+                </div>
+
+                {result.bengaliTranslation && (
+                  <div className="result-bengali-pill">
+                    <span className="bengali-accent-mark" />
+                    <span>{result.bengaliTranslation}</span>
+                  </div>
+                )}
+
+                <div className="result-definition-text">
+                  {(result as WordAnalysisResult).contextualMeaning ||
+                    (result as WordAnalysisResult).simpleEnglishExplanation ||
+                    (result as SentenceAnalysisResult).plainEnglishParaphrase}
+                </div>
+
+                <div className="result-action-footer">
+                  <button
+                    type="button"
+                    className={`btn-save-term ${isSaved ? 'saved' : ''}`}
+                    onClick={handleSave}
+                  >
+                    {isSaved ? (
+                      <><Check size={13} /><span>Saved in Library</span></>
+                    ) : (
+                      <><BookmarkPlus size={13} /><span>Save to Library</span></>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Empty state suggestions */}
+            {!loading && !result && (
+              <div className="lookup-empty-hints">
+                <div className="hints-title">Popular suggestions:</div>
+                <div className="hints-chips-row">
+                  {['meticulous', 'break the ice', 'take for granted', 'resilience'].map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      className="hint-word-chip"
+                      onClick={() => executeSearch(w)}
+                    >
+                      {w}
+                    </button>
+                  ))}
+                </div>
+                <div className="hints-tip-box">
+                  <Lightbulb size={13} className="tip-icon" />
+                  <span>Enter full sentences to get detailed grammatical breakdowns and natural Bengali translations.</span>
+                </div>
+              </div>
+            )}
           </div>
+        )}
 
-          {result.bengaliTranslation && (
-            <div className="word-bengali">{result.bengaliTranslation}</div>
-          )}
+        {/* ======================================================== */}
+        {/* TAB 3: LIBRARY & REVIEW (Spaced Repetition & Saved Words) */}
+        {/* ======================================================== */}
+        {popupTab === 'library' && (
+          <div className="hub-tab-pane">
+            {/* Metric Cards Row */}
+            <div className="library-stats-grid">
+              <div className="stat-card blue" onClick={openDashboard} role="button" tabIndex={0} title="View all words in Dashboard">
+                <div className="stat-card-icon"><BookOpen size={15} /></div>
+                <div className="stat-card-content">
+                  <span className="stat-number">{savedCount}</span>
+                  <span className="stat-title">Saved Words</span>
+                </div>
+              </div>
 
-          <div className="word-def">
-            {(result as WordAnalysisResult).contextualMeaning ||
-              (result as WordAnalysisResult).simpleEnglishExplanation ||
-              (result as SentenceAnalysisResult).plainEnglishParaphrase}
-          </div>
+              <div className={`stat-card ${dueCount > 0 ? 'orange' : 'neutral'}`} onClick={openDashboard} role="button" tabIndex={0} title="Review words due today">
+                <div className="stat-card-icon"><Flame size={15} /></div>
+                <div className="stat-card-content">
+                  <span className="stat-number">{dueCount}</span>
+                  <span className="stat-title">Due for Review</span>
+                </div>
+              </div>
+            </div>
 
-          <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              className="btn-primary"
-              style={{
-                background: isSaved ? 'rgba(0, 113, 227, 0.12)' : '#0071e3',
-                color: isSaved ? '#0071e3' : '#ffffff',
-                fontSize: '12px',
-                padding: '6px 14px'
-              }}
-              onClick={handleSave}
-            >
-              {isSaved ? (
-                <>
-                  <Check size={13} strokeWidth={2.5} />
-                  <span>Saved in Library</span>
-                </>
+            {/* Flashcard Due Banner */}
+            {dueCount > 0 ? (
+              <div className="library-due-banner">
+                <div className="due-banner-text">
+                  <div className="due-banner-title">🔥 {dueCount} words due for spaced repetition</div>
+                  <div className="due-banner-sub">Strengthen your memory with FSRS smart flashcards.</div>
+                </div>
+                <button type="button" className="btn-start-review" onClick={openDashboard}>
+                  <span>Review Flashcards</span>
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+            ) : (
+              <div className="library-caught-up-banner">
+                <Check size={14} className="caught-up-icon" />
+                <span>All caught up! No flashcards due today.</span>
+              </div>
+            )}
+
+            {/* Recent Vocabulary Section */}
+            <div className="library-recent-section">
+              <div className="recent-section-header">
+                <span className="recent-heading">Recent Saved Words</span>
+                <button type="button" className="recent-view-all" onClick={openDashboard}>
+                  <span>View All</span>
+                  <ArrowRight size={11} />
+                </button>
+              </div>
+
+              {recentVocab.length > 0 ? (
+                <div className="recent-vocab-list">
+                  {recentVocab.map((item, idx) => (
+                    <div key={idx} className="recent-vocab-row" onClick={() => {
+                      setPopupTab('lookup');
+                      executeSearch(item.word);
+                    }}>
+                      <div className="recent-word-info">
+                        <span className="recent-word-term">{item.word}</span>
+                        {item.bengali && <span className="recent-word-bn">{item.bengali}</span>}
+                      </div>
+                      <button
+                        type="button"
+                        className="recent-word-audio"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playPronunciation(item.word);
+                        }}
+                        title="Pronounce"
+                      >
+                        <Volume2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <>
-                  <BookmarkPlus size={13} />
-                  <span>Save Word</span>
-                </>
+                <div className="recent-empty-text">No words saved yet. Highlight or search words to build your library.</div>
               )}
-            </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Quick Launch Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: 'auto' }}>
+      {/* 4. Bottom Dock Actions */}
+      <div className="hub-bottom-dock">
         <button
-          className="btn-secondary"
-          style={{ width: '100%', justifyContent: 'center' }}
+          type="button"
+          className="hub-dock-btn"
           onClick={openSidePanel}
+          title="Open LexiFlow in browser Side Panel"
         >
           <PanelRight size={14} />
           <span>Side Panel</span>
         </button>
+
         <button
-          className="btn-dashboard"
-          style={{ width: '100%', justifyContent: 'center' }}
+          type="button"
+          className="hub-dock-btn primary"
           onClick={openDashboard}
+          title="Open full LexiFlow Learning Dashboard"
         >
           <ExternalLink size={14} />
           <span>Dashboard</span>

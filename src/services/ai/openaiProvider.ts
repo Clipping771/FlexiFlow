@@ -187,22 +187,49 @@ Return a valid raw JSON object strictly adhering to this schema:
   "toneAndRegister": "Standard English"
 }`;
     } else {
-      sys = `Analyze this paragraph for an ESL ${lang.targetLabel} learner.
-In "bengaliTranslation" and "easyBengali", provide ${lang.promptTargetInstruction}.
+      sys = `Analyze this text for a learner using smart hierarchical segmentation:
+1. Divide text into paragraphs.
+2. For each paragraph, extract each sentence.
+3. For each sentence, provide the complete natural ${lang.targetLabel} translation and sequential phrase-by-phrase breakdown with plain English and ${lang.targetLabel} explanations.
+All translation and explanation fields ("bengaliTranslation", "easyBengali") must be strictly written in ${lang.targetLabel} (${lang.targetNativeLabel}).
+
 Return a valid raw JSON object strictly adhering to this schema:
 {
   "selectedText": "${text}",
   "selectionType": "paragraph",
-  "mainIdea": "Main thesis of the paragraph",
+  "mainIdea": "Main thesis of the entire text",
   "conciseSummary": "Concise summary",
-  "bengaliTranslation": "Complete natural ${lang.targetLabel} translation",
-  "phraseBreakdown": [
+  "bengaliTranslation": "Complete natural ${lang.targetLabel} translation of text (${lang.promptTargetInstruction})",
+  "paragraphs": [
     {
-      "phrase": "Exact phrase",
-      "easyEnglish": "Simple English explanation",
-      "easyBengali": "Natural ${lang.targetLabel} explanation"
+      "paragraphIndex": 1,
+      "paragraphText": "Exact text of paragraph 1",
+      "mainIdea": "Main idea of this paragraph",
+      "bengaliTranslation": "Natural ${lang.targetLabel} translation of this paragraph",
+      "sentences": [
+        {
+          "sentenceIndex": 1,
+          "sentenceText": "Exact sentence text",
+          "bengaliTranslation": "Natural ${lang.targetLabel} translation of this sentence",
+          "phraseBreakdown": [
+            {
+              "phrase": "Exact sequential chunk from this sentence",
+              "easyEnglish": "Very simple everyday English explanation.",
+              "easyBengali": "Natural easy ${lang.targetLabel} explanation (${lang.promptTargetInstruction})"
+            }
+          ]
+        }
+      ]
     }
   ],
+  "phraseBreakdown": [
+    {
+      "phrase": "Exact meaningful phrase from text",
+      "easyEnglish": "Simple English explanation",
+      "easyBengali": "Natural easy ${lang.targetLabel} explanation"
+    }
+  ],
+  "sentenceBreakdown": ["Sentence 1 summary", "Sentence 2 summary"],
   "keyVocabulary": [{"term": "term", "meaning": "meaning", "bengali": "translation"}],
   "toneAndRegister": "Standard English"
 }`;

@@ -8,6 +8,8 @@ import {
   PhraseAnalysisResult,
   SentenceAnalysisResult,
   ParagraphAnalysisResult,
+  ParagraphSentenceItem,
+  ParagraphBlockItem,
   StageAExplanation,
   StageBDetailedVocabulary,
   StageBSense,
@@ -36,6 +38,7 @@ import { getLanguageConfig } from '../../config/languages';
 import { AIProvider } from './types';
 import { HighlightIntelligenceService } from './highlightIntelligence';
 import { SyntaxEngine } from '../grammar/syntaxEngine';
+import { splitIntoParagraphs, splitIntoSentences } from '../../content/selection';
 
 export class MockAIProvider implements AIProvider {
   name = 'mock';
@@ -810,7 +813,43 @@ export class MockAIProvider implements AIProvider {
   }
 
   private analyzeParagraph(paragraph: string): ParagraphAnalysisResult {
-    const phraseBreakdown = this.decomposeIntoPhraseBreakdown(paragraph);
+    const paraBlocks = splitIntoParagraphs(paragraph);
+    const paragraphs: ParagraphBlockItem[] = [];
+    const allSentences: ParagraphSentenceItem[] = [];
+    let globalSentIdx = 1;
+
+    paraBlocks.forEach((paraText, pIdx) => {
+      const sentenceTexts = splitIntoSentences(paraText);
+      const paraSentences: ParagraphSentenceItem[] = [];
+
+      sentenceTexts.forEach((sentText) => {
+        const sentPhrases = this.decomposeIntoPhraseBreakdown(sentText);
+        const sentenceItem: ParagraphSentenceItem = {
+          sentenceIndex: globalSentIdx++,
+          sentenceText: sentText,
+          bengaliTranslation: this.targetLang === 'zh'
+            ? `语句 ${globalSentIdx - 1} 语境释义：${sentText.slice(0, 30)}...`
+            : (this.targetLang === 'bn'
+              ? `বাক্য ${globalSentIdx - 1}-এর সরল অনুবাদ: ${sentText.slice(0, 40)}...`
+              : `Translation of sentence ${globalSentIdx - 1}: ${sentText.slice(0, 40)}...`),
+          phraseBreakdown: sentPhrases
+        };
+        paraSentences.push(sentenceItem);
+        allSentences.push(sentenceItem);
+      });
+
+      paragraphs.push({
+        paragraphIndex: pIdx + 1,
+        paragraphText: paraText,
+        mainIdea: `Core theme of paragraph ${pIdx + 1}`,
+        bengaliTranslation: this.targetLang === 'bn' ? `প্যারাগ্রাফ ${pIdx + 1}-এর ভাবার্থ ও মূল বক্তব্য।` : `Main idea of paragraph ${pIdx + 1}`,
+        sentences: paraSentences
+      });
+    });
+
+    const phraseBreakdown = allSentences.length > 0
+      ? allSentences.flatMap((s) => s.phraseBreakdown)
+      : this.decomposeIntoPhraseBreakdown(paragraph);
 
     const raw: ParagraphAnalysisResult = {
       selectedText: paragraph,
@@ -833,7 +872,9 @@ export class MockAIProvider implements AIProvider {
         { term: 'sovereignty', meaning: 'Autonomous jurisdiction', bengali: this.targetLang === 'zh' ? '主权管辖' : (this.targetLang === 'bn' ? 'সার্বভৌমত্ব' : 'sovereignty') }
       ],
       argumentStructure: 'Problem Formulation → Proposed Solution → Strategic Implication',
-      toneAndRegister: 'Analytical / Policy Journalism'
+      toneAndRegister: 'Analytical / Policy Journalism',
+      paragraphs,
+      sentences: allSentences
     };
 
     return ParagraphAnalysisSchema.parse(raw);

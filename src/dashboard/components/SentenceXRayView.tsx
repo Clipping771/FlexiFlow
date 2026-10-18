@@ -83,7 +83,7 @@ export const SentenceXRayView: React.FC = () => {
     <div>
       <div className="view-header">
         <div>
-          <h2 className="view-title">🔬 Sentence X-Ray &amp; Grammar Clauses</h2>
+          <h2 className="view-title">Sentence X-Ray &amp; Grammar Clauses</h2>
           <p className="view-desc">
             Deep 9-layer pedagogical grammar deconstruction with simple explanations in your chosen language
           </p>

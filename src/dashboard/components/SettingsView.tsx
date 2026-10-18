@@ -5,7 +5,8 @@ import {
   getAllLanguages,
   getLanguageConfig,
   createCustomLanguageConfig,
-  registerCustomLanguages
+  registerCustomLanguages,
+  SUPPORTED_SOURCE_LANGUAGES
 } from '../../config/languages';
 import {
   BookOpen,
@@ -18,7 +19,13 @@ import {
   RefreshCw,
   ExternalLink,
   Sliders,
-  Volume2
+  Volume2,
+  Sun,
+  Moon,
+  Monitor,
+  Trash2,
+  Download,
+  FileText
 } from 'lucide-react';
 import { playPronunciation } from '../../services/audio/voiceService';
 
@@ -423,68 +430,52 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   return (
     <div className="settings-container">
-      <div className="view-header">
+      <div className="view-header" style={{ marginBottom: '20px' }}>
         <div>
-          <div className="settings-header-badge">
-            <Zap size={12} /> System Preferences
-          </div>
-          <h2 className="view-title">Settings & AI Configuration</h2>
+          <h2 className="view-title">Settings &amp; AI Configuration</h2>
           <p className="view-desc">
-            Customize intelligent reading triggers, bilingual language engines, and AI model parameters
+            Configure reading interaction triggers, translation languages, and AI model parameters
           </p>
         </div>
-      </div>
-
-      {/* Prominent Active Engine HUD Banner */}
-      <div className={`settings-hud-banner ${form.aiProvider === 'gemini' && form.apiKey ? 'active' : 'offline'}`}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div className={`hud-pulse-dot ${form.aiProvider === 'gemini' && form.apiKey ? 'active' : 'offline'}`} />
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span className={`settings-hud-badge ${form.aiProvider === 'gemini' && form.apiKey ? 'active' : 'offline'}`}>
-                {form.aiProvider === 'gemini' && form.apiKey ? 'Live Cloud AI Active' : 'Offline / Mock Active'}
-              </span>
-              <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-main)' }}>
-                {form.aiProvider === 'gemini' && form.apiKey
-                  ? `Google Gemini (${form.selectedModel || 'gemini-2.0-flash'})`
-                  : form.aiProvider === 'ollama'
-                  ? `Local Ollama (${form.selectedModel || 'llama3.2'})`
-                  : form.aiProvider === 'openai' && form.apiKey
-                  ? `OpenAI (${form.selectedModel || 'gpt-4o-mini'})`
-                  : form.aiProvider === 'anthropic' && form.apiKey
-                  ? `Claude (${form.selectedModel || 'claude-3-5-sonnet-20241022'})`
-                  : 'Local Rule-Based Mock Engine'}
-              </span>
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>
-              {form.aiProvider !== 'mock' && form.apiKey
-                ? 'Real-time bilingual contextual analysis and deep linguistic exploration enabled'
-                : 'Configure an API key below to unlock live Google Gemini / Claude translations'}
-            </div>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span className="top-kpi-pill" style={{ padding: '6px 12px', fontSize: '12px' }}>
+            <span className="top-kpi-dot" style={{ background: form.aiProvider !== 'mock' && form.apiKey ? '#10b981' : '#f59e0b' }}></span>
+            <span className="top-kpi-label">Active Engine:</span>
+            <span className="top-kpi-val">
+              {form.aiProvider === 'gemini' && form.apiKey
+                ? `Google Gemini (${form.selectedModel || 'gemini-2.0-flash'})`
+                : form.aiProvider === 'ollama'
+                ? `Local Ollama (${form.selectedModel || 'llama3.2'})`
+                : form.aiProvider === 'openai' && form.apiKey
+                ? `OpenAI (${form.selectedModel || 'gpt-4o-mini'})`
+                : form.aiProvider === 'anthropic' && form.apiKey
+                ? `Claude (${form.selectedModel || 'claude-3-5-sonnet-20241022'})`
+                : 'Offline / Rule-Based'}
+            </span>
+          </span>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         {/* Card 1: Reading Interaction & Triggers */}
         <div className="card">
           <div className="settings-section-header">
-            <div className="settings-section-icon" style={{ color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)' }}>
+            <div className="settings-section-icon">
               <BookOpen size={18} />
             </div>
             <div>
-              <h4 className="settings-section-title">Reading Interaction & Triggers</h4>
-              <p className="settings-section-subtitle">Control how LexiFlow highlights words and invokes the definition popup</p>
+              <h4 className="settings-section-title">Reading Interaction &amp; Triggers</h4>
+              <p className="settings-section-subtitle">Control how LexiFlow highlights text and invokes the definition card</p>
             </div>
           </div>
 
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '8px' }}>
-              Word & Text Selection Trigger Mode:
+              Word &amp; Text Selection Trigger Mode:
             </label>
             <select
               className="select-filter"
-              style={{ width: '100%', height: '42px', fontSize: '13.5px' }}
+              style={{ width: '100%', height: '40px', fontSize: '13px' }}
               value={form.triggerMode}
               onChange={(e) => {
                 const mode = e.target.value as UserSettings['triggerMode'];
@@ -495,10 +486,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 });
               }}
             >
-              <option value="auto_selection">⚡ Automatic on Text Selection (Instant AI Analysis)</option>
-              <option value="double_click">👆 Double-Click any English word</option>
-              <option value="selection_icon">🪄 Show Floating Icon beside selection</option>
-              <option value="manual_only">🖱️ Manual (Context menu only)</option>
+              <option value="auto_selection">Automatic on text selection (Instant)</option>
+              <option value="double_click">Double-click on word</option>
+              <option value="selection_icon">Show floating icon beside selection</option>
+              <option value="manual_only">Manual (Context menu only)</option>
             </select>
           </div>
 
@@ -509,7 +500,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             >
               <div className="settings-switch-label">
                 <div className="settings-switch-title">Auto-Analyze on Text Selection</div>
-                <div className="settings-switch-desc">Instantly launch definition popup when selecting words without an extra trigger click</div>
+                <div className="settings-switch-desc">Instantly launch definition card when selecting words without an extra trigger click</div>
               </div>
               <div className={`ios-toggle ${form.autoAnalyzeOnSelection ? 'checked' : ''}`}>
                 <div className="ios-toggle-thumb" />
@@ -543,187 +534,142 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          {/* LexiFlow 2.0 Reading Mode */}
-          <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--line)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          {/* Reading Mode Segmented Control */}
+          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
-                  Reading &amp; Learning Mode:
+                  Reading Mode:
                 </label>
                 <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Quick Mode prioritizes immediate comprehension; Learn Mode adds Why This Matters, Save with Context &amp; Active Recall
+                  Quick Mode prioritizes immediate comprehension; Learn Mode adds connector logic &amp; active recall
                 </div>
               </div>
-              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                Active: <strong style={{ color: 'var(--blue)', textTransform: 'capitalize' }}>{form.readingMode === 'learn' ? 'Learn Mode' : 'Quick Mode'}</strong>
-              </span>
-            </div>
-
-            <div className="size-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
-              {[
-                { id: 'quick', label: 'Quick Mode (Default)', emoji: '⚡', desc: 'Fast understanding first, contextual meaning & simple English without blocking' },
-                { id: 'learn', label: 'Learn Mode', emoji: '🧠', desc: 'Adds Why This Matters connector logic, Save with Context & Active Recall' }
-              ].map((modeOpt) => {
-                const isSelected = (form.readingMode || 'quick') === modeOpt.id;
-                return (
-                  <button
-                    key={modeOpt.id}
-                    type="button"
-                    className={`size-option-card ${isSelected ? 'selected' : ''}`}
-                    onClick={async () => {
-                      const updated = { ...form, readingMode: modeOpt.id as 'quick' | 'learn' };
-                      setForm(updated);
-                      await onSaveSettings(updated);
-                      setStatus(`Reading Mode set to ${modeOpt.label}. Synchronized across all reading sessions.`);
-                      setTimeout(() => setStatus(null), 3000);
-                    }}
-                  >
-                    <div style={{ fontSize: '20px', marginBottom: '4px' }}>
-                      {modeOpt.emoji}
-                    </div>
-                    <span style={{ fontSize: '13px', fontWeight: isSelected ? 700 : 600, color: isSelected ? 'var(--blue)' : 'var(--text-main)' }}>
-                      {modeOpt.label}
-                    </span>
-                    <span style={{ fontSize: '10px', color: isSelected ? 'var(--blue)' : 'var(--text-muted)', marginTop: '3px', lineHeight: 1.3 }}>
-                      {modeOpt.desc}
-                    </span>
-                  </button>
-                );
-              })}
+              <div className="segmented-control">
+                <button
+                  type="button"
+                  className={`segmented-item ${form.readingMode !== 'learn' ? 'active' : ''}`}
+                  onClick={async () => {
+                    const updated = { ...form, readingMode: 'quick' as const };
+                    setForm(updated);
+                    await onSaveSettings(updated);
+                    setStatus('Reading Mode set to Quick Mode.');
+                    setTimeout(() => setStatus(null), 2500);
+                  }}
+                >
+                  Quick Mode
+                </button>
+                <button
+                  type="button"
+                  className={`segmented-item ${form.readingMode === 'learn' ? 'active' : ''}`}
+                  onClick={async () => {
+                    const updated = { ...form, readingMode: 'learn' as const };
+                    setForm(updated);
+                    await onSaveSettings(updated);
+                    setStatus('Reading Mode set to Learn Mode.');
+                    setTimeout(() => setStatus(null), 2500);
+                  }}
+                >
+                  Learn Mode
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Appearance & Color Theme */}
-          <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--line)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          {/* Clean Inline Theme Mode Selector */}
+          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
-                  Appearance & Theme Mode:
+                  Interface Theme:
                 </label>
                 <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Synchronized across Dashboard, Browser Extension Popup, and In-Page Reading Popups
+                  Synchronized across dashboard, extension popup, and in-page reading card
                 </div>
               </div>
-              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                Active: <strong style={{ color: 'var(--blue)', textTransform: 'capitalize' }}>{form.theme || 'dark'}</strong>
-              </span>
-            </div>
-
-            <div className="size-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-              {[
-                { id: 'dark', label: 'Dark Mode', emoji: '🌙', desc: 'Modern Charcoal & Glass (Eyes Friendly)' },
-                { id: 'light', label: 'Light Mode', emoji: '☀️', desc: 'Clean Studio Slate & Pure Contrast' },
-                { id: 'system', label: 'System Default', emoji: '💻', desc: 'Automatically match Operating System' }
-              ].map((themeOpt) => {
-                const isSelected = (form.theme || 'dark') === themeOpt.id;
-                return (
-                  <button
-                    key={themeOpt.id}
-                    type="button"
-                    className={`size-option-card ${isSelected ? 'selected' : ''}`}
-                    onClick={async () => {
-                      const updated = { ...form, theme: themeOpt.id as UserSettings['theme'] };
-                      setForm(updated);
-                      await onSaveSettings(updated);
-                      setStatus(`Theme set to ${themeOpt.label}. All popups and dashboard synchronized.`);
-                      setTimeout(() => setStatus(null), 3000);
-                    }}
-                  >
-                    <div style={{ fontSize: '20px', marginBottom: '4px' }}>
-                      {themeOpt.emoji}
-                    </div>
-                    <span style={{ fontSize: '13px', fontWeight: isSelected ? 700 : 600, color: isSelected ? 'var(--blue)' : 'var(--text-main)' }}>
-                      {themeOpt.label}
-                    </span>
-                    <span style={{ fontSize: '10px', color: isSelected ? 'var(--blue)' : 'var(--text-muted)', marginTop: '3px', lineHeight: 1.3 }}>
-                      {themeOpt.desc}
-                    </span>
-                  </button>
-                );
-              })}
+              <div className="segmented-control">
+                <button
+                  type="button"
+                  className={`segmented-item ${form.theme === 'light' ? 'active' : ''}`}
+                  onClick={async () => {
+                    const updated = { ...form, theme: 'light' as const };
+                    setForm(updated);
+                    await onSaveSettings(updated);
+                    setStatus('Theme set to Light Mode.');
+                    setTimeout(() => setStatus(null), 2500);
+                  }}
+                >
+                  <Sun size={13} />
+                  <span>Light</span>
+                </button>
+                <button
+                  type="button"
+                  className={`segmented-item ${form.theme === 'dark' || !form.theme ? 'active' : ''}`}
+                  onClick={async () => {
+                    const updated = { ...form, theme: 'dark' as const };
+                    setForm(updated);
+                    await onSaveSettings(updated);
+                    setStatus('Theme set to Dark Mode.');
+                    setTimeout(() => setStatus(null), 2500);
+                  }}
+                >
+                  <Moon size={13} />
+                  <span>Dark</span>
+                </button>
+                <button
+                  type="button"
+                  className={`segmented-item ${form.theme === 'system' ? 'active' : ''}`}
+                  onClick={async () => {
+                    const updated = { ...form, theme: 'system' as const };
+                    setForm(updated);
+                    await onSaveSettings(updated);
+                    setStatus('Theme set to System Default.');
+                    setTimeout(() => setStatus(null), 2500);
+                  }}
+                >
+                  <Monitor size={13} />
+                  <span>System</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Voice & Pronunciation Settings */}
-          <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--line)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          {/* Clean Pronunciation Voice Row */}
+          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Volume2 size={15} style={{ color: 'var(--blue)' }} />
-                  Pronunciation Voice / অডিও উচ্চারণ:
+                  Pronunciation Voice:
                 </label>
                 <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Exclusively Natural Female Voice (Jenny / Aria / Google UK English Female / Samantha / Zira)
-                </div>
-              </div>
-              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                Active: <strong style={{ color: '#10b981' }}>👩 Female Voice Only</strong>
-              </span>
-            </div>
-
-            <div style={{
-              background: 'var(--surface-hover)',
-              border: '1px solid var(--line)',
-              borderRadius: '8px',
-              padding: '12px 14px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: '12px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  background: 'rgba(16, 185, 129, 0.15)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '18px'
-                }}>
-                  👩
-                </div>
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
-                    Ultra-Realistic Studio Female Voice
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    All robotic and male voices are completely blocked. Natural cadence and pitch for all words, phrases & sentences.
-                  </div>
+                  Natural studio female voice for accurate English pronunciation
                 </div>
               </div>
               <button
                 type="button"
-                className="primary-btn"
-                style={{
-                  padding: '6px 14px',
-                  fontSize: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  whiteSpace: 'nowrap'
-                }}
+                className="btn-secondary"
+                style={{ fontSize: '12px', padding: '6px 14px' }}
                 onClick={() => {
-                  playPronunciation("Welcome to LexiFlow. Learn English vocabulary effortlessly with natural female voice.");
+                  playPronunciation("Welcome to LexiFlow. Learn English vocabulary effortlessly with natural pronunciation.");
                 }}
               >
-                <Volume2 size={14} />
-                Test Female Voice 🔊
+                <Volume2 size={13} />
+                <span>Test Voice</span>
               </button>
             </div>
           </div>
 
 
-          {/* Target Translation Language Selector & Studio */}
+          {/* Language Pair: Source & Target Language Options */}
           <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--line)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
               <div>
-                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
-                  Target Translation Language:
+                <label style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-main)' }}>
+                  🌐 Language Configuration (Source &amp; Target)
                 </label>
                 <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Active: {currentLangConfig.flagEmoji} {currentLangConfig.targetLabel} ({currentLangConfig.targetNativeLabel}) {currentLangConfig.isCustom ? '• Custom' : ''}
+                  Pair: <strong>{(form.sourceLanguage || 'en').toUpperCase()}</strong> ➔ <strong>{currentLangConfig.flagEmoji} {currentLangConfig.targetLabel} ({currentLangConfig.targetNativeLabel})</strong>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -742,47 +688,83 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   }}
                   onClick={openAddCustomLanguage}
                 >
-                  ➕ Add Custom Language
+                  + Add Custom Language
                 </button>
               </div>
             </div>
 
-            <select
-              className="select-filter"
-              style={{ width: '100%', height: '42px', fontSize: '13.5px', padding: '0 12px' }}
-              value={form.targetLanguage || 'bn'}
-              onChange={async (e) => {
-                const newLang = e.target.value;
-                const updated = { ...form, targetLanguage: newLang };
-                setForm(updated);
-                await onSaveSettings(updated);
-                const foundLang = allLanguages.find((l) => l.targetLang === newLang) || customLangs.find((c) => c.code === newLang);
-                setStatus(`Target translation language set to ${foundLang?.flagEmoji || '🌐'} ${(foundLang as any)?.targetLabel || (foundLang as any)?.name || newLang}.`);
-                setTimeout(() => setStatus(null), 3000);
-              }}
-            >
-              {customLangs.length > 0 && (
-                <optgroup label="🌟 My Custom Languages">
-                  {customLangs.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.flagEmoji || '🌐'} {c.name} ({c.nativeName || c.name}) — Custom Language
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px', marginBottom: '10px' }}>
+              {/* 1. Source Language */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '6px' }}>
+                  📖 Source Language (Text you read / select):
+                </label>
+                <select
+                  className="select-filter"
+                  style={{ width: '100%', height: '42px', fontSize: '13.5px', padding: '0 12px' }}
+                  value={form.sourceLanguage || 'en'}
+                  onChange={async (e) => {
+                    const newSource = e.target.value;
+                    const updated = { ...form, sourceLanguage: newSource };
+                    setForm(updated);
+                    await onSaveSettings(updated);
+                    setStatus(`Source reading language set to ${newSource.toUpperCase()}.`);
+                    setTimeout(() => setStatus(null), 3000);
+                  }}
+                >
+                  {SUPPORTED_SOURCE_LANGUAGES.map((s) => (
+                    <option key={s.code} value={s.code}>
+                      {s.flagEmoji} {s.name} ({s.nativeName})
                     </option>
                   ))}
-                </optgroup>
-              )}
-              <optgroup label="🌐 Supported Global Languages (30+ Languages)">
-                {allLanguages
-                  .filter((l) => !l.isCustom)
-                  .map((l) => (
-                    <option key={l.targetLang} value={l.targetLang}>
-                      {l.flagEmoji} {l.targetLabel} ({l.targetNativeLabel}) {l.targetLang === 'bn' ? '— Offline Dictionary + AI' : '— AI Contextual Translation'}
-                    </option>
-                  ))}
-              </optgroup>
-            </select>
+                </select>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  The language of the websites, articles, or books you read.
+                </div>
+              </div>
 
-            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '8px', lineHeight: 1.4 }}>
-              💡 All instant explanations, contextual meanings, sentence breakdowns, and AI coach responses will be delivered in the chosen language. Bengali includes the verified 60,000+ word offline dictionary.
+              {/* 2. Target Language */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '6px' }}>
+                  🎯 Target Language (Explanations &amp; translations):
+                </label>
+                <select
+                  className="select-filter"
+                  style={{ width: '100%', height: '42px', fontSize: '13.5px', padding: '0 12px' }}
+                  value={form.targetLanguage || 'bn'}
+                  onChange={async (e) => {
+                    const newLang = e.target.value;
+                    const updated = { ...form, targetLanguage: newLang };
+                    setForm(updated);
+                    await onSaveSettings(updated);
+                    const foundLang = allLanguages.find((l) => l.targetLang === newLang) || customLangs.find((c) => c.code === newLang);
+                    setStatus(`Target translation language set to ${foundLang?.flagEmoji || '🌐'} ${(foundLang as any)?.targetLabel || (foundLang as any)?.name || newLang}.`);
+                    setTimeout(() => setStatus(null), 3000);
+                  }}
+                >
+                  {customLangs.length > 0 && (
+                    <optgroup label="🌟 My Custom Languages">
+                      {customLangs.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.flagEmoji || '🌐'} {c.name} ({c.nativeName || c.name}) — Custom Language
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label="🌐 Supported Global Languages (30+ Languages)">
+                    {allLanguages
+                      .filter((l) => !l.isCustom)
+                      .map((l) => (
+                        <option key={l.targetLang} value={l.targetLang}>
+                          {l.flagEmoji} {l.targetLabel} ({l.targetNativeLabel}) {l.targetLang === 'bn' ? '— Offline Dictionary + AI' : '— AI Contextual Translation'}
+                        </option>
+                      ))}
+                  </optgroup>
+                </select>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  All instant definitions, breakdowns, and AI responses will be in this language.
+                </div>
+              </div>
             </div>
 
             {/* Custom Languages List */}
@@ -968,7 +950,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </label>
             <select
               className="select-filter"
-              style={{ width: '100%', height: '42px', fontSize: '13.5px' }}
+              style={{ width: '100%', height: '40px', fontSize: '13px' }}
               value={form.aiProvider}
               onChange={(e) => {
                 const newProvider = e.target.value as UserSettings['aiProvider'];
@@ -981,11 +963,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 setCustomModelMode(false);
               }}
             >
-              <option value="mock">💾 Local Offline / Rule-Based (No API Key Required)</option>
-              <option value="gemini">✦ Google Gemini (Recommended & Fast)</option>
-              <option value="openai">✳ OpenAI (GPT-4o / GPT-4o-mini)</option>
-              <option value="anthropic">🪶 Anthropic (Claude 3.5 Sonnet)</option>
-              <option value="ollama">🦙 Local Ollama (Self-Hosted Private LLM)</option>
+              <option value="gemini">Google Gemini (Recommended &amp; Fast)</option>
+              <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
+              <option value="anthropic">Anthropic Claude (Claude 3.5 Sonnet)</option>
+              <option value="ollama">Local Ollama (Self-Hosted LLM)</option>
+              <option value="mock">Offline / Rule-Based (No API Key Required)</option>
             </select>
           </div>
 
@@ -1382,13 +1364,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
         {/* Minimal Event Telemetry & Privacy Card */}
         <div className="card" style={{ marginTop: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-main)' }}>
-                📊 Minimal Event Telemetry & Privacy
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-main)' }}>
+                Minimal Event Telemetry &amp; Privacy
               </h3>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>
-                LexiFlow 2.0 tracks strictly 5 approved lifecycle events with daily aggregate counters. No URLs, page text, words, or personal content are ever stored.
+                LexiFlow tracks strictly 5 approved lifecycle events with daily aggregate counters. No URLs, page text, words, or personal content are ever stored.
               </p>
             </div>
             {telemetryInfo && (
@@ -1406,7 +1388,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               onClick={handleExportTelemetry}
             >
-              📊 Export Telemetry Logs (JSON)
+              <Download size={13} />
+              <span>Export Telemetry Logs</span>
             </button>
             <button
               type="button"
@@ -1414,7 +1397,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               onClick={handleExportFeedbackReports}
             >
-              📑 Export Feedback Reports (JSON)
+              <FileText size={13} />
+              <span>Export Feedback Reports</span>
               {feedbackReportsCount > 0 && (
                 <span style={{ fontSize: '11px', background: 'rgba(0, 113, 227, 0.12)', color: 'var(--blue)', padding: '1px 6px', borderRadius: '10px' }}>
                   {feedbackReportsCount}
@@ -1424,10 +1408,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <button
               type="button"
               className="btn-secondary"
-              style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', fontWeight: 600 }}
+              style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               onClick={handleClearTelemetry}
             >
-              🗑️ Clear Event Logs
+              <Trash2 size={13} />
+              <span>Clear Event Logs</span>
             </button>
             <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
               Exported as clean JSON blobs without tracking page URLs.

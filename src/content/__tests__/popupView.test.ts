@@ -268,6 +268,127 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     expect(bengaliPos).toBeGreaterThan(phrasePos);
   });
 
+  // 3c. Selecting multiple paragraphs
+  it('3c. Selecting multiple paragraphs: renders hierarchical Paragraphs -> Sentences -> Phrases tree', () => {
+    const multiParaResult: ParagraphAnalysisResult = {
+      selectedText: 'First paragraph sentence one. First paragraph sentence two.\n\nSecond paragraph sentence one. Second paragraph sentence two.',
+      selectionType: 'paragraph',
+      mainIdea: 'Overview of both paragraphs.',
+      conciseSummary: 'Summary of both paragraphs.',
+      bengaliTranslation: 'উভয় অনুচ্ছেদের পূর্ণ অনুবাদ।',
+      phraseBreakdown: [],
+      paragraphs: [
+        {
+          paragraphIndex: 1,
+          paragraphText: 'First paragraph sentence one. First paragraph sentence two.',
+          sentences: [
+            {
+              sentenceIndex: 1,
+              sentenceText: 'First paragraph sentence one.',
+              bengaliTranslation: 'প্রথম প্যারার বাক্য ১।',
+              phraseBreakdown: [
+                {
+                  phrase: 'First paragraph sentence one',
+                  easyEnglish: 'Sentence 1 of paragraph 1.',
+                  easyBengali: 'প্যারা ১ এর বাক্য ১ এর অর্থ'
+                }
+              ]
+            },
+            {
+              sentenceIndex: 2,
+              sentenceText: 'First paragraph sentence two.',
+              bengaliTranslation: 'প্রথম প্যারার বাক্য ২।',
+              phraseBreakdown: [
+                {
+                  phrase: 'First paragraph sentence two',
+                  easyEnglish: 'Sentence 2 of paragraph 1.',
+                  easyBengali: 'প্যারা ১ এর বাক্য ২ এর অর্থ'
+                }
+              ]
+            }
+          ]
+        },
+        {
+          paragraphIndex: 2,
+          paragraphText: 'Second paragraph sentence one. Second paragraph sentence two.',
+          sentences: [
+            {
+              sentenceIndex: 3,
+              sentenceText: 'Second paragraph sentence one.',
+              bengaliTranslation: 'দ্বিতীয় প্যারার বাক্য ১।',
+              phraseBreakdown: [
+                {
+                  phrase: 'Second paragraph sentence one',
+                  easyEnglish: 'Sentence 1 of paragraph 2.',
+                  easyBengali: 'প্যারা ২ এর বাক্য ১ এর অর্থ'
+                }
+              ]
+            },
+            {
+              sentenceIndex: 4,
+              sentenceText: 'Second paragraph sentence two.',
+              bengaliTranslation: 'দ্বিতীয় প্যারার বাক্য ২।',
+              phraseBreakdown: [
+                {
+                  phrase: 'Second paragraph sentence two',
+                  easyEnglish: 'Sentence 2 of paragraph 2.',
+                  easyBengali: 'প্যারা ২ এর বাক্য ২ এর অর্থ'
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      keyVocabulary: [],
+      argumentStructure: 'Structured sequence across paragraphs',
+      toneAndRegister: 'Formal / Academic'
+    };
+
+    popup.showAnalysis(multiParaResult, '', '');
+    const el = popup.getElement();
+
+    // Verify Paragraph blocks rendered
+    expect(el.textContent).toContain('প্যারাগ্রাফ ১');
+    expect(el.textContent).toContain('প্যারাগ্রাফ ২');
+
+    // Verify Sentences rendered under respective paragraphs
+    expect(el.textContent).toContain('বাক্য ১');
+    expect(el.textContent).toContain('বাক্য ২');
+    expect(el.textContent).toContain('বাক্য ৩');
+    expect(el.textContent).toContain('বাক্য ৪');
+
+    // Verify Sentence translations and phrases
+    expect(el.textContent).toContain('প্রথম প্যারার বাক্য ১।');
+    expect(el.textContent).toContain('দ্বিতীয় প্যারার বাক্য ১।');
+    expect(el.textContent).toContain('First paragraph sentence one');
+    expect(el.textContent).toContain('Second paragraph sentence one');
+
+    // Verify interactive sentence tab switching
+    const sentenceTabs = el.querySelectorAll('.lf-sentence-switcher .lf-tab') as NodeListOf<HTMLButtonElement>;
+    expect(sentenceTabs.length).toBeGreaterThanOrEqual(2);
+    expect(sentenceTabs[0].classList.contains('active')).toBe(true);
+
+    sentenceTabs[1].click();
+    const updatedTabs = el.querySelectorAll('.lf-sentence-switcher .lf-tab') as NodeListOf<HTMLButtonElement>;
+    expect(updatedTabs[1].classList.contains('active')).toBe(true);
+
+    // Verify Stepper Prev & Next buttons
+    const prevBtn = el.querySelector('.lf-stepper-prev') as HTMLButtonElement;
+    const nextBtn = el.querySelector('.lf-stepper-next') as HTMLButtonElement;
+    expect(prevBtn).not.toBeNull();
+    expect(nextBtn).not.toBeNull();
+    expect(prevBtn.disabled).toBe(false);
+
+    prevBtn.click();
+    const backTabs = el.querySelectorAll('.lf-sentence-switcher .lf-tab') as NodeListOf<HTMLButtonElement>;
+    expect(backTabs[0].classList.contains('active')).toBe(true);
+
+    const freshNextBtn = el.querySelector('.lf-stepper-next') as HTMLButtonElement;
+    freshNextBtn.click();
+    const forwardTabs = el.querySelectorAll('.lf-sentence-switcher .lf-tab') as NodeListOf<HTMLButtonElement>;
+    expect(forwardTabs[1].classList.contains('active')).toBe(true);
+  });
+
   // 4. Selecting a word within a sentence
   it('4. Selecting a word within a sentence: interactive tokens trigger onSelectWord', () => {
     popup.showSentence(mockSentenceResult, '', '');
@@ -862,6 +983,21 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     );
     expect(el.innerHTML).toContain('हिन्दी');
     expect(el.innerHTML).toContain('सरल हिन्दी');
+
+    // Switch to Russian
+    popup.setSourceLanguage('en');
+    popup.setTargetLanguage('ru');
+    expect(popup.getSourceLanguage()).toBe('en');
+    expect(popup.getTargetLanguage()).toBe('ru');
+    popup.showSentence(
+      {
+        ...mockSentenceResult,
+        bengaliTranslation: 'Это простое предложение.'
+      },
+      'context sentence',
+      'nearby paragraph'
+    );
+    expect(el.innerHTML).toContain('Русский');
   });
 
   // 19. 8-Directional Resizing System

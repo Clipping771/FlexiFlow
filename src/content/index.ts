@@ -1,5 +1,5 @@
 import { calculatePopupPosition, clampPositionToViewport } from './positioning';
-import { getSelectionData, isEditableElement } from './selection';
+import { getSelectionData, isEditableElement, detectSelectionType } from './selection';
 import { POPUP_STYLES } from './styles';
 import { PopupView } from './popupView';
 import { TriggerView } from './triggerView';
@@ -269,6 +269,7 @@ class ContentScriptManager {
     if (this.userSettings.customLanguages) {
       registerCustomLanguages(this.userSettings.customLanguages);
     }
+    this.popupView.setSourceLanguage(this.userSettings.sourceLanguage || 'en');
     this.popupView.setTargetLanguage(this.userSettings.targetLanguage || 'bn');
     this.popupView.setReadingMode(this.userSettings.readingMode || 'quick');
     if (this.isPopupPositioned) {
@@ -406,9 +407,9 @@ class ContentScriptManager {
             width: 100,
             height: 20
           } as DOMRect;
-          this.lastAnalyzedText = text;
-          this.isUserDismissed = false;
-          this.executeAnalysis(text, 'word', '', '', dummyRect);
+          const clean = text.trim();
+          const selType = detectSelectionType(clean);
+          this.executeAnalysis(clean, selType, clean, '', dummyRect);
           sendResponse?.({ success: true });
           return;
         }

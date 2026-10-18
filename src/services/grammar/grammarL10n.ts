@@ -732,38 +732,22 @@ export function buildBeginnerBreakdownSections(
   const tipTitle = isEn ? '💡 Remember this' : (isEs ? '💡 Recuerda esto' : (isHi ? '💡 याद रखें' : '💡 মনে রাখো'));
 
   // 01: SUBJECT
-  const subjectText = clause?.subject || (cleanSentence.includes('we haven') ? 'We' : (cleanSentence.includes('researchers') ? 'Researchers' : 'Subject'));
+  const subjectText = clause?.subject || (cleanSentence ? cleanSentence.split(/\s+/)[0] : 'Subject');
   let subjectRole = isEn ? 'Subject' : (isEs ? 'Sujeto' : (isHi ? 'कर्ता' : 'কর্তা'));
-  let subjectSimple = '';
-  let subjectTip = isEn
+  const subjectSimple = (isEn ? clause?.subjectExplanation : clause?.subjectExplanationBengali) ||
+    clause?.subjectExplanationBengali ||
+    clause?.subjectExplanation ||
+    (isEn
+      ? `'${subjectText}' is the entity performing the action or being discussed in this clause.`
+      : (isEs
+        ? `'${subjectText}' es quien realiza la acción principal de la oración. Por eso funciona como el Sujeto.`
+        : `'${subjectText}' হলো বাক্যের মূল কর্তা। কার সম্পর্কে বা কে কাজটি করছে? '${subjectText}'। তাই এটি হলো Subject বা কর্তা।`));
+  const subjectTip = isEn
     ? 'Look for who is performing the action or who is being discussed to identify the Subject.'
     : (isEs
       ? 'Identifica quién realiza la acción o de quién se habla para encontrar el Sujeto.'
       : 'কে কাজটি করছে বা কার সম্পর্কে বলা হচ্ছে, তা খুঁজে Subject শেখো।');
-  let subjectQA = '';
-
-  if (cleanSentence.includes('we haven') || subjectText.toLowerCase() === 'we') {
-    subjectSimple = isEn
-      ? `'We' refers to ourselves. Who hasn't invested enough time and effort into this problem? We haven't. That is why 'We' is the Subject.`
-      : (isEs
-        ? `'We' significa 'nosotros'. ¿Quiénes no han invertido suficiente tiempo y esfuerzo? Nosotros. Por eso 'We' es el Sujeto.`
-        : `'We' মানে 'আমরা'। কার এই সমস্যার জন্য যথেষ্ট সময় ও পরিশ্রম দিইনি? আমরা। তাই 'We' হলো Subject বা কর্তা।`);
-    subjectQA = isEn ? 'Who? We.' : (isEs ? '¿Quiénes? Nosotros.' : 'কারা? আমরা।');
-  } else if (cleanSentence.includes('researchers demand') || subjectText.toLowerCase().includes('researcher')) {
-    subjectSimple = isEn
-      ? `'Researchers' means the scientific experts investigating medical treatments. Who is demanding urgent funding? The researchers. That is why 'Researchers' is the Subject.`
-      : (isEs
-        ? `'Researchers' son los científicos e investigadores médicos. ¿Quiénes exigen financiación urgente? Los investigadores. Por eso 'Researchers' es el Sujeto.`
-        : `'Researchers' মানে 'গবেষকগণ' বা 'চিকিৎসা বিজ্ঞানী দল'। কারা জরুরি অর্থায়নের দাবি জানাচ্ছেন? গবেষকেরা। তাই 'Researchers' হলো এই বাক্যের Subject বা কর্তা।`);
-    subjectQA = isEn ? 'Who? The researchers.' : (isEs ? '¿Quiénes? Los investigadores.' : 'কারা? গবেষকেরা।');
-  } else {
-    subjectSimple = isEn
-      ? `'${subjectText}' is the entity performing the action. Asking "who or what does the action?" reveals '${subjectText}' as the Subject.`
-      : (isEs
-        ? `'${subjectText}' es quien realiza la acción principal de la oración. Por eso funciona como el Sujeto.`
-        : `'${subjectText}' হলো বাক্যের মূল কর্তা। কার সম্পর্কে বা কে কাজটি করছে? '${subjectText}'। তাই এটি হলো Subject বা কর্তা।`);
-    subjectQA = isEn ? `Who? ${subjectText}.` : (isEs ? `¿Quién? ${subjectText}.` : `কারা? ${subjectText}।`);
-  }
+  const subjectQA = isEn ? `Who? ${subjectText}.` : (isEs ? `¿Quién? ${subjectText}.` : `কারা / কে? ${subjectText}।`);
 
   sections.push({
     num: '01',
@@ -777,43 +761,27 @@ export function buildBeginnerBreakdownSections(
     tipText: subjectTip,
     isOpen: true,
     badgeLetter: 'S',
-    badgeBg: '#10b981',
+    badgeBg: '#2563eb',
     guidingQuestion: subjectQA
   });
 
   // 02: VERB PHRASE
-  const verbText = clause?.verbPhrase || clause?.verb || (cleanSentence.includes('haven\'t invested') ? "haven't invested" : (cleanSentence.includes('demand') ? 'demand' : 'Verb'));
+  const verbText = clause?.verbPhrase || clause?.verb || 'Verb';
   let verbRole = isEn ? 'Verb Phrase' : (isEs ? 'Frase verbal' : (isHi ? 'क्रिया' : 'ক্রিয়া পদবন্ধ'));
-  let verbSimple = '';
-  let verbTip = isEn
+  const verbSimple = (isEn ? clause?.verbExplanation : clause?.verbExplanationBengali) ||
+    clause?.verbExplanationBengali ||
+    clause?.verbExplanation ||
+    (isEn
+      ? `'${verbText}' expresses the core action or state of being of the subject. It is the engine that drives the sentence.`
+      : (isEs
+        ? `'${verbText}' expresa la acción o estado del sujeto en la oración.`
+        : `'${verbText}' হলো বাক্যের প্রধান সমাপিকা ক্রিয়া (Verb)। কর্তা কী করছে বা কী অবস্থা, তা সরাসরি প্রকাশ করছে।`));
+  const verbTip = isEn
     ? 'The verb tells you what action the subject performed, did not perform, or what state they are in.'
     : (isEs
       ? 'El verbo indica qué acción realizó el sujeto o en qué estado se encuentra.'
       : 'কর্তা ঠিক কী কাজ করছে বা তার অবস্থা কী, তা যে শব্দ দিয়ে বোঝায় সেটাই Verb।');
-  let verbQA = '';
-
-  if (cleanSentence.includes('haven\'t invested') || verbText.toLowerCase().includes('invest')) {
-    verbSimple = isEn
-      ? `'haven't invested' expresses the action that was not taken. It shows that the subject did not dedicate sufficient time or effort. This is the main Verb Phrase.`
-      : (isEs
-        ? `'haven't invested' expresa la acción que no se realizó: no invertir suficiente tiempo o energía. Por eso es la Frase Verbal.`
-        : `'haven't invested' মানে 'বিনিয়োগ করিনি' বা 'যথেষ্ট দিইনি'। কর্তারা কী করেনি? তারা বিনিয়োগ করেনি। তাই এটি হলো বাক্যের Verb বা ক্রিয়া।`);
-    verbQA = isEn ? 'What action? Did not invest.' : (isEs ? '¿Qué acción? No invertimos.' : 'কী করিনি? যথেষ্ট বিনিয়োগ করিনি।');
-  } else if (cleanSentence.includes('demand') || verbText.toLowerCase().includes('demand')) {
-    verbSimple = isEn
-      ? `'demand' means actively asking with firm insistence. What action are the researchers taking? Demanding. This is the main finite Verb.`
-      : (isEs
-        ? `'demand' significa exigir firmemente. ¿Qué acción realizan los investigadores? Exigen. Por eso es el Verbo principal.`
-        : `'demand' মানে 'দাবি জানাচ্ছে' বা 'দৃঢ়ভাবে চাইছে'। কর্তারা কী কাজ করছেন? তারা দাবি জানাচ্ছেন। তাই 'demand' হলো বাক্যের মূল সমাপিকা ক্রিয়া (Verb)।`);
-    verbQA = isEn ? 'What action? Demanding firmly.' : (isEs ? '¿Qué hacen? Exigen firmemente.' : 'কী করছে? দাবি জানাচ্ছে।');
-  } else {
-    verbSimple = isEn
-      ? `'${verbText}' expresses the core action or state of being of the subject. It is the engine that drives the sentence.`
-      : (isEs
-        ? `'${verbText}' expresa la acción o estado del sujeto en la oración.`
-        : `'${verbText}' হলো বাক্যের প্রধান ক্রিয়া (Verb)। কর্তা কী করছে বা কী ঘটছে, তা '${verbText}' সরাসরি প্রকাশ করছে।`);
-    verbQA = isEn ? `What action? ${verbText}.` : (isEs ? `¿Qué acción? ${verbText}.` : `কী কাজ? ${verbText}।`);
-  }
+  const verbQA = isEn ? `What action? ${verbText}.` : (isEs ? `¿Qué acción? ${verbText}.` : `কী কাজ / ক্রিয়া? ${verbText}।`);
 
   sections.push({
     num: '02',
@@ -827,47 +795,31 @@ export function buildBeginnerBreakdownSections(
     tipText: verbTip,
     isOpen: false,
     badgeLetter: 'V',
-    badgeBg: '#2563eb',
+    badgeBg: '#3b82f6',
     guidingQuestion: verbQA
   });
 
   // 03: DIRECT OBJECT
-  const doText = clause?.directObject || (cleanSentence.includes('enough time') ? 'enough time, effort, focus or energy' : (cleanSentence.includes('urgent funding') ? 'urgent funding' : ''));
+  const doText = clause?.directObject || '';
   if (doText) {
     let doRole = isEn ? 'Direct Object' : (isEs ? 'Objeto Directo' : (isHi ? 'प्रत्यक्ष कर्म' : 'সরাসরি কর্ম'));
-    let doSimple = '';
-    let doTip = isEn
+    const doSimple = (isEn ? clause?.directObjectExplanation : clause?.directObjectExplanationBengali) ||
+      clause?.directObjectExplanationBengali ||
+      clause?.directObjectExplanation ||
+      (isEn
+        ? `'${doText}' directly receives the action of the verb. Asking "what?" or "whom?" after the verb reveals it as the Direct Object.`
+        : (isEs
+          ? `'${doText}' recibe directamente la acción del verbo como el Objeto Directo.`
+          : `'${doText}' হলো Direct Object (সরাসরি কর্ম)। ক্রিয়াকে 'কী?' বা 'কাকে?' প্রশ্ন করলে '${doText}' উত্তর পাওয়া যায়।`));
+    const doTip = isEn
       ? 'Ask "what?" or "whom?" after the verb to find the Direct Object.'
       : (isEs
         ? 'Pregunta "¿qué?" o "¿a quién?" al verbo para encontrar el Objeto Directo.'
         : 'ক্রিয়াকে "কী?" বা "কাকে?" প্রশ্ন করে Direct Object খুঁজে বের করো।');
-    let doQA = '';
-
-    if (cleanSentence.includes('enough time') || doText.toLowerCase().includes('energy')) {
-      doSimple = isEn
-        ? `'enough time, effort, focus or energy' answers what was not invested. Asking "what?" directly after the verb reveals this as the Direct Object.`
-        : (isEs
-          ? `'enough time, effort, focus or energy' responde qué no se invirtió. Es el Objeto Directo de la acción.`
-          : `'enough time, effort, focus or energy' মানে 'যথেষ্ট সময়, পরিশ্রম, মনোযোগ বা শক্তি'। কী বিনিয়োগ করিনি? সময়, পরিশ্রম, মনোযোগ বা শক্তি। তাই এটি Direct Object বা সরাসরি কর্ম।`);
-      doQA = isEn ? 'Invested what? Time, effort, focus or energy.' : (isEs ? '¿Qué no se invirtió? Tiempo, esfuerzo, enfoque o energía.' : 'কী বিনিয়োগ করিনি? সময়, পরিশ্রম, মনোযোগ বা শক্তি।');
-    } else if (cleanSentence.includes('urgent funding') || doText.toLowerCase().includes('funding')) {
-      doSimple = isEn
-        ? `'urgent funding' specifies the critical financial resources needed. Asking "demanding what?" identifies this as the Direct Object.`
-        : (isEs
-          ? `'urgent funding' especifica los recursos financieros necesarios. Al preguntar "¿qué exigen?" se identifica como el Objeto Directo.`
-          : `'urgent funding' মানে 'জরুরি তহবিল বা অর্থায়ন'। গবেষকেরা ঠিক কী দাবি করছেন? জরুরি অর্থায়ন। ক্রিয়াকে 'কী?' প্রশ্ন করলে যে উত্তর পাওয়া যায়, তাই Direct Object।`);
-      doQA = isEn ? 'Demanding what? Urgent funding.' : (isEs ? '¿Qué exigen? Financiación urgente.' : 'কী দাবি করছে? জরুরি অর্থায়ন।');
-    } else {
-      doSimple = isEn
-        ? `'${doText}' directly receives the action of the verb. Asking "what?" or "whom?" after the verb reveals it as the Direct Object.`
-        : (isEs
-          ? `'${doText}' recibe directamente la acción del verbo como el Objeto Directo.`
-          : `'${doText}' হলো Direct Object (সরাসরি কর্ম)। ক্রিয়াকে 'কী?' বা 'কাকে?' প্রশ্ন করলে '${doText}' উত্তর পাওয়া যায়।`);
-      doQA = isEn ? `Receives what? ${doText}.` : (isEs ? `¿Qué recibe la acción? ${doText}.` : `কী বা কাকে? ${doText}।`);
-    }
+    const doQA = isEn ? `Receives what? ${doText}.` : (isEs ? `¿Qué recibe la acción? ${doText}.` : `কী বা কাকে? ${doText}।`);
 
     sections.push({
-      num: '03',
+      num: String(sections.length + 1).padStart(2, '0'),
       typeKey: 'object',
       title: 'Direct Object',
       phrase: doText,
@@ -878,85 +830,67 @@ export function buildBeginnerBreakdownSections(
       tipText: doTip,
       isOpen: false,
       badgeLetter: 'DO',
-      badgeBg: '#d97706',
+      badgeBg: '#64748b',
       guidingQuestion: doQA
     });
   }
 
-  // 04: PREPOSITIONAL PHRASE / PURPOSE INFINITIVE / ADVERBIALS
-  let fourthPhrase = '';
-  let fourthTitle = 'Prepositional Phrase';
-  let fourthRole = isEn ? 'Prepositional Phrase' : (isEs ? 'Frase Preposicional' : 'পদান্বয়ী পদবন্ধ');
-  let fourthSimple = '';
-  let fourthTip = '';
-  let fourthQA = '';
-  let fourthBadge = 'PP';
-
-  if (cleanSentence.includes('on this problem')) {
-    fourthPhrase = 'on this problem';
-    fourthTitle = 'Prepositional Phrase';
-    fourthRole = isEn ? 'Prepositional Phrase' : 'পদান্বয়ী পদবন্ধ';
-    fourthSimple = isEn
-      ? `'on this problem' specifies where the resources were needed. Begun with the preposition 'on', it functions as a clarifying Prepositional Phrase.`
-      : `'on this problem' মানে 'এই সমস্যার উপর'। কোন বিষয়ের উপর সময় দেওয়া হয়নি? এই সমস্যায়। 'on' অব্যয় দিয়ে শুরু হওয়ায় এটি Prepositional Phrase।`;
-    fourthTip = isEn
-      ? `Phrases starting with prepositions like 'in', 'on', 'at', or 'with' add clarifying location, target, or context.`
-      : `'in', 'on', 'at', 'with', 'for' দিয়ে শুরু হয়ে অতিরিক্ত ক্ষেত্র বা অবস্থান নির্দেশ করলে তা Prepositional Phrase।`;
-    fourthQA = isEn ? 'On what? On this problem.' : 'কিসের উপর? এই সমস্যার উপর।';
-    fourthBadge = 'PP';
-  } else if (cleanSentence.includes('to transform') || clause?.adverbials?.some((a: any) => a.text.includes('to transform'))) {
-    fourthPhrase = 'to transform Australian ovarian cancer survival';
-    fourthTitle = 'Purpose Infinitive';
-    fourthRole = isEn ? 'Infinitive of Purpose' : (isEs ? 'Infinitivo de Propósito' : 'উদ্দেশ্যমূলক পদবন্ধ');
-    fourthSimple = isEn
-      ? `'to transform Australian ovarian cancer survival' explains the ultimate purpose of the funding demand. It answers "why" the action is requested.`
-      : (isEs
-        ? `'to transform Australian ovarian cancer survival' explica el objetivo o motivo de exigir financiación. Responde a la pregunta "¿para qué?".`
-        : `'to transform Australian ovarian cancer survival' মানে 'অস্ট্রেলিয়ায় ডিম্বাশয়ের ক্যান্সারে বেঁচে থাকার হারকে রূপান্তর বা উন্নত করার উদ্দেশ্যে'। অর্থায়ন চাওয়ার পেছনে মূল লক্ষ্য বা কারণ কী? ক্যান্সার রোগীদের জীবন বাঁচানো। তাই এটি Infinitive of Purpose বা উদ্দেশ্যমূলক পদবন্ধ।`);
-    fourthTip = isEn
-      ? `Phrases starting with "to + base verb" that answer "Why?" function as an Infinitive of Purpose.`
-      : (isEs
-        ? `Las frases con "to + verbo base" que responden a "¿por qué?" o "¿para qué?" son infinitivos de propósito.`
-        : `কোনো কাজের কারণ, লক্ষ্য বা উদ্দেশ্য বুঝতে 'কেন?' প্রশ্ন করলে যে অংশ উত্তর দেয়, তা হলো Adverbial of Purpose (to + Base Verb)।`);
-    fourthQA = isEn ? 'Why? To transform cancer survival.' : (isEs ? '¿Por qué? Para transformar la supervivencia.' : 'কেন / উদ্দেশ্য কী? ক্যান্সারে বেঁচে থাকার হার পরিবর্তন করতে।');
-    fourthBadge = 'P';
-  } else if (clause?.adverbials && clause.adverbials.length > 0) {
-    const adv = clause.adverbials[0];
-    fourthPhrase = adv.text;
-    fourthTitle = adv.type || 'Adverbial Phrase';
-    fourthRole = isEn ? 'Adverbial' : (isEs ? 'Adverbial' : 'ক্রিয়া-বিশেষণীয় পদবন্ধ');
-    fourthSimple = adv.explanation || (isEn ? `'${adv.text}' provides additional context explaining when, where, why, or how the action occurred.` : `'${adv.text}' বাক্যে অতিরিক্ত সময়, স্থান বা প্রেক্ষাপট নির্দেশ করছে।`);
-    fourthTip = isEn ? 'Adverbials tell you when, where, why, or how the action took place.' : 'কখন, কোথায়, কীভাবে বা কেন প্রশ্নগুলোর উত্তর দিলে তা Adverbial।';
-    fourthQA = isEn ? `Context: ${adv.text}.` : `প্রেক্ষাপট: ${adv.text}।`;
-    fourthBadge = 'A';
-  } else if (clause?.complement) {
-    fourthPhrase = clause.complement;
-    fourthTitle = 'Complement';
-    fourthRole = isEn ? 'Subject Complement' : (isEs ? 'Complemento' : 'পরিপূরক');
-    fourthSimple = isEn ? `'${clause.complement}' describes or identifies the subject.` : `'${clause.complement}' কর্তার অবস্থা বা পরিচয় প্রকাশ করে।`;
-    fourthTip = isEn ? 'Complements complete the meaning of linking verbs like is, are, was, or were.' : 'সংযোজক ক্রিয়ার পর কর্তার পরিচয় দিলে তা Complement।';
-    fourthQA = isEn ? `Quality/Identity: ${clause.complement}.` : `পরিচয়: ${clause.complement}।`;
-    fourthBadge = 'C';
-  }
-
-  if (fourthPhrase) {
+  // 04: COMPLEMENT (if present)
+  const complementText = clause?.complement || '';
+  if (complementText) {
+    const compRole = isEn ? 'Complement' : (isEs ? 'Complemento' : 'পরিপূরক (Complement)');
+    const compSimple = (isEn ? clause?.complementExplanation : clause?.complementExplanationBengali) ||
+      clause?.complementExplanationBengali ||
+      clause?.complementExplanation ||
+      (isEn
+        ? `'${complementText}' completes the predicate and describes the subject or object.`
+        : `'${complementText}' বাক্যের অর্থ পূর্ণ করে কর্তা বা কর্মের বৈশিষ্ট্য প্রকাশ করে।`);
     sections.push({
       num: String(sections.length + 1).padStart(2, '0'),
-      typeKey: 'adverbial',
-      title: fourthTitle,
-      phrase: fourthPhrase,
-      roleLabel: fourthRole,
+      typeKey: 'complement',
+      title: 'Complement',
+      phrase: complementText,
+      roleLabel: compRole,
       simpleTitle: simpleWordTitle,
-      simpleText: fourthSimple,
+      simpleText: compSimple,
       tipTitle,
-      tipText: fourthTip,
+      tipText: isEn ? 'Complements describe or identify the subject or object.' : 'Subject বা Object সম্পর্কে তথ্য দিয়ে অর্থ পূর্ণ করে।',
       isOpen: false,
-      badgeLetter: fourthBadge,
-      badgeBg: '#0d9488',
-      guidingQuestion: fourthQA
+      badgeLetter: 'C',
+      badgeBg: '#6366f1',
+      guidingQuestion: isEn ? `What is it? ${complementText}.` : `কেমন বা কী? ${complementText}।`
     });
   }
 
+  // 05: ADVERBIALS / PREPOSITIONAL PHRASES
+  if (Array.isArray(clause?.adverbials) && clause.adverbials.length > 0) {
+    clause.adverbials.forEach((adv: any, i: number) => {
+      const advText = adv.text || '';
+      if (!advText) return;
+      const advRole = isEn ? (adv.type || 'Adverbial') : (isEs ? 'Adverbial' : 'ক্রিয়া-বিশেষণীয় পদবন্ধ (Adverbial)');
+      const advSimple = (isEn ? adv.explanation : adv.explanationBengali) ||
+        adv.explanationBengali ||
+        adv.explanation ||
+        (isEn
+          ? `'${advText}' provides contextual information explaining when, where, why, or how the action occurred.`
+          : `'${advText}' বাক্যে কাজের সময়, স্থান, কারণ বা ধরন প্রকাশ করছে।`);
+      sections.push({
+        num: String(sections.length + 1).padStart(2, '0'),
+        typeKey: `adverbial_${i}`,
+        title: adv.type || 'Adverbial',
+        phrase: advText,
+        roleLabel: advRole,
+        simpleTitle: simpleWordTitle,
+        simpleText: advSimple,
+        tipTitle,
+        tipText: isEn ? 'Adverbials tell you when, where, why, or how the action took place.' : 'কখন, কোথায়, কীভাবে বা কেন নির্দেশ করলে তা Adverbial।',
+        isOpen: false,
+        badgeLetter: 'ADV',
+        badgeBg: '#0f766e',
+        guidingQuestion: isEn ? `Context: ${advText}.` : `প্রেক্ষাপট: ${advText}।`
+      });
+    });
+  }
   return sections;
 }
 

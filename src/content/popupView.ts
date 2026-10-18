@@ -5,6 +5,8 @@ import {
   PhraseAnalysisResult,
   SentenceAnalysisResult,
   ParagraphAnalysisResult,
+  ParagraphSentenceItem,
+  ParagraphBlockItem,
   PhraseExplanation,
   VocabularyItem,
   WritingGoal,
@@ -16,8 +18,9 @@ import {
   UserSettings,
   createInitialFSRSState
 } from '../types';
-import { getLanguageConfig } from '../config/languages';
+import { getLanguageConfig, getAllLanguages } from '../config/languages';
 import { clampPositionToViewport } from './positioning';
+import { splitIntoParagraphs, splitIntoSentences } from './selection';
 import { playPronunciation } from '../services/audio/voiceService';
 import { getValidatedWhyThisMatters, findDiscourseConnectors, MatchedConnector } from '../services/connectors/matcher';
 import { generateCloze } from '../services/cloze/generator';
@@ -59,6 +62,8 @@ export class PopupView {
   private showAskAI: boolean = false;
   private activeTab: 'meaning' | 'ask-ai' | 'details' = 'meaning';
   private activeSentenceTab: 'breakdown' | 'grammar' | 'clauses' | 'ask-ai' = 'breakdown';
+  private activeParaIndex: number = 0;
+  private activeParaSentenceIndex: number = 0;
   private writingAssistResult: WritingAssistResult | null = null;
   private followUpList: FollowUpResponse[] = [];
   private isFollowUpLoading: boolean = false;
@@ -93,6 +98,7 @@ export class PopupView {
   private userResizedHeight: number | null = null;
 
   private currentSize: 'small' | 'medium' | 'large' | 'xlarge' = 'medium';
+  private sourceLanguage: string = 'en';
   private targetLanguage: string = 'bn';
   private currentTheme: 'light' | 'dark' | 'system' = 'dark';
   private readingMode: 'quick' | 'learn' = 'quick';
@@ -160,7 +166,7 @@ export class PopupView {
     const isLearn = this.readingMode === 'learn';
     return `
       <button type="button" class="lf-btn-icon lf-reading-mode-btn ${isLearn ? 'learn-mode' : ''}" title="Reading Mode: ${isLearn ? 'Learn Mode (Click for Quick Mode)' : 'Quick Mode (Click for Learn Mode)'}" aria-label="Toggle Reading Mode">
-        ${isLearn ? '🧠 Learn' : '⚡ Quick'}
+        ${isLearn ? `${lfIcon('brain')} Learn` : `${lfIcon('bolt')} Quick`}
       </button>
     `;
   }
@@ -185,6 +191,20 @@ export class PopupView {
     if (this.callbacks.onUpdateSettings) {
       this.callbacks.onUpdateSettings({ popupSize: nextSize });
     }
+  }
+
+  setSourceLanguage(lang: string): void {
+    const newLang = lang || 'en';
+    if (this.sourceLanguage !== newLang) {
+      this.sourceLanguage = newLang;
+      if (this.currentStageA || this.currentSentenceAnalysis || this.currentParagraphAnalysis || this.currentAnalysis) {
+        this.render({ preserveScroll: true });
+      }
+    }
+  }
+
+  getSourceLanguage(): string {
+    return this.sourceLanguage;
   }
 
   setTargetLanguage(lang: string): void {
@@ -624,33 +644,33 @@ export class PopupView {
           </div>
           <div class="lf-actions-top">
             ${this.renderModeToggleHtml()}
-            <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">✕</button>
+            <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">${lfIcon('close')}</button>
           </div>
         </div>
 
         <div class="lf-tabs lf-tabs-skeleton" aria-hidden="true">
-          <button type="button" class="lf-tab active" tabindex="-1">📝 Sentence</button>
-          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">✨ Ask AI</button>
-          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">🧩 Grammar</button>
+          <button type="button" class="lf-tab active" tabindex="-1">Sentence</button>
+          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">Ask AI</button>
+          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">Grammar</button>
         </div>
 
         <div class="lf-content lf-skeleton-content" id="lf-main-content" role="status" aria-live="polite">
           <!-- A. Selected Sentence displayed immediately with rule-based connector marks -->
           <div class="lf-sentence-card">
             <div class="lf-section-label">
-              <span>📝 Selected Sentence:</span>
+              <span>Selected Sentence:</span>
             </div>
             <div class="lf-sentence-text ${!this.isSentenceExpanded && isLongSentence ? 'truncated' : ''}">
               ${this.renderSentenceWithConnectors(clean, connectors)}
             </div>
             <div class="lf-sentence-hint">
-              💡 Click any word in the text to inspect its dictionary meaning
+              Click any word in the text to inspect its dictionary meaning
             </div>
 
             ${connectors.length > 0 ? `
               <div class="lf-connector-detected-card" style="margin-top: 8px; padding: 7px 10px; background: rgba(147, 51, 234, 0.08); border-left: 3px solid #9333ea; border-radius: 6px;">
                 <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #9333ea; margin-bottom: 2px;">
-                  ⚡ Discourse Connector: "${escapeHtml(connectors[0].text)}" (${escapeHtml(connectors[0].categoryLabel)})
+                  Discourse Connector: "${escapeHtml(connectors[0].text)}" (${escapeHtml(connectors[0].categoryLabel)})
                 </div>
                 <div style="font-size: 12px; color: var(--text-main, #1d1d1f); line-height: 1.4;">
                   ${escapeHtml(connectors[0].discourseRole)}
@@ -671,7 +691,7 @@ export class PopupView {
                   Analyzing phrase breakdown & ${escapeHtml(targetLabel)} translation with AI...
                 </span>
               </div>
-              <span class="lf-ai-live-badge">✨ Live AI</span>
+              <span class="lf-ai-live-badge">${lfIcon('sparkles')} Live AI</span>
             </div>
 
             <!-- Shimmering placeholder breakdown lines -->
@@ -730,16 +750,16 @@ export class PopupView {
     const tabsHtml = isSentenceOrPara
       ? `
         <div class="lf-tabs lf-tabs-skeleton" aria-hidden="true">
-          <button type="button" class="lf-tab active" tabindex="-1">🧩 Breakdown</button>
-          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">✨ Ask AI</button>
-          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">🔍 Grammar</button>
+          <button type="button" class="lf-tab active" tabindex="-1">Breakdown</button>
+          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">Ask AI</button>
+          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">Grammar</button>
         </div>
       `
       : `
         <div class="lf-tabs lf-tabs-skeleton" aria-hidden="true">
-          <button type="button" class="lf-tab active" tabindex="-1">📖 Meaning</button>
-          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">✨ Ask AI</button>
-          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">📚 Deep Dive</button>
+          <button type="button" class="lf-tab active" tabindex="-1">Meaning</button>
+          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">Ask AI</button>
+          <button type="button" class="lf-tab" tabindex="-1" style="opacity: 0.5;">Deep Dive</button>
         </div>
       `;
 
@@ -781,7 +801,7 @@ export class PopupView {
         <div class="lf-content lf-skeleton-content" role="status" aria-live="polite">
           <div class="lf-def-item" style="margin-bottom: 10px;">
             <div style="font-size: var(--lf-font-sublabel, 12px); text-transform: uppercase; color: #86868b; font-weight: 700; margin-bottom: 6px;">
-              📖 Easy English:
+              Easy English:
             </div>
             <div class="lf-skeleton-line lf-shimmer" style="width: 94%; height: 14px; margin-bottom: 6px;"></div>
             <div class="lf-skeleton-line lf-shimmer" style="width: 66%; height: 14px;"></div>
@@ -813,7 +833,7 @@ export class PopupView {
           <span class="lf-pos">${type.toUpperCase()}</span>
         </div>
         <div class="lf-actions-top">
-          <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">✕</button>
+          <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">${lfIcon('close')}</button>
         </div>
       </div>
       ${tabsHtml}
@@ -846,25 +866,25 @@ export class PopupView {
             <span class="lf-pos" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">OFFLINE</span>
           </div>
           <div class="lf-actions-top">
-            <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">✕</button>
+            <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">${lfIcon('close')}</button>
           </div>
         </div>
         <div class="lf-content" id="lf-main-content">
           <div class="lf-sentence-card">
             <div class="lf-section-label">
-              <span>📝 Selected Sentence:</span>
+              <span>Selected Sentence:</span>
             </div>
             <div class="lf-sentence-text">
               ${this.renderSentenceWithConnectors(clean, connectors)}
             </div>
             <div class="lf-sentence-hint">
-              💡 Click any word in the text to inspect its dictionary meaning
+              Click any word in the text to inspect its dictionary meaning
             </div>
 
             ${connectors.length > 0 ? `
               <div class="lf-connector-detected-card" style="margin-top: 8px; padding: 7px 10px; background: rgba(147, 51, 234, 0.08); border-left: 3px solid #9333ea; border-radius: 6px;">
                 <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #9333ea; margin-bottom: 2px;">
-                  ⚡ Discourse Connector: "${escapeHtml(connectors[0].text)}" (${escapeHtml(connectors[0].categoryLabel)})
+                  Discourse Connector: "${escapeHtml(connectors[0].text)}" (${escapeHtml(connectors[0].categoryLabel)})
                 </div>
                 <div style="font-size: 12px; color: var(--text-main, #1d1d1f); line-height: 1.4;">
                   ${escapeHtml(connectors[0].discourseRole)}
@@ -876,19 +896,47 @@ export class PopupView {
             ` : ''}
           </div>
 
-          <div style="margin-top: 10px; padding: 12px 14px; background: rgba(239, 68, 68, 0.06); border-left: 3px solid #ef4444; border-radius: 8px;">
-            <div style="font-size: 13px; font-weight: 700; color: #ef4444; margin-bottom: 4px;">
-              AI Interpretation Unavailable / ${escapeHtml(getLanguageConfig(this.targetLanguage)?.targetLang === 'bn' ? 'AI বিশ্লেষণ অনুপলব্ধ' : `${getLanguageConfig(this.targetLanguage)?.targetLabel || 'AI'} Offline`)}
+          <div style="margin-top: 10px; padding: 12px 14px; background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px;">
+            <div style="font-size: 12.5px; font-weight: 700; color: #dc2626; margin-bottom: 4px;">
+              AI Interpretation Unavailable / AI বিশ্লেষণ অনুপলব্ধ
             </div>
-            <div style="font-size: 12px; color: var(--text-main, #1d1d1f); margin-bottom: 6px; line-height: 1.45;">
+            <div style="font-size: 12px; color: var(--text-main, #1e293b); margin-bottom: 6px; line-height: 1.45;">
               ${escapeHtml(errorMessage || 'AI provider unavailable or offline.')}
             </div>
-            <div style="font-size: 11.5px; color: var(--text-muted, #86868b); line-height: 1.4;">
-              Deep phrase breakdown and contextual translation require an active AI provider. Rule-based connector analysis is shown above. You can click any individual word to view its offline dictionary definition.
+            <div style="font-size: 11.5px; color: var(--text-muted, #64748b); line-height: 1.4;">
+              Deep phrase breakdown and contextual translation require an active AI provider.
+            </div>
+          </div>
+
+          <!-- Inline Quick Setup Card -->
+          <div class="lf-quick-api-setup" style="margin-top: 10px; padding: 12px; border-radius: 8px; background: rgba(37,99,235,0.04); border: 1px solid rgba(37,99,235,0.2);">
+            <div style="font-size: 12px; font-weight: 700; color: #2563eb; margin-bottom: 4px;">
+              ${lfIcon('bolt')} Connect AI for Live Analysis
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-muted, #64748b); margin-bottom: 8px;">
+              Enter your Gemini API key (Free from Google AI Studio) to unlock real-time syntactic and clause breakdowns:
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <input type="password" class="lf-quick-api-input" placeholder="Paste Gemini API Key..." style="flex: 1; padding: 6px 8px; font-size: 12px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.15); background: var(--bg-surface, #ffffff); color: var(--text-main, #0f172a);" />
+              <button type="button" class="lf-quick-api-save-btn" style="padding: 6px 12px; font-size: 11.5px; font-weight: 600; border-radius: 6px; background: #2563eb; color: #ffffff; border: none; cursor: pointer; white-space: nowrap;">
+                Save &amp; Analyze
+              </button>
             </div>
           </div>
         </div>
       `;
+
+      this.element.querySelector('.lf-quick-api-save-btn')?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const input = this.element.querySelector('.lf-quick-api-input') as HTMLInputElement | null;
+        const key = input?.value?.trim();
+        if (key && this.callbacks.onUpdateSettings) {
+          await this.callbacks.onUpdateSettings({ apiKey: key, aiProvider: 'gemini' });
+          if (this.callbacks.onChangeMode) {
+            this.callbacks.onChangeMode('sentence');
+          }
+        }
+      });
 
       this.element.querySelector('.lf-close-btn')?.addEventListener('click', (e) => {
         e.preventDefault();
@@ -924,7 +972,7 @@ export class PopupView {
           <span class="lf-heading-word" title="${escapeHtml(clean)}">${headingHtml}</span>
           <span class="lf-pos" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">ERROR</span>
         </div>
-        <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">✕</button>
+        <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">${lfIcon('close')}</button>
       </div>
       <div style="padding: 16px; font-size: 13px; color: #fca5a5; line-height: 1.5;">
         <strong style="display: block; margin-bottom: 6px; color: #ef4444;">AI Interpretation Unavailable</strong>
@@ -1033,7 +1081,7 @@ export class PopupView {
 
     const badgeEl = this.element.querySelector('.lf-ai-badge') as HTMLElement | null;
     if (badgeEl) {
-      badgeEl.textContent = '✨ AI-generated';
+      badgeEl.innerHTML = `${lfIcon('sparkles')} AI-generated`;
     }
 
     const confidenceEl = this.element.querySelector('.lf-confidence-pill') as HTMLElement | null;
@@ -1103,6 +1151,8 @@ export class PopupView {
     this.showFeedbackModal = false;
     this.feedbackSuccess = false;
     this.showAskAI = false;
+    this.activeParaIndex = 0;
+    this.activeParaSentenceIndex = 0;
     this.writingAssistResult = null;
     this.followUpList = [];
     this.render();
@@ -1259,27 +1309,27 @@ export class PopupView {
             </button>
           ` : ''}
           <span class="lf-heading-word" title="${escapeHtml(a.selectedText)}">${escapeHtml(a.selectedText)}</span>
-          <button type="button" class="lf-btn-icon lf-voice-btn" title="Pronounce word / উচ্চারণ শুনুন" aria-label="Listen pronunciation" style="width: 26px; height: 26px; min-width: 26px; min-height: 26px; font-size: 13px; margin: 0 2px;">🔊</button>
+          <button type="button" class="lf-btn-icon lf-voice-btn" title="Pronounce word / উচ্চারণ শুনুন" aria-label="Listen pronunciation" style="width: 26px; height: 26px; min-width: 26px; min-height: 26px; margin: 0 2px;">${lfIcon('volume')}</button>
           <span class="lf-pos" title="${escapeHtml(rawPos)}">${escapeHtml(displayPos)}</span>
         </div>
         <div class="lf-actions-top">
           ${this.renderModeToggleHtml()}
-          <button class="lf-btn-icon lf-pin-btn ${this.isPinned ? 'active' : ''}" title="${this.isPinned ? 'Unpin popup' : 'Pin popup'}" aria-label="Pin popup">📌</button>
-          <button class="lf-btn-icon lf-copy-btn" title="Copy text" aria-label="Copy text">📋</button>
-          <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">✕</button>
+          <button class="lf-btn-icon lf-pin-btn ${this.isPinned ? 'active' : ''}" title="${this.isPinned ? 'Unpin popup' : 'Pin popup'}" aria-label="Pin popup">${lfIcon('pin')}</button>
+          <button class="lf-btn-icon lf-copy-btn" title="Copy text" aria-label="Copy text">${lfIcon('copy')}</button>
+          <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">${lfIcon('close')}</button>
         </div>
       </div>
 
       <!-- Native Segmented Control -->
       <div class="lf-tabs" role="tablist">
         <button type="button" class="lf-tab ${this.activeTab === 'meaning' ? 'active' : ''}" data-tab="meaning">
-          📖 Meaning
+          Meaning
         </button>
         <button type="button" class="lf-tab ${this.activeTab === 'ask-ai' ? 'active' : ''}" data-tab="ask-ai">
-          ✨ Ask AI
+          Ask AI
         </button>
         <button type="button" class="lf-tab ${this.activeTab === 'details' ? 'active' : ''}" data-tab="details">
-          📚 Deep Dive ${bCount ? `(${bCount})` : ''}
+          Deep Dive ${bCount ? `(${bCount})` : ''}
         </button>
       </div>
 
@@ -1288,7 +1338,7 @@ export class PopupView {
           <!-- 1. Easy English First -->
           <div class="lf-def-item" style="margin-bottom: 8px;">
             <div class="lf-section-sublabel" style="font-size: var(--lf-font-sublabel, 12px); text-transform: uppercase; font-weight: 700; margin-bottom: 2px;">
-              📖 Easy English:
+              Easy English:
             </div>
             <div class="lf-easy-english-text" style="font-size: var(--lf-font-english, 16px); line-height: 1.45; font-weight: 500;">
               ${escapeHtml(a.easyEnglish)}
@@ -1309,7 +1359,7 @@ export class PopupView {
           <!-- 3. In this sentence -->
           <div class="lf-context-box" style="margin-bottom: 8px; padding: 8px 10px; border-radius: 8px;">
             <div class="lf-context-label" style="font-size: var(--lf-font-sublabel, 12px); text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">
-              💡 In this sentence:
+              In this sentence:
             </div>
             <div class="lf-context-text" style="font-size: var(--lf-font-context, 15px); line-height: 1.45;">
               ${escapeHtml(a.contextMeaning)}
@@ -1321,7 +1371,7 @@ export class PopupView {
             <div class="lf-why-matters-box" style="margin-bottom: 10px; padding: 10px 12px; background: rgba(147, 51, 234, 0.08); border-left: 3px solid #9333ea; border-radius: 8px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                 <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #9333ea; display: flex; align-items: center; gap: 4px;">
-                  💡 Why This Matters (${escapeHtml(whyMatters.connector.categoryLabel)}):
+                  Why This Matters (${escapeHtml(whyMatters.connector.categoryLabel)}):
                 </span>
                 <button type="button" class="lf-looks-wrong-btn" title="Report inaccurate connector or why it matters analysis" style="background: none; border: none; font-size: 10.5px; color: var(--text-muted, #6e6e73); cursor: pointer; text-decoration: underline;">
                   Looks wrong?
@@ -1344,7 +1394,7 @@ export class PopupView {
               <div class="lf-active-recall-box" style="margin-bottom: 10px; padding: 10px 12px; background: rgba(147, 51, 234, 0.06); border: 1px dashed rgba(147, 51, 234, 0.35); border-radius: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
                   <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #9333ea; display: flex; align-items: center; gap: 4px;">
-                    🧠 Active Recall Challenge:
+                    Active Recall Challenge:
                   </span>
                   <span style="font-size: 10.5px; color: var(--text-muted, #6e6e73); font-weight: 600;">
                     Hint: ${escapeHtml(cloze.hint.firstLetter)}... (${cloze.hint.length} letters)
@@ -1359,7 +1409,7 @@ export class PopupView {
                   </button>
                 </div>
                 <div class="lf-cloze-answer" hidden style="display: none; margin-top: 6px; padding: 5px 8px; background: rgba(147, 51, 234, 0.12); border-radius: 5px; font-size: 12px; font-weight: 700; color: #9333ea;">
-                  ✓ Word: <strong>${escapeHtml(cloze.targetWord)}</strong> ${a.easyBengali ? `(${escapeHtml(a.easyBengali)})` : ''}
+                  Word: <strong>${escapeHtml(cloze.targetWord)}</strong> ${a.easyBengali ? `(${escapeHtml(a.easyBengali)})` : ''}
                 </div>
               </div>
             `;
@@ -1375,7 +1425,7 @@ export class PopupView {
           <div class="lf-word-grammar-card" style="margin-bottom: 10px; padding: 10px 12px; background: rgba(0, 113, 227, 0.05); border: 1px solid rgba(0, 113, 227, 0.18); border-radius: 8px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
               <span style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; color: #0071e3; letter-spacing: 0.04em;">
-                🔬 Grammar Breakdown:
+                Grammar Breakdown:
               </span>
               <span style="font-size: 11px; padding: 2px 7px; border-radius: 4px; background: rgba(0, 113, 227, 0.12); color: #0071e3; font-weight: 600;">
                 ${escapeHtml(a.partOfSpeech || 'Word')}
@@ -1422,17 +1472,17 @@ export class PopupView {
           <!-- 5. Quick AI Instant Actions -->
           <div class="lf-quick-ai-box">
             <div class="lf-quick-ai-title">
-              <span>✨ Ask AI Quick Actions:</span>
+              <span>Ask AI Quick Actions:</span>
             </div>
             <div class="lf-quick-ai-chips">
               <button type="button" class="lf-quick-chip" data-prompt="Explain this word in super simple terms like I'm 5 years old">
-                <span>💡</span><span>Like I'm 5</span>
+                ${lfIcon('lightbulb')}<span>Like I'm 5</span>
               </button>
               <button type="button" class="lf-quick-chip" data-prompt="What is the subtle difference between this word and its common synonyms?">
-                <span>🔍</span><span>Nuance vs Synonyms</span>
+                ${lfIcon('search')}<span>Nuance vs Synonyms</span>
               </button>
               <button type="button" class="lf-quick-chip" data-prompt="How do native English speakers naturally use this in everyday conversation?">
-                <span>🗣️</span><span>Daily Native Usage</span>
+                ${lfIcon('message')}<span>Daily Native Usage</span>
               </button>
               <button type="button" class="lf-quick-chip" data-prompt="Explain this word in ${escapeHtml(langConfig.targetLabel)} with detailed context and nuances">
                 <span style="font-size: 10px; font-weight: 700; color: #0071e3;">${escapeHtml(langConfig.targetNativeLabel)}</span><span>${escapeHtml(langConfig.targetNativeHeader)}</span>
@@ -1446,11 +1496,11 @@ export class PopupView {
           <!-- 7. Honesty Bar: AI-generated + Confidence + Machine voice -->
           <div class="lf-honesty-bar" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0, 0, 0, 0.08);">
             <div style="display: flex; align-items: center; gap: 6px;">
-              <span class="lf-ai-badge">${isVerifiedDict ? '📖 Verified Lexicon' : '✨ AI-generated'}</span>
+              <span class="lf-ai-badge">${isVerifiedDict ? `${lfIcon('book')} Verified Lexicon` : `${lfIcon('sparkles')} AI-generated`}</span>
               <span class="lf-confidence-pill ${a.confidence}">Confidence: ${escapeHtml(a.confidence)}</span>
             </div>
             <button class="lf-machine-voice-btn" title="Machine-synthesized text-to-speech" aria-label="Listen with machine speech synthesis">
-              Machine voice 🔊
+              Machine voice ${lfIcon('volume')}
             </button>
           </div>
 
@@ -1493,18 +1543,18 @@ export class PopupView {
             aria-controls="lf-expanded-section"
             title="Toggle full dictionary definitions and examples"
           >
-            ${(this.activeTab === 'details' || this.isExpanded) ? '▲ Overview' : '📖 Meanings'}
+            ${(this.activeTab === 'details' || this.isExpanded) ? 'Overview' : `${lfIcon('book')} Meanings`}
           </button>
           <button type="button" class="lf-btn-action secondary lf-qa-toggle-btn" title="Ask AI follow-up" aria-label="Ask AI">
-            💬 Ask AI
+            ${lfIcon('message')} Ask AI
           </button>
         </div>
         <div class="lf-footer-right">
           <button class="lf-btn-action secondary lf-report-trigger-btn" title="Report inaccurate explanation" aria-label="Report wrong meaning">
-            🚩 Report
+            ${lfIcon('flag')} Report
           </button>
           <button class="lf-btn-action lf-save-btn ${this.isSaved ? 'saved' : ''}" title="${this.readingMode === 'learn' ? 'Save with context sentence and Active Recall for spaced review' : 'Quick save vocabulary'}">
-            ${this.isSaved ? (this.readingMode === 'learn' ? '✓ Saved with Context' : '✓ Saved') : (this.readingMode === 'learn' ? '🧠 Save with Context' : '+ Save')}
+            ${this.isSaved ? (this.readingMode === 'learn' ? '✓ Saved with Context' : '✓ Saved') : (this.readingMode === 'learn' ? 'Save with Context' : '+ Save')}
           </button>
         </div>
       </div>
@@ -1532,30 +1582,30 @@ export class PopupView {
         <div class="lf-title-row">
           <span class="lf-drag-indicator" title="Drag to reposition">⠿</span>
           <span class="lf-heading-sentence">Sentence Analysis</span>
-          <button type="button" class="lf-btn-icon lf-voice-btn" title="Listen to sentence / বাক্যটি শুনুন" aria-label="Listen to sentence" style="width: 26px; height: 26px; min-width: 26px; min-height: 26px; font-size: 13px; margin: 0 2px;">🔊</button>
+          <button type="button" class="lf-btn-icon lf-voice-btn" title="Listen to sentence / বাক্যটি শুনুন" aria-label="Listen to sentence" style="width: 26px; height: 26px; min-width: 26px; min-height: 26px; margin: 0 2px;">${lfIcon('volume')}</button>
           <span class="lf-pos">SENTENCE</span>
         </div>
         <div class="lf-actions-top">
           ${this.renderModeToggleHtml()}
-          <button class="lf-btn-icon lf-pin-btn ${this.isPinned ? 'active' : ''}" title="${this.isPinned ? 'Unpin popup' : 'Pin popup'}" aria-label="Pin popup">📌</button>
-          <button class="lf-btn-icon lf-copy-btn" title="Copy sentence text" aria-label="Copy sentence text">📋</button>
-          <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">✕</button>
+          <button class="lf-btn-icon lf-pin-btn ${this.isPinned ? 'active' : ''}" title="${this.isPinned ? 'Unpin popup' : 'Pin popup'}" aria-label="Pin popup">${lfIcon('pin')}</button>
+          <button class="lf-btn-icon lf-copy-btn" title="Copy sentence text" aria-label="Copy sentence text">${lfIcon('copy')}</button>
+          <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">${lfIcon('close')}</button>
         </div>
       </div>
 
       <!-- Native Segmented Control -->
       <div class="lf-tabs" role="tablist">
         <button type="button" class="lf-tab ${this.activeSentenceTab === 'breakdown' ? 'active' : ''}" data-tab="breakdown">
-          📝 Sentence
+          Sentence
         </button>
         <button type="button" class="lf-tab ${this.activeSentenceTab === 'grammar' ? 'active' : ''}" data-tab="grammar">
-          🧩 Grammar
+          Grammar
         </button>
         <button type="button" class="lf-tab ${this.activeSentenceTab === 'clauses' ? 'active' : ''}" data-tab="clauses">
-          🌿 Clauses
+          Clauses
         </button>
         <button type="button" class="lf-tab ${this.activeSentenceTab === 'ask-ai' ? 'active' : ''}" data-tab="ask-ai">
-          ✨ Ask AI
+          Ask AI
         </button>
       </div>
 
@@ -1564,7 +1614,7 @@ export class PopupView {
           <!-- A. Original Text -->
           <div class="lf-sentence-card">
             <div class="lf-section-label">
-              <span>📝 Original Text:</span>
+              <span>Original Text:</span>
               ${isLongSentence ? `
                 <button class="lf-text-toggle-btn" id="lf-sentence-text-toggle">
                   ${this.isSentenceExpanded ? 'Show less' : 'Show full'}
@@ -1575,7 +1625,7 @@ export class PopupView {
               ${this.renderSentenceWithConnectors(s.selectedText, findDiscourseConnectors(s.selectedText))}
             </div>
             <div class="lf-sentence-hint">
-              💡 Click any word in the text to inspect its contextual meaning
+              Click any word in the text to inspect its contextual meaning
             </div>
           </div>
 
@@ -1587,7 +1637,7 @@ export class PopupView {
             <div class="lf-why-matters-box" style="margin-bottom: 12px; padding: 10px 12px; background: rgba(147, 51, 234, 0.08); border-left: 3px solid #9333ea; border-radius: 8px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                 <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #9333ea; display: flex; align-items: center; gap: 4px;">
-                  💡 Why This Matters (${escapeHtml(sentenceWhyMatters.connector.categoryLabel)}):
+                  Why This Matters (${escapeHtml(sentenceWhyMatters.connector.categoryLabel)}):
                 </span>
                 <button type="button" class="lf-looks-wrong-btn" title="Report inaccurate connector or why it matters analysis" style="background: none; border: none; font-size: 10.5px; color: var(--text-muted, #6e6e73); cursor: pointer; text-decoration: underline;">
                   Looks wrong?
@@ -1614,7 +1664,7 @@ export class PopupView {
           ${(s.plainEnglishParaphrase || s.overallMeaning) ? `
             <div class="lf-def-item" style="margin-bottom: 10px; padding: 8px 10px; border-radius: 6px;">
               <div class="lf-section-sublabel" style="font-size: var(--lf-font-sublabel, 12px); text-transform: uppercase; font-weight: 700; margin-bottom: 3px;">
-                💡 English Summary &amp; Core Proposition:
+                English Summary &amp; Core Proposition:
               </div>
               <div class="lf-easy-english-text" style="font-size: var(--lf-font-english, 15px); line-height: 1.45; font-weight: 500;">
                 ${escapeHtml(s.plainEnglishParaphrase || s.overallMeaning)}
@@ -1631,17 +1681,17 @@ export class PopupView {
           <!-- Quick AI Prompt Chips for Sentence -->
           <div class="lf-quick-ai-box">
             <div class="lf-quick-ai-title">
-              <span>✨ Ask AI Quick Actions:</span>
+              <span>Ask AI Quick Actions:</span>
             </div>
             <div class="lf-quick-ai-chips">
               <button type="button" class="lf-quick-chip" data-prompt="Break down the core message in super easy everyday English">
-                <span>💡</span><span>Explain simply</span>
+                ${lfIcon('lightbulb')}<span>Explain simply</span>
               </button>
               <button type="button" class="lf-quick-chip" data-prompt="Explain the grammatical structure and rhetorical tone used here">
-                <span>🧩</span><span>Grammar & Tone</span>
+                ${lfIcon('puzzle')}<span>Grammar & Tone</span>
               </button>
               <button type="button" class="lf-quick-chip" data-prompt="How would a native speaker rephrase this in casual speech or friendly email?">
-                <span>🗣️</span><span>Conversational</span>
+                ${lfIcon('message')}<span>Conversational</span>
               </button>
               <button type="button" class="lf-quick-chip" data-prompt="Explain the deeper meaning of this statement in ${escapeHtml(langConfig.targetLabel)}">
                 <span style="font-size: 10px; font-weight: 700; color: #0071e3;">${escapeHtml(langConfig.targetNativeLabel)}</span><span>${escapeHtml(langConfig.targetNativeHeader)}</span>
@@ -1652,13 +1702,13 @@ export class PopupView {
           <!-- Honesty Bar: AI Badge, Tone & Register, Machine Voice -->
           <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0, 0, 0, 0.08);">
             <div style="display: flex; align-items: center; gap: 6px;">
-              <span class="lf-ai-badge">✨ AI-generated</span>
+              <span class="lf-ai-badge">${lfIcon('sparkles')} AI-generated</span>
               ${s.toneAndRegister ? `
                 <span class="lf-confidence-pill high" style="background: rgba(0, 113, 227, 0.12); color: #0071e3;">${escapeHtml(s.toneAndRegister)}</span>
               ` : ''}
             </div>
             <button class="lf-machine-voice-btn" title="Read sentence aloud with speech synthesis" aria-label="Listen to sentence">
-              Machine voice 🔊
+              Machine voice ${lfIcon('volume')}
             </button>
           </div>
 
@@ -1701,18 +1751,18 @@ export class PopupView {
             aria-controls="lf-sentence-expanded-section"
             title="Expand Grammar and Clause analysis"
           >
-            🧩 Grammar &amp; Clauses
+            ${lfIcon('puzzle')} Grammar &amp; Clauses
           </button>
           <button type="button" class="lf-btn-action secondary lf-qa-toggle-btn" title="Ask AI about this sentence" aria-label="Ask AI">
-            💬 Ask AI
+            ${lfIcon('message')} Ask AI
           </button>
         </div>
         <div class="lf-footer-right">
           <button class="lf-btn-action secondary lf-report-trigger-btn" title="Report inaccurate explanation" aria-label="Report wrong meaning">
-            🚩 Report
+            ${lfIcon('flag')} Report
           </button>
           <button class="lf-btn-action lf-save-btn ${this.isSaved ? 'saved' : ''}">
-            ${this.isSaved ? (this.readingMode === 'learn' ? '✓ Saved with Context' : '✓ Saved') : (this.readingMode === 'learn' ? '🧠 Save with Context' : '+ Save')}
+            ${this.isSaved ? (this.readingMode === 'learn' ? '✓ Saved with Context' : '✓ Saved') : (this.readingMode === 'learn' ? 'Save with Context' : '+ Save')}
           </button>
         </div>
       </div>
@@ -1722,68 +1772,191 @@ export class PopupView {
   }
 
   private renderParagraphView(p: ParagraphAnalysisResult): void {
-    const isLongText = p.selectedText.length > 200;
     const langConfig = getLanguageConfig(this.targetLanguage);
-    const phrases = this.ensurePhraseBreakdown(
-      p.selectedText,
-      p.phraseBreakdown,
-      undefined,
-      p.bengaliTranslation
-    );
+    const isBn = langConfig.targetLang === 'bn';
+    const toBnNum = (n: number | string) => {
+      const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+      return isBn ? String(n).replace(/\d/g, (d) => bnDigits[Number(d)] || d) : String(n);
+    };
+
+    const hierarchical = this.ensureHierarchicalParagraph(p);
+    const hasMultipleParagraphs = hierarchical.paragraphs.length > 1;
+
+    if (this.activeParaIndex >= hierarchical.paragraphs.length) {
+      this.activeParaIndex = 0;
+    }
+    const currentPara = hierarchical.paragraphs[this.activeParaIndex] || hierarchical.paragraphs[0];
+    if (this.activeParaSentenceIndex >= currentPara.sentences.length) {
+      this.activeParaSentenceIndex = 0;
+    }
 
     this.element.innerHTML = `
       <div class="lf-header">
         <div class="lf-title-row">
           <span class="lf-drag-indicator" title="Drag to reposition">⠿</span>
           <span class="lf-heading-sentence">Paragraph Intelligence</span>
-          <button type="button" class="lf-btn-icon lf-voice-btn" title="Listen to paragraph / প্যারাগ্রাফটি শুনুন" aria-label="Listen to paragraph" style="width: 26px; height: 26px; min-width: 26px; min-height: 26px; font-size: 13px; margin: 0 2px;">🔊</button>
+          <button type="button" class="lf-btn-icon lf-voice-btn" title="Listen to paragraph / প্যারাগ্রাফটি শুনুন" aria-label="Listen to paragraph" style="width: 26px; height: 26px; min-width: 26px; min-height: 26px; margin: 0 2px;">${lfIcon('volume')}</button>
           <span class="lf-pos">PARAGRAPH</span>
         </div>
         <div class="lf-actions-top">
           ${this.renderModeToggleHtml()}
-          <button class="lf-btn-icon lf-pin-btn ${this.isPinned ? 'active' : ''}" title="${this.isPinned ? 'Unpin popup' : 'Pin popup'}" aria-label="Pin popup">📌</button>
-          <button class="lf-btn-icon lf-copy-btn" title="Copy paragraph text" aria-label="Copy paragraph text">📋</button>
-          <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">✕</button>
+          <button class="lf-btn-icon lf-pin-btn ${this.isPinned ? 'active' : ''}" title="${this.isPinned ? 'Unpin popup' : 'Pin popup'}" aria-label="Pin popup">${lfIcon('pin')}</button>
+          <button class="lf-btn-icon lf-copy-btn" title="Copy paragraph text" aria-label="Copy paragraph text">${lfIcon('copy')}</button>
+          <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">${lfIcon('close')}</button>
+        </div>
+      </div>
+
+      <!-- Multiple Paragraph Selector Tabs (if > 1 paragraph) -->
+      ${hasMultipleParagraphs ? `
+        <div class="lf-para-tabs-compact lf-para-tabs" role="tablist">
+          ${hierarchical.paragraphs.map((para, pIdx) => `
+            <button type="button" class="lf-tab ${this.activeParaIndex === pIdx ? 'active' : ''}" data-para-idx="${pIdx}">
+              ${isBn ? `প্যারাগ্রাফ ${toBnNum(para.paragraphIndex)}` : `Paragraph ${para.paragraphIndex}`}
+            </button>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      <!-- Sentence Stepper Slider: [<] বাক্য ১ / ৪ [>] with interactive mini dots slider -->
+      <div class="lf-sentence-stepper-container">
+        <div class="lf-sentence-stepper">
+          <button
+            type="button"
+            class="lf-stepper-nav-btn lf-stepper-prev"
+            data-action="prev-sentence"
+            ${this.activeParaSentenceIndex === 0 ? 'disabled' : ''}
+            title="${isBn ? 'পূর্ববর্তী বাক্য' : 'Previous sentence'}"
+            aria-label="Previous sentence"
+          >
+            ${lfIcon('chevronLeft')}
+          </button>
+
+          <div class="lf-stepper-center">
+            <div class="lf-stepper-counter">
+              <span class="lf-stepper-label">${isBn ? 'বাক্য' : 'Sentence'}</span>
+              <span class="lf-stepper-num">${toBnNum(this.activeParaSentenceIndex + 1)}</span>
+              <span class="lf-stepper-sep">/</span>
+              <span class="lf-stepper-total">${toBnNum(currentPara.sentences.length)}</span>
+            </div>
+            <div class="lf-slider-dots-track lf-sentence-switcher" role="tablist" aria-label="Sentence switcher dots">
+              ${currentPara.sentences.map((sent, sIdx) => `
+                <button
+                  type="button"
+                  class="lf-tab lf-slider-dot ${this.activeParaSentenceIndex === sIdx ? 'active' : ''}"
+                  data-sent-idx="${sIdx}"
+                  title="${isBn ? `বাক্য ${toBnNum(sent.sentenceIndex)}` : `Sentence ${sent.sentenceIndex}`}"
+                  aria-label="${isBn ? `বাক্য ${toBnNum(sent.sentenceIndex)}` : `Sentence ${sent.sentenceIndex}`}"
+                ></button>
+              `).join('')}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="lf-stepper-nav-btn lf-stepper-next"
+            data-action="next-sentence"
+            ${this.activeParaSentenceIndex >= currentPara.sentences.length - 1 ? 'disabled' : ''}
+            title="${isBn ? 'পরবর্তী বাক্য' : 'Next sentence'}"
+            aria-label="Next sentence"
+          >
+            ${lfIcon('chevronRight')}
+          </button>
         </div>
       </div>
 
       <div class="lf-content" id="lf-main-content">
-        <!-- A. Original Text -->
-        <div class="lf-sentence-card">
-          <div class="lf-section-label">
-            <span>📝 Original Text:</span>
-            ${isLongText ? `
-              <button class="lf-text-toggle-btn" id="lf-para-text-toggle">
-                ${this.isSentenceExpanded ? 'Show less' : 'Show full'}
-              </button>
+        <!-- Render Sentence Panels (Using exact same structure as normal Sentence Mode!) -->
+        ${hierarchical.paragraphs.map((para, pIdx) => `
+          <div class="lf-para-panel" data-para-panel-idx="${pIdx}" style="display: ${this.activeParaIndex === pIdx ? 'block' : 'none'};">
+            ${para.sentences.map((sent, sIdx) => {
+              const isSentenceVisible = (this.activeParaIndex === pIdx && this.activeParaSentenceIndex === sIdx);
+              return `
+                <div class="lf-sentence-panel" data-panel-idx="${sIdx}" style="display: ${isSentenceVisible ? 'block' : 'none'};">
+                  <!-- A. Original Sentence Text (Exact Sentence Mode Pattern!) -->
+                  <div class="lf-sentence-card">
+                    <div class="lf-section-label">
+                      <span>${isBn ? `বাক্য ${toBnNum(sent.sentenceIndex)} (মূল বাক্য):` : `Sentence ${sent.sentenceIndex}:`}</span>
+                      <button type="button" class="lf-btn-icon lf-voice-mini-btn" data-speak="${escapeHtml(sent.sentenceText)}" title="Listen to this sentence" aria-label="Listen to sentence" style="width: 22px; height: 22px; min-width: 22px; min-height: 22px; margin: 0 4px;">
+                        ${lfIcon('volume')}
+                      </button>
+                    </div>
+                    <div class="lf-sentence-text">
+                      ${this.renderInteractiveSentence(sent.sentenceText)}
+                    </div>
+                    <div class="lf-sentence-hint">
+                      Click any word in the text to inspect its contextual meaning
+                    </div>
+                  </div>
+
+                  <!-- B. Phrase-by-Phrase Explanation (Exact Sentence Mode Pattern!) -->
+                  <div class="lf-phrase-breakdown-section">
+                    <div class="lf-section-label" style="color: #0a84ff; margin-bottom: 6px;">
+                      <span>Phrase-by-Phrase Explanation (${sent.phraseBreakdown.length}):</span>
+                    </div>
+                    <div class="lf-phrases-list">
+                      ${sent.phraseBreakdown.map((item, phIdx) => `
+                        <div class="lf-phrase-item">
+                          <div class="lf-phrase-orig">
+                            <span class="lf-phrase-num">#${phIdx + 1}</span>
+                            <strong>"${escapeHtml(item.phrase)}"</strong>
+                          </div>
+                          <div class="lf-phrase-field lf-phrase-english">
+                            <span class="lf-field-label">Easy English:</span>
+                            <span>${escapeHtml(item.easyEnglish)}</span>
+                          </div>
+                          ${(this.targetLanguage !== 'en' || (item.easyBengali && item.easyBengali !== item.easyEnglish && !/[\u0980-\u09FF]/.test(item.easyBengali))) ? `
+                            <div class="lf-phrase-field lf-phrase-bengali">
+                              <span class="lf-field-label">${langConfig.flagEmoji} ${escapeHtml(langConfig.targetNativeHeader)}:</span>
+                              <span>${escapeHtml(item.easyBengali)}</span>
+                            </div>
+                          ` : ''}
+                        </div>
+                      `).join('')}
+                    </div>
+                  </div>
+
+                  <!-- C. Full Bengali for Sentence (Exact Sentence Mode Pattern!) -->
+                  <div class="lf-bengali-box" style="margin-bottom: 12px; padding: 10px 12px; border-radius: 8px;">
+                    <div class="lf-bengali-box-header" style="font-size: var(--lf-font-sublabel, 12px); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; margin-bottom: 3px;">
+                      ${langConfig.targetLang === 'bn' ? '🇧🇩 সম্পূর্ণ বাংলা অর্থ (Full Bengali):' : `${langConfig.flagEmoji} ${escapeHtml(langConfig.targetNativeHeader)} (${escapeHtml(langConfig.targetLabel)}):`}
+                    </div>
+                    <div class="lf-easy-bengali-text" style="font-size: var(--lf-font-bengali, 18.5px); font-weight: 700; line-height: 1.45;">
+                      ${escapeHtml(sent.bengaliTranslation || p.bengaliTranslation || `${langConfig.targetNativeHeader}...`)}
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `).join('')}
+
+        <!-- Toggle for Complete Full Paragraph Text & Translation -->
+        <div style="margin-top: 10px; margin-bottom: 8px;">
+          <button type="button" class="lf-text-toggle-btn" id="lf-para-text-toggle" style="background: none; border: none; font-size: 11.5px; font-weight: 600; color: #0071e3; cursor: pointer; padding: 2px 0;">
+            ${this.isSentenceExpanded ? '▲ Hide Full Paragraph Overview' : '▼ Show Full Paragraph Overview'}
+          </button>
+        </div>
+
+        ${this.isSentenceExpanded ? `
+          <div style="padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.06); margin-bottom: 10px;">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 4px;">Full Paragraph:</div>
+            <div style="font-size: 13.5px; color: var(--text-main, #1d1d1f); line-height: 1.45; margin-bottom: 8px;">
+              ${this.renderInteractiveSentence(p.selectedText)}
+            </div>
+            ${p.bengaliTranslation ? `
+              <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #2563eb; margin-bottom: 4px;">Full Translation:</div>
+              <div style="font-size: 14px; color: #0f172a; line-height: 1.45; font-weight: 500;">
+                ${escapeHtml(p.bengaliTranslation)}
+              </div>
             ` : ''}
           </div>
-          <div class="lf-sentence-text ${!this.isSentenceExpanded && isLongText ? 'truncated' : ''}">
-            ${this.renderInteractiveSentence(p.selectedText)}
-          </div>
-          <div class="lf-sentence-hint">
-            💡 Click any word in the text to inspect its contextual meaning
-          </div>
-        </div>
-
-        <!-- B. Phrase-by-Phrase Explanation -->
-        ${this.renderPhraseBreakdownHtml(phrases)}
-
-        <!-- C. Full Target Language -->
-        <div class="lf-bengali-box" style="margin-bottom: 12px; padding: 10px 12px; border-radius: 8px;">
-          <div class="lf-bengali-box-header" style="font-size: var(--lf-font-sublabel, 12px); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; margin-bottom: 3px;">
-            ${langConfig.targetLang === 'bn' ? '🇧🇩 সম্পূর্ণ বাংলা অর্থ (Full Bengali):' : `${langConfig.flagEmoji} ${escapeHtml(langConfig.targetNativeHeader)} (${escapeHtml(langConfig.targetLabel)}):`}
-          </div>
-          <div class="lf-easy-bengali-text" style="font-size: var(--lf-font-bengali, 18.5px); font-weight: 700; line-height: 1.45;">
-            ${escapeHtml(p.bengaliTranslation || `${langConfig.targetNativeHeader}...`)}
-          </div>
-        </div>
+        ` : ''}
 
         <!-- Optional Main Idea & Summary -->
         ${(p.mainIdea || p.conciseSummary) ? `
           <div class="lf-def-item" style="margin-bottom: 10px; padding: 8px 10px; border-radius: 6px;">
             <div class="lf-section-sublabel" style="font-size: var(--lf-font-sublabel, 12px); text-transform: uppercase; font-weight: 700; margin-bottom: 3px;">
-              💡 Main Idea:
+              Main Idea:
             </div>
             <div class="lf-easy-english-text" style="font-size: var(--lf-font-english, 15px); line-height: 1.45; font-weight: 500;">
               ${escapeHtml(p.mainIdea || p.conciseSummary)}
@@ -1794,13 +1967,13 @@ export class PopupView {
         <!-- Honesty Bar: AI Badge, Tone & Register, Machine Voice -->
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(0, 0, 0, 0.08);">
           <div style="display: flex; align-items: center; gap: 6px;">
-            <span class="lf-ai-badge">✨ AI-generated</span>
+            <span class="lf-ai-badge">${lfIcon('sparkles')} AI-generated</span>
             ${p.toneAndRegister ? `
               <span class="lf-confidence-pill high" style="background: rgba(10, 132, 255, 0.14); color: #0a84ff;">${escapeHtml(p.toneAndRegister)}</span>
             ` : ''}
           </div>
           <button class="lf-machine-voice-btn" title="Read paragraph aloud with speech synthesis" aria-label="Listen to paragraph">
-            Machine voice 🔊
+            Machine voice ${lfIcon('volume')}
           </button>
         </div>
 
@@ -1825,15 +1998,15 @@ export class PopupView {
             aria-controls="lf-para-expanded-section"
             title="Toggle key vocabulary and paragraph flow insights"
           >
-            ${this.isSentenceAnalysisExpanded ? '▲ Summary' : '📑 Key Terms'}
+            ${this.isSentenceAnalysisExpanded ? 'Summary' : `${lfIcon('book')} Key Terms`}
           </button>
           <button type="button" class="lf-btn-action secondary lf-qa-toggle-btn" title="Ask AI about this paragraph" aria-label="Ask AI">
-            💬 Ask AI
+            ${lfIcon('message')} Ask AI
           </button>
         </div>
         <div class="lf-footer-right">
           <button class="lf-btn-action secondary lf-report-trigger-btn" title="Report inaccurate explanation" aria-label="Report wrong meaning">
-            🚩 Report
+            ${lfIcon('flag')} Report
           </button>
           <button class="lf-btn-action lf-save-btn ${this.isSaved ? 'saved' : ''}">
             ${this.isSaved ? '✓ Saved' : '+ Save'}
@@ -1845,13 +2018,111 @@ export class PopupView {
     this.bindEventsParagraph(p);
   }
 
+  private ensureHierarchicalParagraph(p: ParagraphAnalysisResult): {
+    paragraphs: ParagraphBlockItem[];
+    sentences: ParagraphSentenceItem[];
+  } {
+    if (p.paragraphs && p.paragraphs.length > 0) {
+      const sentences = p.paragraphs.flatMap((pb) => pb.sentences);
+      return { paragraphs: p.paragraphs, sentences };
+    }
+
+    if (p.sentences && p.sentences.length > 0) {
+      const paragraphs: ParagraphBlockItem[] = [
+        {
+          paragraphIndex: 1,
+          paragraphText: p.selectedText,
+          mainIdea: p.mainIdea,
+          bengaliTranslation: p.bengaliTranslation,
+          sentences: p.sentences
+        }
+      ];
+      return { paragraphs, sentences: p.sentences };
+    }
+
+    // Dynamic Hierarchical Segmentation Fallback:
+    const paraTexts = splitIntoParagraphs(p.selectedText);
+    const existingPhrases = Array.isArray(p.phraseBreakdown) ? [...p.phraseBreakdown] : [];
+    const paragraphs: ParagraphBlockItem[] = [];
+    const allSentences: ParagraphSentenceItem[] = [];
+    let sentenceCounter = 1;
+
+    // Sentence translation splitter for Bengali full stops (dari / question / exclamation)
+    const bengaliSentences = (p.bengaliTranslation || '')
+      .split(/(?<=[।!?])\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    let phraseCursor = 0;
+
+    paraTexts.forEach((paraText, pIdx) => {
+      const sentTexts = splitIntoSentences(paraText);
+      const paraSentences: ParagraphSentenceItem[] = [];
+
+      sentTexts.forEach((sentText) => {
+        const normSent = sentText.toLowerCase().replace(/[^\w\s]/g, '');
+
+        // Match existing phrases that overlap with this sentence
+        const matchedPhrases: PhraseExplanation[] = [];
+        for (let i = 0; i < existingPhrases.length; i++) {
+          const ph = existingPhrases[i];
+          const normPhrase = (ph.phrase || '').toLowerCase().replace(/[^\w\s]/g, '');
+          if (normPhrase && (normSent.includes(normPhrase) || normPhrase.includes(normSent))) {
+            matchedPhrases.push(ph);
+          }
+        }
+
+        let finalPhrases = matchedPhrases;
+        if (finalPhrases.length === 0) {
+          if (sentTexts.length === 1 && existingPhrases.length > 0) {
+            finalPhrases = existingPhrases;
+          } else if (phraseCursor < existingPhrases.length) {
+            const phrasesPerSentence = Math.max(1, Math.ceil(existingPhrases.length / sentTexts.length));
+            finalPhrases = existingPhrases.slice(phraseCursor, phraseCursor + phrasesPerSentence);
+            phraseCursor += phrasesPerSentence;
+          } else {
+            finalPhrases = this.ensurePhraseBreakdown(sentText, undefined, undefined, p.bengaliTranslation);
+          }
+        }
+
+        // Approximate or assign Bengali sentence translation
+        let sentBengali = bengaliSentences[allSentences.length] || p.bengaliTranslation;
+        if (!sentBengali && finalPhrases.length > 0) {
+          sentBengali = finalPhrases.map((ph) => ph.easyBengali).filter(Boolean).join(' ');
+        }
+
+        const sentenceItem: ParagraphSentenceItem = {
+          sentenceIndex: sentenceCounter++,
+          sentenceText: sentText,
+          bengaliTranslation: sentBengali || p.bengaliTranslation,
+          phraseBreakdown: finalPhrases
+        };
+
+        paraSentences.push(sentenceItem);
+        allSentences.push(sentenceItem);
+      });
+
+      paragraphs.push({
+        paragraphIndex: pIdx + 1,
+        paragraphText: paraText,
+        mainIdea: p.mainIdea,
+        bengaliTranslation: pIdx === 0 ? p.bengaliTranslation : undefined,
+        sentences: paraSentences
+      });
+    });
+
+    return { paragraphs, sentences: allSentences };
+  }
+
+
+
   private renderPhraseBreakdownHtml(phrases: PhraseExplanation[]): string {
     const langConfig = getLanguageConfig(this.targetLanguage);
     return `
       <!-- B. Phrase-by-Phrase Explanation -->
       <div class="lf-phrase-breakdown-section">
         <div class="lf-section-label" style="color: #0a84ff; margin-bottom: 6px;">
-          <span>🔍 Phrase-by-Phrase Explanation (${phrases.length}):</span>
+          <span>Phrase-by-Phrase Explanation (${phrases.length}):</span>
         </div>
         <div class="lf-phrases-list">
           ${phrases.map((item, idx) => `
@@ -1861,7 +2132,7 @@ export class PopupView {
                 <strong>"${escapeHtml(item.phrase)}"</strong>
               </div>
               <div class="lf-phrase-field lf-phrase-english">
-                <span class="lf-field-label">📖 Easy English:</span>
+                <span class="lf-field-label">Easy English:</span>
                 <span>${escapeHtml(item.easyEnglish)}</span>
               </div>
               ${(this.targetLanguage !== 'en' || (item.easyBengali && item.easyBengali !== item.easyEnglish && !/[\u0980-\u09FF]/.test(item.easyBengali))) ? `
@@ -2037,75 +2308,135 @@ export class PopupView {
     const structure = s.sentenceStructure;
     const clauses = Array.isArray(s.clauses) ? s.clauses : [];
     const mainClause = clauses.find(c => c.type === 'main') || clauses[0] || { text: s.selectedText || '', type: 'main', role: 'Main Clause' };
-    const overview = getSentenceOverviewTeaching(structure?.type || 'compound-complex', this.targetLanguage);
+    const overview = getSentenceOverviewTeaching(structure?.type || 'complex', this.targetLanguage);
     const sections = buildBeginnerBreakdownSections(mainClause, s.selectedText, this.targetLanguage);
     const patternFormula = s.patternSummary?.formula || (sections.length > 0 ? sections.map(sec => sec.badgeLetter).join(' + ') : 'S + V + DO');
+    const grammarRules = Array.isArray(s.grammarRules) ? s.grammarRules : [];
+    const connectors = Array.isArray(s.connectors) ? s.connectors : [];
+    const wordGrammar = Array.isArray(s.wordLevelGrammar) ? s.wordLevelGrammar : [];
+    const mistakes = s.commonMistakesAndAlternatives;
+    const practice = s.practice;
+
+    const allLangs = getAllLanguages();
 
     return `
       <div class="lf-gb-container">
-        <!-- 1. Header Banner -->
+        <!-- 1. Header Row -->
         <div class="lf-gb-header-card">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div class="lf-gb-header-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-              </svg>
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="lf-section-tag" style="font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #2563eb;">GRAMMAR INTELLIGENCE</span>
             </div>
-            <div>
-              <div class="lf-gb-header-title">Grammar Breakdown</div>
-              <div class="lf-gb-header-subtitle">Understand how the sentence works.</div>
-            </div>
-          </div>
-          <span class="lf-gb-header-chevron">▲</span>
-        </div>
-
-        <!-- 2. Sentence Overview -->
-        <div class="lf-gb-overview-card">
-          <div class="lf-gb-section-title">Sentence Overview <span style="font-size: 11px; font-weight: 500; color: var(--text-muted, #8e8e93);">(Syntactic Structure)</span></div>
-          <div class="lf-gb-type-pill">${escapeHtml(overview.badgeLabel)}</div>
-          <div class="lf-gb-overview-text">${escapeHtml(overview.explanation)}</div>
-        </div>
-
-        <!-- 3. Explore each part -->
-        <div class="lf-gb-explore-section">
-          <div class="lf-gb-explore-header">
-            <div>
-              <div class="lf-gb-section-title">Explore each part</div>
-              <div class="lf-gb-section-subtitle">Tap a section to explore its explanation.</div>
-            </div>
-            <div class="lf-gb-lang-picker">
-              <label for="lf-explanation-lang-select" class="lf-gb-lang-label">Explanation language</label>
-              <select id="lf-explanation-lang-select" class="lf-explanation-lang-select">
-                <option value="bn" ${this.targetLanguage === 'bn' ? 'selected' : ''}>বাংলা</option>
-                <option value="en" ${this.targetLanguage === 'en' ? 'selected' : ''}>English</option>
-                <option value="es" ${this.targetLanguage === 'es' ? 'selected' : ''}>Español</option>
-                <option value="hi" ${this.targetLanguage === 'hi' ? 'selected' : ''}>हिन्दी</option>
+            <div class="lf-gb-lang-picker" style="display: flex; align-items: center; gap: 5px;">
+              <span class="lf-source-pill" style="font-size: 10.5px; font-weight: 600; color: #64748b; background: rgba(120,120,128,0.1); padding: 2px 5px; border-radius: 4px;">Source: ${this.sourceLanguage ? this.sourceLanguage.toUpperCase() : 'EN'}</span>
+              <span style="font-size: 10px; color: #94a3b8;">➔</span>
+              <label for="lf-explanation-lang-select" class="lf-gb-lang-label" style="font-size: 11px; color: #64748b; font-weight: 600;">Target:</label>
+              <select id="lf-explanation-lang-select" class="lf-explanation-lang-select" style="font-size: 11.5px; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.15); background: var(--bg-surface, #ffffff); color: var(--text-main, #0f172a); max-width: 140px;">
+                ${allLangs.map((l) => `
+                  <option value="${l.targetLang}" ${this.targetLanguage === l.targetLang ? 'selected' : ''}>
+                    ${l.flagEmoji} ${escapeHtml(l.targetNativeLabel || l.targetLabel)}
+                  </option>
+                `).join('')}
               </select>
             </div>
           </div>
+        </div>
 
-          <div class="lf-gb-accordion-list">
+        <!-- 2. Sentence Overview & Syntactic Pattern -->
+        <div class="lf-gb-overview-card" style="margin-top: 10px; padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.08);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <div class="lf-gb-section-title" style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted, #64748b);">Syntactic Structure</div>
+            <div class="lf-gb-type-pill" style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; background: rgba(37,99,235,0.08); color: #2563eb; border: 1px solid rgba(37,99,235,0.2);">${escapeHtml(overview.badgeLabel)}</div>
+          </div>
+          <div class="lf-gb-overview-text" style="font-size: 13px; color: var(--text-main, #0f172a); line-height: 1.45;">${escapeHtml(structure?.explanation || overview.explanation)}</div>
+          ${(structure?.explanationBengali && this.targetLanguage !== 'en') ? `
+            <div class="lf-gb-overview-target" style="margin-top: 6px; font-size: 13px; font-weight: 500; color: #2563eb; line-height: 1.45;">
+              ${escapeHtml(structure.explanationBengali)}
+            </div>
+          ` : ''}
+          <div class="lf-gb-pattern-formula" style="margin-top: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; padding: 6px 10px; border-radius: 6px; background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.06); font-weight: 600; color: var(--text-main, #0f172a);">
+            ${escapeHtml(patternFormula)}
+          </div>
+          ${s.patternSummary?.explanation ? `
+            <div style="font-size: 12px; color: var(--text-muted, #64748b); margin-top: 6px; line-height: 1.4;">
+              ${escapeHtml(s.patternSummary.explanation)}
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- 3. Key Grammar Rules (Deep Real AI Explanations) -->
+        ${grammarRules.length > 0 ? `
+          <div class="lf-gb-rules-section" style="margin-top: 12px;">
+            <div class="lf-gb-section-title" style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted, #64748b); margin-bottom: 8px;">Key Grammar Rules (${grammarRules.length})</div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              ${grammarRules.map(r => `
+                <div class="lf-gb-rule-card" style="padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.08);">
+                  <div style="font-size: 13px; font-weight: 700; color: var(--text-main, #0f172a); margin-bottom: 4px;">
+                    ${escapeHtml(r.ruleName)}
+                  </div>
+                  ${r.whereIsIt ? `
+                    <div style="font-size: 11.5px; font-style: italic; color: #2563eb; margin-bottom: 6px;">
+                      In sentence: “${escapeHtml(r.whereIsIt)}”
+                    </div>
+                  ` : ''}
+                  <div style="font-size: 12.5px; color: var(--text-main, #1e293b); line-height: 1.45; margin-bottom: 6px;">
+                    ${escapeHtml(r.whatIsIt || r.howItWorks)}
+                  </div>
+                  ${r.whyUsed ? `
+                    <div style="font-size: 12px; color: var(--text-muted, #64748b); margin-bottom: 6px;">
+                      <strong>Purpose:</strong> ${escapeHtml(r.whyUsed)}
+                    </div>
+                  ` : ''}
+                  ${r.reusablePattern ? `
+                    <div style="font-size: 11.5px; font-family: ui-monospace, monospace; padding: 4px 8px; border-radius: 4px; background: rgba(0,0,0,0.04); margin-bottom: 6px; color: #0f172a;">
+                      Pattern: ${escapeHtml(r.reusablePattern)}
+                    </div>
+                  ` : ''}
+                  ${r.example?.english ? `
+                    <div style="font-size: 12px; padding: 6px 10px; border-left: 2px solid #2563eb; background: rgba(37,99,235,0.03); border-radius: 0 6px 6px 0; margin-bottom: 4px;">
+                      <div style="font-weight: 600;">Example: ${escapeHtml(r.example.english)}</div>
+                      ${r.example.bengali && this.targetLanguage !== 'en' ? `
+                        <div style="color: #2563eb; font-size: 11.5px; margin-top: 2px;">${escapeHtml(r.example.bengali)}</div>
+                      ` : ''}
+                    </div>
+                  ` : ''}
+                  ${r.commonConfusion ? `
+                    <div style="font-size: 11.5px; color: #dc2626; margin-top: 4px;">
+                      ⚠️ <strong>Watch out:</strong> ${escapeHtml(r.commonConfusion)}
+                    </div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- 4. Dynamic Syntactic Constituents (Subject, Verb, Object, Adverbials) -->
+        <div class="lf-gb-explore-section" style="margin-top: 12px;">
+          <div class="lf-gb-section-title" style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted, #64748b); margin-bottom: 4px;">Syntactic Constituents</div>
+          <div class="lf-gb-section-subtitle" style="font-size: 11.5px; color: var(--text-muted, #64748b); margin-bottom: 8px;">Explore how each component functions in the main clause.</div>
+
+          <div class="lf-gb-accordion-list" style="display: flex; flex-direction: column; gap: 8px;">
             ${sections.map((sec, idx) => `
-              <details class="lf-gb-accordion" ${idx === 0 ? 'open' : ''}>
-                <summary class="lf-gb-summary">
-                  <div style="display: flex; align-items: baseline; gap: 10px;">
-                    <span class="lf-gb-acc-num">${escapeHtml(sec.num)}</span>
-                    <div class="lf-gb-acc-info">
-                      <span class="lf-gb-acc-title">${escapeHtml(sec.title)}</span>
-                      <span class="lf-gb-acc-phrase">${escapeHtml(sec.phrase)}</span>
+              <details class="lf-gb-accordion" ${idx === 0 ? 'open' : ''} style="border-radius: 8px; border: 1px solid rgba(0,0,0,0.08); background: rgba(0,0,0,0.015); overflow: hidden;">
+                <summary class="lf-gb-summary" style="padding: 10px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="lf-constituent-tag" style="font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(37,99,235,0.08); color: #2563eb;">${escapeHtml(sec.badgeLetter)}</span>
+                    <div>
+                      <span style="font-size: 12.5px; font-weight: 700; color: var(--text-main, #0f172a); margin-right: 6px;">${escapeHtml(sec.title)}:</span>
+                      <span style="font-size: 12.5px; font-weight: 500; color: var(--text-muted, #475569);">“${escapeHtml(sec.phrase)}”</span>
                     </div>
                   </div>
-                  <span class="lf-gb-acc-chevron">▼</span>
+                  <span class="lf-gb-acc-chevron" style="font-size: 10px; color: #94a3b8;">▼</span>
                 </summary>
-                <div class="lf-gb-body">
-                  <span class="lf-gb-role-badge">${escapeHtml(sec.roleLabel)}</span>
-                  <div class="lf-gb-body-subtitle">${escapeHtml(sec.simpleTitle)}</div>
-                  <div class="lf-gb-body-text">${escapeHtml(sec.simpleText)}</div>
+                <div class="lf-gb-body" style="padding: 10px 12px 12px 12px; border-top: 1px solid rgba(0,0,0,0.06); font-size: 12px; line-height: 1.45;">
+                  <div style="color: var(--text-main, #1e293b); margin-bottom: 6px;">${escapeHtml(sec.simpleText)}</div>
+                  ${sec.guidingQuestion ? `
+                    <div style="font-size: 11.5px; color: #2563eb; font-weight: 500; margin-bottom: 4px;">${escapeHtml(sec.guidingQuestion)}</div>
+                  ` : ''}
                   ${sec.tipText ? `
-                    <div class="lf-gb-tip-box">
-                      <div class="lf-gb-tip-title">${escapeHtml(sec.tipTitle)}</div>
-                      <div class="lf-gb-tip-text">${escapeHtml(sec.tipText)}</div>
+                    <div style="font-size: 11px; color: var(--text-muted, #64748b); background: rgba(0,0,0,0.03); padding: 6px 8px; border-radius: 6px; margin-top: 6px;">
+                      💡 ${escapeHtml(sec.tipText)}
                     </div>
                   ` : ''}
                 </div>
@@ -2114,111 +2445,316 @@ export class PopupView {
           </div>
         </div>
 
-        <!-- 4. Sentence Pattern -->
-        <div class="lf-gb-pattern-section">
-          <div class="lf-gb-section-title">Sentence Pattern</div>
-          <div class="lf-gb-pattern-box">
-            <div class="lf-gb-pattern-formula">${escapeHtml(patternFormula)}</div>
-            <div class="lf-gb-pattern-divider"></div>
-            <div class="lf-gb-pattern-list">
-              ${sections.map((sec) => `
-                <div class="lf-gb-pattern-item">
-                  <div class="lf-gb-sq-badge" style="background-color: ${sec.badgeBg};">
-                    ${escapeHtml(sec.badgeLetter)}
+        <!-- 5. Discourse Connectors (if present) -->
+        ${connectors.length > 0 ? `
+          <div class="lf-gb-connectors-section" style="margin-top: 12px;">
+            <div class="lf-gb-section-title" style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted, #64748b); margin-bottom: 8px;">Discourse &amp; Connectors</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              ${connectors.map(conn => `
+                <div style="padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.08);">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                    <strong style="color: #2563eb; font-size: 13px;">“${escapeHtml(conn.connector)}”</strong>
+                    <span style="font-size: 10.5px; padding: 1px 6px; border-radius: 4px; background: rgba(37,99,235,0.08); color: #2563eb; font-weight: 600;">
+                      ${escapeHtml(conn.logicalRelationship || 'Transition')}
+                    </span>
                   </div>
-                  <div class="lf-gb-pattern-item-content">
-                    <div class="lf-gb-pattern-item-phrase">${escapeHtml(sec.phrase)}</div>
-                    <div class="lf-gb-pattern-item-qa">${escapeHtml(sec.guidingQuestion)}</div>
-                  </div>
+                  <div style="font-size: 12px; color: var(--text-main, #1e293b); margin-bottom: 4px;">${escapeHtml(conn.meaning)}</div>
+                  ${conn.grammaticalPattern ? `
+                    <div style="font-size: 11.5px; font-family: ui-monospace, monospace; color: #475569; margin-bottom: 4px;">
+                      Pattern: ${escapeHtml(conn.grammaticalPattern)}
+                    </div>
+                  ` : ''}
+                  ${conn.contrastWithSimilar ? `
+                    <div style="font-size: 11.5px; color: var(--text-muted, #64748b);">
+                      Contrast: ${escapeHtml(conn.contrastWithSimilar)}
+                    </div>
+                  ` : ''}
                 </div>
               `).join('')}
             </div>
           </div>
-        </div>
+        ` : ''}
 
-        <!-- 5. Footnote Preview -->
-        <div class="lf-gb-footnote">
-          UI concept preview — Real classification and explanations must be generated from the actual complete sentence.
-        </div>
+        <!-- 6. Word-Level Grammar in Context (if present) -->
+        ${wordGrammar.length > 0 ? `
+          <div class="lf-gb-words-section" style="margin-top: 12px;">
+            <div class="lf-gb-section-title" style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted, #64748b); margin-bottom: 8px;">Word-Level Grammar</div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              ${wordGrammar.map(wg => `
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; padding: 8px 10px; border-radius: 6px; background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.06); font-size: 12px;">
+                  <div>
+                    <strong style="color: var(--text-main, #0f172a);">${escapeHtml(wg.word)}</strong>
+                    <span style="color: var(--text-muted, #64748b); font-size: 11px; margin-left: 6px;">(${escapeHtml(wg.partOfSpeech)})</span>
+                    ${wg.usageNotes ? `<div style="font-size: 11.5px; color: #475569; margin-top: 2px;">${escapeHtml(wg.usageNotes)}</div>` : ''}
+                  </div>
+                  <span style="font-size: 11px; font-weight: 600; color: #2563eb; background: rgba(37,99,235,0.06); padding: 2px 6px; border-radius: 4px; white-space: nowrap;">
+                    ${escapeHtml(wg.syntacticRole)}
+                  </span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- 7. Common Pitfalls & Natural Alternative (if present) -->
+        ${(mistakes?.commonMistake || mistakes?.naturalAlternative) ? `
+          <div style="margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.08);">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #475569; margin-bottom: 6px;">
+              Learner Pitfall &amp; Alternative
+            </div>
+            ${mistakes.commonMistake ? `
+              <div style="font-size: 12px; color: #dc2626; margin-bottom: 4px;">
+                ❌ <strong>Common mistake:</strong> ${escapeHtml(mistakes.commonMistake)}
+              </div>
+            ` : ''}
+            ${mistakes.correctedExample ? `
+              <div style="font-size: 12px; color: #16a34a; margin-bottom: 4px;">
+                ✓ <strong>Corrected:</strong> ${escapeHtml(mistakes.correctedExample)}
+              </div>
+            ` : ''}
+            ${mistakes.naturalAlternative ? `
+              <div style="font-size: 12px; color: var(--text-main, #0f172a); margin-bottom: 2px;">
+                ✨ <strong>Natural alternative:</strong> “${escapeHtml(mistakes.naturalAlternative)}”
+              </div>
+            ` : ''}
+            ${mistakes.nuanceDifference ? `
+              <div style="font-size: 11.5px; color: var(--text-muted, #64748b); margin-top: 4px;">
+                ${escapeHtml(mistakes.nuanceDifference)}
+              </div>
+            ` : ''}
+          </div>
+        ` : ''}
+
+        <!-- 8. Interactive Practice Question (if present) -->
+        ${practice?.practiceQuestion ? `
+          <div style="margin-top: 12px; padding: 12px; border-radius: 10px; background: rgba(37,99,235,0.04); border: 1px solid rgba(37,99,235,0.18);">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #2563eb; margin-bottom: 6px;">
+              🎯 Practice &amp; Quick Check
+            </div>
+            <div style="font-size: 12.5px; font-weight: 600; color: var(--text-main, #0f172a); margin-bottom: 8px; line-height: 1.4;">
+              ${escapeHtml(practice.practiceQuestion)}
+            </div>
+            ${(practice.options && practice.options.length > 0) ? `
+              <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;">
+                ${practice.options.map(opt => `
+                  <div style="font-size: 12px; color: #334155; padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.6); border: 1px solid rgba(0,0,0,0.05);">
+                    ${escapeHtml(opt)}
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+            <details style="margin-top: 6px;">
+              <summary style="font-size: 11.5px; font-weight: 600; color: #2563eb; cursor: pointer; user-select: none;">
+                Reveal Answer &amp; Explanation
+              </summary>
+              <div style="margin-top: 6px; font-size: 12px; color: var(--text-main, #1e293b); padding: 8px; border-radius: 6px; background: rgba(255,255,255,0.8);">
+                <div style="font-weight: 700; color: #16a34a; margin-bottom: 2px;">Answer: ${escapeHtml(practice.answer)}</div>
+                ${practice.explanation ? `<div style="font-size: 11.5px; color: #475569;">${escapeHtml(practice.explanation)}</div>` : ''}
+              </div>
+            </details>
+          </div>
+        ` : ''}
       </div>
     `;
   }
 
   public renderSentenceClausesTab(s: SentenceAnalysisResult): string {
-    const clauses = s.clauses || [];
+    const clauses = Array.isArray(s.clauses) ? s.clauses : [];
     const clauseRel = s.clauseRelationship;
+    const structureMap = s.structureMap;
+    const phraseConstituents = Array.isArray(s.phraseConstituents) ? s.phraseConstituents : [];
+    const conversational = Array.isArray(s.conversationalElements) ? s.conversationalElements : [];
 
     return `
-      <div style="margin-top: 10px; padding-top: 10px; border-top: 0.5px solid rgba(0, 0, 0, 0.08); display: flex; flex-direction: column; gap: 12px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-          <strong style="font-size: 13px; color: var(--text-main, #1d1d1f);">🌿 Clause Breakdown (${clauses.length} clause${clauses.length === 1 ? '' : 's'})</strong>
+      <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 12px;">
+        <!-- Header -->
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span class="lf-section-tag" style="font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #2563eb;">
+            CLAUSE ARCHITECTURE (${clauses.length} CLAUSE${clauses.length === 1 ? '' : 'S'})
+          </span>
         </div>
 
+        <!-- 1. Visual Clause Relationship & Hierarchy Map -->
+        ${(clauseRel || (structureMap && structureMap.nodes && structureMap.nodes.length > 0)) ? `
+          <div style="padding: 12px; border-radius: 10px; background: rgba(0, 0, 0, 0.02); border: 1px solid rgba(0, 0, 0, 0.08);">
+            <div style="font-size: 11px; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;">
+              Clause Relationship Map
+            </div>
+            ${clauseRel?.formula ? `
+              <div style="font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; color: #0f172a; padding: 4px 8px; background: rgba(0,0,0,0.03); border-radius: 4px; margin-bottom: 6px;">
+                ${escapeHtml(clauseRel.formula)}
+              </div>
+            ` : ''}
+            ${clauseRel?.explanation ? `
+              <div style="font-size: 12px; color: var(--text-main, #1e293b); line-height: 1.45; margin-bottom: 4px;">
+                ${escapeHtml(clauseRel.explanation)}
+              </div>
+            ` : ''}
+            ${clauseRel?.explanationBengali && this.targetLanguage !== 'en' ? `
+              <div style="font-size: 12px; color: #2563eb; font-weight: 500; margin-top: 2px;">
+                ${escapeHtml(clauseRel.explanationBengali)}
+              </div>
+            ` : ''}
+
+            <!-- Node Hierarchy Map if present -->
+            ${(structureMap?.nodes && structureMap.nodes.length > 0) ? `
+              <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+                ${structureMap.nodes.map(node => `
+                  <div style="display: flex; align-items: flex-start; gap: 8px; padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,0.7); border: 1px solid rgba(0,0,0,0.06); font-size: 11.5px;">
+                    <span style="font-weight: 700; text-transform: uppercase; font-size: 10px; padding: 1px 5px; border-radius: 3px; background: rgba(37,99,235,0.08); color: #2563eb; flex-shrink: 0;">
+                      ${escapeHtml(node.relationType || 'clause')}
+                    </span>
+                    <div>
+                      <span style="font-weight: 600; color: #0f172a;">“${escapeHtml(node.clauseOrElement)}”</span>
+                      ${node.connectsTo ? `<span style="color: #64748b;"> ➔ connects to ${escapeHtml(node.connectsTo)}</span>` : ''}
+                      ${node.explanation ? `<div style="color: #475569; margin-top: 2px;">${escapeHtml(node.explanation)}</div>` : ''}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+          </div>
+        ` : ''}
+
+        <!-- 2. Detailed Clause Cards -->
         ${clauses.map((c, idx) => {
           const isMain = c.type === 'main';
           const clauseNum = idx + 1;
           const badgeLabel = isMain ? 'INDEPENDENT' : 'DEPENDENT';
-          const badgeBg = isMain ? 'rgba(0, 113, 227, 0.1)' : 'rgba(147, 51, 234, 0.1)';
-          const badgeColor = isMain ? '#0071e3' : '#9333ea';
-          const title = isMain ? `Clause ${clauseNum} — Independent / Main Clause` : `Clause ${clauseNum} — ${c.category || c.role || 'Dependent Clause'}`;
+          const badgeBg = isMain ? 'rgba(37, 99, 235, 0.08)' : 'rgba(100, 116, 139, 0.08)';
+          const badgeColor = isMain ? '#2563eb' : '#475569';
+          const badgeBorder = isMain ? 'rgba(37, 99, 235, 0.2)' : 'rgba(100, 116, 139, 0.2)';
+          const title = isMain ? `Clause ${clauseNum} — Main / Independent Clause` : `Clause ${clauseNum} — ${c.category || c.role || 'Dependent Clause'}`;
 
           return `
-            <div class="lf-clause-card" style="padding: 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.02); border: 1px solid rgba(0, 0, 0, 0.08);">
-              <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
+            <div class="lf-clause-card" style="padding: 12px; border-radius: 10px; background: rgba(0, 0, 0, 0.02); border: 1px solid rgba(0, 0, 0, 0.08);">
+              <!-- Top Row: Badge, Title, Standalone -->
+              <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="lf-pos" style="font-size: 10px; padding: 2px 7px; background: ${badgeBg}; color: ${badgeColor}; border-radius: 4px; font-weight: 700;">
+                  <span class="lf-clause-badge" style="font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700; letter-spacing: 0.03em; background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder};">
                     ${escapeHtml(badgeLabel)}
                   </span>
-                  <strong style="font-size: 12.5px; color: var(--text-main, #1d1d1f);">${escapeHtml(title)}</strong>
+                  <strong style="font-size: 12.5px; color: var(--text-main, #0f172a);">${escapeHtml(title)}</strong>
                 </div>
-                ${c.standalone ? `
-                  <span style="font-size: 10.5px; color: #86868b; background: rgba(0,0,0,0.04); padding: 1px 6px; border-radius: 4px;">
+                ${c.standalone !== undefined ? `
+                  <span style="font-size: 10.5px; color: #64748b; background: rgba(0,0,0,0.04); padding: 1px 6px; border-radius: 4px;">
                     Standalone: ${escapeHtml(String(c.standalone))}
                   </span>
                 ` : ''}
               </div>
 
-              <div style="font-size: 13px; font-style: italic; color: #1d1d1f; margin-bottom: 8px; padding: 6px 10px; background: rgba(0,0,0,0.03); border-radius: 6px; line-height: 1.45;">
+              <!-- Clause Exact Text -->
+              <div style="font-size: 13px; font-style: italic; color: #0f172a; margin-bottom: 8px; padding: 8px 10px; background: rgba(0,0,0,0.03); border-radius: 6px; line-height: 1.45;">
                 “${escapeHtml(c.text)}”
               </div>
 
-              <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px;">
-                <div><strong style="color: ${badgeColor};">Clause Type:</strong> ${isMain ? 'Independent Clause' : 'Dependent Clause'}</div>
-                ${(!isMain && c.category) ? `<div><strong style="color: ${badgeColor};">Category:</strong> ${escapeHtml(c.category)}</div>` : ''}
-                ${(!isMain && c.subordinator) ? `<div><strong style="color: ${badgeColor};">Subordinator:</strong> “${escapeHtml(c.subordinator)}”</div>` : ''}
-                ${c.subject ? `<div><strong style="color: #0071e3;">Subject:</strong> “${escapeHtml(c.subject)}”</div>` : ''}
-                ${(c.verbPhrase || c.verb) ? `<div><strong style="color: #34c759;">Verb Phrase:</strong> “${escapeHtml(c.verbPhrase || c.verb || '')}”</div>` : ''}
-                ${(c.coordinatedVerbs && c.coordinatedVerbs.length > 0) ? `
-                  <div><strong style="color: #34c759;">Coordinated verbs:</strong> ${c.coordinatedVerbs.map(v => `“${escapeHtml(v)}”`).join(' and ')}</div>
+              <!-- Clause Explanation & Target Translation -->
+              ${c.typeExplanation ? `
+                <div style="font-size: 12px; color: var(--text-muted, #475569); line-height: 1.4; margin-bottom: 6px;">
+                  <strong>Classification:</strong> ${escapeHtml(c.typeExplanation)}
+                </div>
+              ` : ''}
+              ${(c.explanationBengali && this.targetLanguage !== 'en') ? `
+                <div style="font-size: 12.5px; color: #2563eb; font-weight: 500; line-height: 1.4; margin-bottom: 8px; padding-left: 8px; border-left: 2px solid #2563eb;">
+                  ${escapeHtml(c.explanationBengali)}
+                </div>
+              ` : ''}
+
+              <!-- Syntactic Breakdown within Clause -->
+              <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; border-top: 1px solid rgba(0,0,0,0.06); padding-top: 8px;">
+                ${c.clausePattern ? `
+                  <div style="margin-bottom: 2px;">
+                    <strong style="color: #64748b; font-size: 11px; text-transform: uppercase;">Pattern:</strong>
+                    <span style="font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 600; color: #0f172a; margin-left: 4px;">${escapeHtml(c.clausePattern)}</span>
+                  </div>
+                ` : ''}
+                ${(!isMain && c.subordinator) ? `
+                  <div><strong style="color: #2563eb;">Subordinator:</strong> “${escapeHtml(c.subordinator)}”</div>
+                ` : ''}
+                ${c.subject ? `
+                  <div>
+                    <strong style="color: #2563eb;">Subject:</strong> “${escapeHtml(c.subject)}”
+                    ${c.subjectExplanation ? `<span style="color: #64748b; font-size: 11.5px;"> — ${escapeHtml(c.subjectExplanation)}</span>` : ''}
+                  </div>
+                ` : ''}
+                ${(c.verbPhrase || c.verb) ? `
+                  <div>
+                    <strong style="color: #2563eb;">Verb Phrase:</strong> “${escapeHtml(c.verbPhrase || c.verb || '')}”
+                    ${c.tenseAspect ? `<span style="font-size: 11px; font-weight: 600; color: #64748b; background: rgba(0,0,0,0.04); padding: 1px 4px; border-radius: 3px; margin-left: 4px;">${escapeHtml(c.tenseAspect)}</span>` : ''}
+                    ${c.verbExplanation ? `<span style="color: #64748b; font-size: 11.5px;"> — ${escapeHtml(c.verbExplanation)}</span>` : ''}
+                  </div>
+                ` : ''}
+                ${c.directObject ? `
+                  <div>
+                    <strong style="color: #2563eb;">Direct Object:</strong> “${escapeHtml(c.directObject)}”
+                    ${c.directObjectExplanation ? `<span style="color: #64748b; font-size: 11.5px;"> — ${escapeHtml(c.directObjectExplanation)}</span>` : ''}
+                  </div>
+                ` : ''}
+                ${c.indirectObject ? `
+                  <div><strong style="color: #2563eb;">Indirect Object:</strong> “${escapeHtml(c.indirectObject)}”</div>
+                ` : ''}
+                ${c.complement ? `
+                  <div><strong style="color: #2563eb;">Complement:</strong> “${escapeHtml(c.complement)}”</div>
                 ` : ''}
                 ${(c.adverbials && c.adverbials.length > 0) ? `
-                  <div><strong style="color: #0284c7;">Adverbial phrase:</strong> ${c.adverbials.map(a => `“${escapeHtml(a.text)}”`).join(', ')}</div>
+                  <div>
+                    <strong style="color: #0f766e;">Adverbials:</strong>
+                    ${c.adverbials.map(a => `“${escapeHtml(a.text)}”${a.type ? ` (${escapeHtml(a.type)})` : ''}`).join(', ')}
+                  </div>
                 ` : ''}
-                ${c.functionDescription ? `
-                  <div><strong style="color: #86868b;">Function:</strong> ${escapeHtml(c.functionDescription)}</div>
+                ${c.questionAnswered ? `
+                  <div style="font-size: 11.5px; color: #475569; margin-top: 2px;">
+                    <strong>Answers question:</strong> ${escapeHtml(c.questionAnswered)}
+                  </div>
+                ` : ''}
+                ${c.dependsOn ? `
+                  <div style="font-size: 11.5px; color: #475569;">
+                    <strong>Depends on:</strong> ${escapeHtml(c.dependsOn)}
+                  </div>
+                ` : ''}
+                ${c.example ? `
+                  <div style="font-size: 11.5px; color: #2563eb; background: rgba(37,99,235,0.03); padding: 4px 8px; border-radius: 4px; margin-top: 4px;">
+                    <strong>Parallel example:</strong> ${escapeHtml(c.example)}
+                  </div>
                 ` : ''}
               </div>
             </div>
           `;
         }).join('')}
 
-        <!-- Clause Relationship -->
-        ${clauseRel ? `
-          <div style="padding: 12px; border-radius: 8px; background: rgba(147, 51, 234, 0.05); border: 1px solid rgba(147, 51, 234, 0.2);">
-            <div style="font-size: 11px; font-weight: 700; color: #9333ea; text-transform: uppercase; margin-bottom: 4px;">
-              🔗 Clause Relationship:
+        <!-- 3. Complex Phrase Constituents (if present) -->
+        ${phraseConstituents.length > 0 ? `
+          <div style="padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.08);">
+            <div style="font-size: 11px; font-weight: 700; color: #0f172a; text-transform: uppercase; margin-bottom: 8px;">
+              Internal Phrase Constituents
             </div>
-            <div style="font-size: 13px; font-family: monospace; font-weight: 700; color: #7e22ce; margin-bottom: 6px;">
-              ${escapeHtml(clauseRel.formula)}
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              ${phraseConstituents.map(pc => `
+                <div style="font-size: 12px; padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,0.8); border: 1px solid rgba(0,0,0,0.06);">
+                  <div style="font-weight: 700; color: #2563eb;">“${escapeHtml(pc.phrase)}” <span style="font-weight: 400; color: #64748b; font-size: 11px;">(${escapeHtml(pc.phraseTypeLabel)})</span></div>
+                  ${pc.headWord ? `<div style="font-size: 11.5px; color: #334155; margin-top: 2px;">Head word: <strong>${escapeHtml(pc.headWord)}</strong> | Role: ${escapeHtml(pc.roleInClause || 'Constituent')}</div>` : ''}
+                  ${pc.explanation ? `<div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">${escapeHtml(pc.explanation)}</div>` : ''}
+                </div>
+              `).join('')}
             </div>
-            <div style="font-size: 12px; color: var(--text-main, #1d1d1f); line-height: 1.45;">
-              ${escapeHtml(clauseRel.explanation)}
+          </div>
+        ` : ''}
+
+        <!-- 4. Conversational Elements (if present) -->
+        ${conversational.length > 0 ? `
+          <div style="padding: 12px; border-radius: 10px; background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.08);">
+            <div style="font-size: 11px; font-weight: 700; color: #0f172a; text-transform: uppercase; margin-bottom: 6px;">
+              Conversational Repairs &amp; Speech Markers
             </div>
-            ${clauseRel.explanationBengali && (this.targetLanguage !== 'en' || (clauseRel.explanationBengali !== clauseRel.explanation && !/[\u0980-\u09FF]/.test(clauseRel.explanationBengali))) ? `
-              <div style="font-size: 11.5px; color: #9333ea; margin-top: 4px; font-weight: 500;">
-                ${escapeHtml(clauseRel.explanationBengali)}
+            ${conversational.map(ce => `
+              <div style="font-size: 12px; line-height: 1.45;">
+                <strong style="color: #2563eb;">“${escapeHtml(ce.text)}”</strong> — <span style="color: #64748b;">${escapeHtml(ce.typeLabel)}</span>
+                <div style="margin-top: 2px; color: #334155;">${escapeHtml(ce.explanation)}</div>
+                ${ce.explanationBengali && this.targetLanguage !== 'en' ? `
+                  <div style="color: #2563eb; font-size: 11.5px; margin-top: 2px;">${escapeHtml(ce.explanationBengali)}</div>
+                ` : ''}
               </div>
-            ` : ''}
+            `).join('')}
           </div>
         ` : ''}
       </div>
@@ -2291,33 +2827,33 @@ export class PopupView {
     const nativeLabel = langConfig?.targetNativeLabel || 'বাংলা';
 
     const wordChips = [
-      { emoji: '💡', label: "Explain like I'm 5", prompt: "Explain this word in super simple terms like I'm 5 years old" },
-      { emoji: '🔍', label: "Nuance vs Synonyms", prompt: "What is the subtle difference between this word and its common synonyms?" },
-      { emoji: '🗣️', label: "Native Daily Usage", prompt: "How do native English speakers naturally use this in everyday conversation?" },
-      { emoji: '✍️', label: "2 Real Examples", prompt: `Give me 2 practical, everyday example sentences with ${targetLabel} translation` },
+      { icon: 'lightbulb', label: "Explain like I'm 5", prompt: "Explain this word in super simple terms like I'm 5 years old" },
+      { icon: 'search', label: "Nuance vs Synonyms", prompt: "What is the subtle difference between this word and its common synonyms?" },
+      { icon: 'message', label: "Native Daily Usage", prompt: "How do native English speakers naturally use this in everyday conversation?" },
+      { icon: 'pen', label: "2 Real Examples", prompt: `Give me 2 practical, everyday example sentences with ${targetLabel} translation` },
       {
-        emoji: targetFlag,
+        icon: 'languages',
         label: langConfig?.targetLang === 'bn' ? "সহজ বাংলায় বিশদ" : `${nativeLabel} Detail`,
         prompt: langConfig?.targetLang === 'bn'
           ? "এই শব্দের সূক্ষ্ম অর্থ ও ব্যবহার সহজ বাংলায় বিস্তারিত বুঝিয়ে দাও"
           : `Explain the subtle nuance and usage of this word clearly in ${targetLabel} (${nativeLabel})`
       },
-      { emoji: '⚠️', label: "Common Pitfalls", prompt: "What are the most common mistakes learners make with this word?" }
+      { icon: 'alert', label: "Common Pitfalls", prompt: "What are the most common mistakes learners make with this word?" }
     ];
 
     const sentenceChips = [
-      { emoji: '💡', label: "Explain simply", prompt: "Break down the core message in super easy everyday English" },
-      { emoji: '🧩', label: "Grammar & Tone", prompt: "Explain the grammatical structure and rhetorical tone used here" },
-      { emoji: '🗣️', label: "Conversational Rewrite", prompt: "How would a native speaker rephrase this in casual speech or friendly email?" },
+      { icon: 'lightbulb', label: "Explain simply", prompt: "Break down the core message in super easy everyday English" },
+      { icon: 'puzzle', label: "Grammar & Tone", prompt: "Explain the grammatical structure and rhetorical tone used here" },
+      { icon: 'message', label: "Conversational Rewrite", prompt: "How would a native speaker rephrase this in casual speech or friendly email?" },
       {
-        emoji: targetFlag,
+        icon: 'languages',
         label: langConfig?.targetLang === 'bn' ? "সহজ বাংলা ভাবার্থ" : `${nativeLabel} Meaning`,
         prompt: langConfig?.targetLang === 'bn'
           ? "এই বক্তব্যটির অন্তর্নিহিত ভাব ও তাৎপর্য সহজ বাংলায় বুঝিয়ে দাও"
           : `Explain the underlying nuance and message of this statement clearly in ${targetLabel} (${nativeLabel})`
       },
-      { emoji: '✍️', label: "Practice Variation", prompt: "Give me a similar sentence with this same structure to practice with" },
-      { emoji: '❓', label: "Why this phrasing?", prompt: "Why did the author use this specific phrasing instead of simpler words?" }
+      { icon: 'pen', label: "Practice Variation", prompt: "Give me a similar sentence with this same structure to practice with" },
+      { icon: 'help', label: "Why this phrasing?", prompt: "Why did the author use this specific phrasing instead of simpler words?" }
     ];
 
     const activeChips = isWord ? wordChips : sentenceChips;
@@ -2330,15 +2866,18 @@ export class PopupView {
         <!-- LexiFlow Coach Header -->
         <div class="lf-qa-header">
           <div class="lf-qa-brand">
-            <span class="lf-qa-avatar-icon">✨</span>
+            <span class="lf-qa-avatar-icon">${lfIcon('sparkles')}</span>
             <span class="lf-qa-title">LexiFlow AI Coach</span>
             ${displayFocus ? `<span class="lf-qa-focus-tag" title="${escapeHtml(focusText || '')}">Focus: "${escapeHtml(displayFocus)}"</span>` : ''}
           </div>
           <div class="lf-qa-controls">
             ${this.followUpList.length > 0 ? `
-              <button type="button" class="lf-qa-mini-btn lf-qa-clear-btn" title="Clear conversation history">🗑️ Clear</button>
+              <button type="button" class="lf-qa-mini-btn lf-qa-clear-btn" title="Clear conversation history">
+                ${lfIcon('trash')}
+                <span>Clear</span>
+              </button>
             ` : ''}
-            <button type="button" class="lf-btn-icon lf-qa-close-panel-btn" title="Close Ask AI panel" aria-label="Close Ask AI">✕</button>
+            <button type="button" class="lf-btn-icon lf-qa-close-panel-btn" title="Close Ask AI panel" aria-label="Close Ask AI">${lfIcon('close')}</button>
           </div>
         </div>
 
@@ -2346,8 +2885,8 @@ export class PopupView {
         <div class="lf-qa-chips-row">
           ${activeChips.map((c) => `
             <button type="button" class="lf-qa-chip" data-prompt="${escapeHtml(c.prompt)}" title="${escapeHtml(c.prompt)}">
-              <span>${c.emoji}</span>
-              <span>${escapeHtml(c.label)}</span>
+              <span class="lf-qa-chip-icon">${lfIcon(c.icon)}</span>
+              <span class="lf-qa-chip-label">${escapeHtml(c.label)}</span>
             </button>
           `).join('')}
         </div>
@@ -2384,7 +2923,7 @@ export class PopupView {
             aria-label="Send question"
           >
             <span>Ask</span>
-            <span>➤</span>
+            ${lfIcon('send')}
           </button>
         </div>
       </div>
@@ -2611,14 +3150,14 @@ export class PopupView {
           <!-- LexiFlow AI Response Bubble -->
           <div class="lf-chat-ai">
             <div class="lf-ai-header-pill">
-              <span class="lf-qa-avatar-icon" style="width: 14px; height: 14px; font-size: 8px;">✨</span>
+              <span class="lf-qa-avatar-icon lf-qa-avatar-small">${lfIcon('sparkles')}</span>
               <span>LexiFlow AI Tutor</span>
             </div>
 
             <!-- Key Takeaway Pill if present -->
             ${f.keyTakeaway ? `
               <div class="lf-qa-takeaway-box">
-                <span class="lf-qa-takeaway-label">💡 Key Takeaway:</span>
+                <span class="lf-qa-takeaway-label">${lfIcon('lightbulb')} Key Takeaway:</span>
                 <span>${escapeHtml(f.keyTakeaway)}</span>
               </div>
             ` : ''}
@@ -2631,7 +3170,10 @@ export class PopupView {
             <!-- Warm Target Language Insight Card -->
             ${f.bengaliSummary ? `
               <div class="lf-qa-bengali-card">
-                <div class="lf-qa-bengali-label">${getLanguageConfig(this.targetLanguage)?.flagEmoji || '🇧🇩'} ${escapeHtml(getLanguageConfig(this.targetLanguage)?.targetLang === 'bn' ? 'সহজ বাংলা সারসংক্ষেপ:' : `${getLanguageConfig(this.targetLanguage)?.targetNativeHeader || 'Summary'}:`)}</div>
+                <div class="lf-qa-bengali-label">
+                  ${lfIcon('languages')}
+                  <span>${escapeHtml(getLanguageConfig(this.targetLanguage)?.targetLang === 'bn' ? 'সহজ বাংলা সারসংক্ষেপ:' : `${getLanguageConfig(this.targetLanguage)?.targetNativeHeader || 'Summary'}:`)}</span>
+                </div>
                 <div class="lf-qa-bengali-text">${escapeHtml(f.bengaliSummary)}</div>
               </div>
             ` : ''}
@@ -2639,12 +3181,13 @@ export class PopupView {
             <!-- Practical Examples if present -->
             ${f.examples && f.examples.length > 0 ? `
               <div class="lf-qa-examples-box">
-                <div style="font-size: 10.5px; font-weight: 700; color: #a855f7; text-transform: uppercase; margin-bottom: 4px;">
-                  ✍️ Practical Usage:
+                <div class="lf-qa-examples-header">
+                  ${lfIcon('pen')}
+                  <span>Practical Usage:</span>
                 </div>
                 ${f.examples.map((ex) => `
                   <div class="lf-qa-example-item">
-                    <div>"${escapeHtml(ex.english)}"</div>
+                    <div class="lf-qa-example-english">"${escapeHtml(ex.english)}"</div>
                     ${ex.bengali ? `<div class="lf-qa-example-bengali">↳ ${escapeHtml(ex.bengali)}</div>` : ''}
                   </div>
                 `).join('')}
@@ -2659,7 +3202,8 @@ export class PopupView {
                 data-copy="${escapeHtml(f.answer + (f.bengaliSummary ? '\n\n' + f.bengaliSummary : ''))}"
                 title="Copy answer"
               >
-                📋 Copy
+                ${lfIcon('copy')}
+                <span>Copy</span>
               </button>
               <button
                 type="button"
@@ -2667,7 +3211,8 @@ export class PopupView {
                 data-speak="${escapeHtml(f.answer)}"
                 title="Listen to explanation"
               >
-                🔊 Listen
+                ${lfIcon('volume')}
+                <span>Listen</span>
               </button>
             </div>
 
@@ -2675,13 +3220,13 @@ export class PopupView {
             ${f.suggestedFollowUps && f.suggestedFollowUps.length > 0 ? `
               <div class="lf-qa-suggested-box">
                 <div class="lf-qa-suggested-title">
-                  <span>✨</span>
+                  ${lfIcon('compass')}
                   <span>Explore further with LexiFlow AI:</span>
                 </div>
                 <div class="lf-qa-suggested-chips">
                   ${f.suggestedFollowUps.map((sug) => `
                     <button type="button" class="lf-qa-suggested-chip" data-prompt="${escapeHtml(sug)}" title="${escapeHtml(sug)}">
-                      <span>💬</span>
+                      ${lfIcon('message')}
                       <span>${escapeHtml(sug)}</span>
                     </button>
                   `).join('')}
@@ -2880,16 +3425,16 @@ export class PopupView {
         </div>
         <div class="lf-actions-top">
           ${this.renderModeToggleHtml()}
-          <button class="lf-btn-icon lf-pin-btn ${this.isPinned ? 'active' : ''}" title="${this.isPinned ? 'Unpin popup' : 'Pin popup'}">📌</button>
-          <button class="lf-btn-icon lf-copy-btn" title="Copy text">📋</button>
-          <button class="lf-btn-icon lf-close-btn" title="Close">✕</button>
+          <button class="lf-btn-icon lf-pin-btn ${this.isPinned ? 'active' : ''}" title="${this.isPinned ? 'Unpin popup' : 'Pin popup'}">${lfIcon('pin')}</button>
+          <button class="lf-btn-icon lf-copy-btn" title="Copy text">${lfIcon('copy')}</button>
+          <button class="lf-btn-icon lf-close-btn" title="Close">${lfIcon('close')}</button>
         </div>
       </div>
       <div class="lf-content">
         ${isParagraph && para.mainIdea ? `
           <div style="margin-bottom: 8px; padding: 8px 10px; background: rgba(255,255,255,0.04); border-radius: 6px;">
             <div style="font-size: var(--lf-font-sublabel, 12px); text-transform: uppercase; color: #0a84ff; font-weight: 700; margin-bottom: 2px;">
-              💡 Main Idea:
+              Main Idea:
             </div>
             <div style="font-size: var(--lf-font-english, 15px); color: #f1f5f9; line-height: 1.45;">
               ${escapeHtml(para.mainIdea)}
@@ -2899,7 +3444,7 @@ export class PopupView {
 
         <div class="lf-bengali-box" style="margin-bottom: 8px; padding: 10px 12px; border-radius: 8px;">
           <div class="lf-bengali-box-header" style="font-size: var(--lf-font-sublabel, 12px); text-transform: uppercase; font-weight: 700; margin-bottom: 3px;">
-            ${getLanguageConfig(this.targetLanguage)?.targetLang === 'bn' ? '🇧🇩 সম্পূর্ণ বাংলা অর্থ (Full Bengali):' : `${getLanguageConfig(this.targetLanguage)?.flagEmoji || '🌐'} ${escapeHtml(getLanguageConfig(this.targetLanguage)?.targetNativeHeader || 'Translation')} (${escapeHtml(getLanguageConfig(this.targetLanguage)?.targetLabel || 'Target')}):`}
+            ${getLanguageConfig(this.targetLanguage)?.targetLang === 'bn' ? 'সম্পূর্ণ বাংলা অর্থ (Full Bengali):' : `${getLanguageConfig(this.targetLanguage)?.flagEmoji || '🌐'} ${escapeHtml(getLanguageConfig(this.targetLanguage)?.targetNativeHeader || 'Translation')} (${escapeHtml(getLanguageConfig(this.targetLanguage)?.targetLabel || 'Target')}):`}
           </div>
           <div class="lf-easy-bengali-text" style="font-size: var(--lf-font-bengali, 18.5px); font-weight: 600; line-height: 1.45;">
             ${escapeHtml(a.bengaliTranslation)}
@@ -2908,7 +3453,7 @@ export class PopupView {
       </div>
       <div class="lf-footer">
         <div></div>
-        <button class="lf-btn-action lf-save-btn ${this.isSaved ? 'saved' : ''}">${this.isSaved ? (this.readingMode === 'learn' ? '✓ Saved with Context' : '✓ Saved') : (this.readingMode === 'learn' ? '🧠 Save with Context' : '+ Save')}</button>
+        <button class="lf-btn-action lf-save-btn ${this.isSaved ? 'saved' : ''}">${this.isSaved ? (this.readingMode === 'learn' ? '✓ Saved with Context' : '✓ Saved') : (this.readingMode === 'learn' ? 'Save with Context' : '+ Save')}</button>
       </div>
     `;
 
@@ -2935,8 +3480,8 @@ export class PopupView {
       e.stopPropagation();
       navigator.clipboard.writeText(a.selectedText);
       const btn = this.element.querySelector('.lf-copy-btn') as HTMLElement;
-      if (btn) btn.textContent = '✓';
-      setTimeout(() => { if (btn) btn.textContent = '📋'; }, 1200);
+      if (btn) btn.innerHTML = lfIcon('check');
+      setTimeout(() => { if (btn) btn.innerHTML = lfIcon('copy'); }, 1200);
     });
     this.element.querySelector('.lf-save-btn')?.addEventListener('click', async (e) => {
       e.preventDefault();
@@ -3037,8 +3582,8 @@ export class PopupView {
       if (this.currentStageA) {
         navigator.clipboard.writeText(this.currentStageA.selectedText);
         const btn = el.querySelector('.lf-copy-btn') as HTMLElement;
-        if (btn) btn.textContent = '✓';
-        setTimeout(() => { if (btn) btn.textContent = '📋'; }, 1200);
+        if (btn) btn.innerHTML = lfIcon('check');
+        setTimeout(() => { if (btn) btn.innerHTML = lfIcon('copy'); }, 1200);
       }
     });
 
@@ -3232,8 +3777,8 @@ export class PopupView {
       e.stopPropagation();
       navigator.clipboard.writeText(s.selectedText);
       const btn = el.querySelector('.lf-copy-btn') as HTMLElement;
-      if (btn) btn.textContent = '✓';
-      setTimeout(() => { if (btn) btn.textContent = '📋'; }, 1200);
+      if (btn) btn.innerHTML = lfIcon('check');
+      setTimeout(() => { if (btn) btn.innerHTML = lfIcon('copy'); }, 1200);
     });
 
     el.querySelectorAll('.lf-voice-btn, .lf-machine-voice-btn').forEach((btn) => {
@@ -3450,8 +3995,8 @@ export class PopupView {
       e.stopPropagation();
       navigator.clipboard.writeText(p.selectedText);
       const btn = el.querySelector('.lf-copy-btn') as HTMLElement;
-      if (btn) btn.textContent = '✓';
-      setTimeout(() => { if (btn) btn.textContent = '📋'; }, 1200);
+      if (btn) btn.innerHTML = lfIcon('check');
+      setTimeout(() => { if (btn) btn.innerHTML = lfIcon('copy'); }, 1200);
     });
 
     el.querySelectorAll('.lf-voice-btn, .lf-machine-voice-btn').forEach((btn) => {
@@ -3459,6 +4004,59 @@ export class PopupView {
         e.preventDefault();
         e.stopPropagation();
         this.speakText(p.selectedText);
+      });
+    });
+
+    el.querySelectorAll('.lf-voice-mini-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const textToSpeak = btn.getAttribute('data-speak') || '';
+        if (textToSpeak) {
+          this.speakText(textToSpeak);
+        }
+      });
+    });
+
+    el.querySelectorAll('.lf-sentence-switcher .lf-tab').forEach((tab) => {
+      tab.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const sentIdx = Number(tab.getAttribute('data-sent-idx') || '0');
+        this.activeParaSentenceIndex = sentIdx;
+        this.render({ preserveScroll: true });
+      });
+    });
+
+    el.querySelector('.lf-stepper-prev')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (this.activeParaSentenceIndex > 0) {
+        this.activeParaSentenceIndex--;
+        this.render({ preserveScroll: true });
+      }
+    });
+
+    el.querySelector('.lf-stepper-next')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const hierarchical = this.ensureHierarchicalParagraph(p);
+      const currentPara = hierarchical.paragraphs[this.activeParaIndex] || hierarchical.paragraphs[0];
+      const maxIdx = (currentPara?.sentences.length || 1) - 1;
+      if (this.activeParaSentenceIndex < maxIdx) {
+        this.activeParaSentenceIndex++;
+        this.render({ preserveScroll: true });
+      }
+    });
+
+    el.querySelectorAll('.lf-para-tabs .lf-tab').forEach((tab) => {
+      tab.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const paraIdx = Number(tab.getAttribute('data-para-idx') || '0');
+        this.activeParaIndex = paraIdx;
+        this.activeParaSentenceIndex = 0;
+        this.render({ preserveScroll: true });
       });
     });
 
@@ -3603,4 +4201,58 @@ function escapeHtml(str?: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+export function lfIcon(name: string, extraClass: string = ''): string {
+  const cls = extraClass ? `lf-svg-icon ${extraClass}` : 'lf-svg-icon';
+  switch (name) {
+    case 'volume':
+      return `<svg class="${cls}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`;
+    case 'pin':
+      return `<svg class="${cls}" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg>`;
+    case 'copy':
+      return `<svg class="${cls}" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>`;
+    case 'check':
+      return `<svg class="${cls}" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    case 'close':
+      return `<svg class="${cls}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    case 'chevronLeft':
+      return `<svg class="${cls}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>`;
+    case 'chevronRight':
+      return `<svg class="${cls}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+    case 'sparkles':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path></svg>`;
+    case 'book':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"></path><path d="M6 6h10"></path><path d="M6 10h10"></path></svg>`;
+    case 'flag':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>`;
+    case 'message':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
+    case 'bolt':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
+    case 'brain':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-5.04Z"></path><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-5.04Z"></path></svg>`;
+    case 'puzzle':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.439 7.85c0-1.574-1.277-2.85-2.85-2.85a2.85 2.85 0 0 0-2.85 2.85v.15H10v-.15A2.85 2.85 0 0 0 7.15 5C5.576 5 4.3 6.276 4.3 7.85v2.3h.15a2.85 2.85 0 0 1 0 5.7H4.3v2.3C4.3 19.724 5.576 21 7.15 21a2.85 2.85 0 0 0 2.85-2.85v-.15h3.739v.15a2.85 2.85 0 0 0 2.85 2.85c1.573 0 2.85-1.276 2.85-2.85v-2.3h-.15a2.85 2.85 0 0 1 0-5.7h.15v-2.3Z"></path></svg>`;
+    case 'lightbulb':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path><path d="M9 18h6"></path><path d="M10 22h4"></path></svg>`;
+    case 'search':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`;
+    case 'send':
+      return `<svg class="${cls}" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
+    case 'trash':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>`;
+    case 'languages':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"></path><path d="m4 14 6-6 2-3"></path><path d="M2 5h12"></path><path d="M7 2h1"></path><path d="m22 22-5-10-5 10"></path><path d="M14 18h6"></path></svg>`;
+    case 'pen':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>`;
+    case 'help':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+    case 'alert':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+    case 'compass':
+      return `<svg class="${cls}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>`;
+    default:
+      return '';
+  }
 }

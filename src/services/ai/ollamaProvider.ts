@@ -266,15 +266,40 @@ Return a valid raw JSON object strictly adhering to this schema:
   "toneAndRegister": "Standard English"
 }`;
     } else {
-      prompt = `Analyze this paragraph for an ESL ${lang.targetLabel} learner: "${text}".
+      prompt = `Analyze this text for an ESL ${lang.targetLabel} learner with smart hierarchical segmentation:
+1. Divide text into paragraphs.
+2. For each paragraph, extract each sentence.
+3. For each sentence, provide the complete natural ${lang.targetLabel} translation and phrase-by-phrase breakdown.
 In "bengaliTranslation" and "easyBengali", provide ${lang.promptTargetInstruction}.
 Return a valid raw JSON object strictly adhering to this schema:
 {
   "selectedText": "${text}",
   "selectionType": "paragraph",
-  "mainIdea": "Main thesis of the paragraph",
+  "mainIdea": "Main thesis of the text",
   "conciseSummary": "Concise summary",
   "bengaliTranslation": "Complete natural ${lang.targetLabel} translation",
+  "paragraphs": [
+    {
+      "paragraphIndex": 1,
+      "paragraphText": "Exact paragraph text",
+      "mainIdea": "Paragraph main idea",
+      "bengaliTranslation": "Paragraph translation in ${lang.targetLabel}",
+      "sentences": [
+        {
+          "sentenceIndex": 1,
+          "sentenceText": "Exact sentence text",
+          "bengaliTranslation": "Sentence translation in ${lang.targetLabel}",
+          "phraseBreakdown": [
+            {
+              "phrase": "Exact sequential phrase from sentence",
+              "easyEnglish": "Simple English explanation",
+              "easyBengali": "Natural ${lang.targetLabel} explanation"
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "phraseBreakdown": [
     {
       "phrase": "Exact phrase",

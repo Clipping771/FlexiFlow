@@ -24,6 +24,25 @@ export interface LanguagePairConfig {
   isCustom?: boolean;          // Whether language was added by user
 }
 
+export interface SourceLanguageConfig {
+  code: string;
+  name: string;
+  nativeName: string;
+  flagEmoji: string;
+}
+
+export const SUPPORTED_SOURCE_LANGUAGES: SourceLanguageConfig[] = [
+  { code: 'en', name: 'English', nativeName: 'English', flagEmoji: '🇬🇧' },
+  { code: 'es', name: 'Spanish', nativeName: 'Español', flagEmoji: '🇪🇸' },
+  { code: 'fr', name: 'French', nativeName: 'Français', flagEmoji: '🇫🇷' },
+  { code: 'de', name: 'German', nativeName: 'Deutsch', flagEmoji: '🇩🇪' },
+  { code: 'zh', name: 'Chinese', nativeName: '中文', flagEmoji: '🇨🇳' },
+  { code: 'ja', name: 'Japanese', nativeName: '日本語', flagEmoji: '🇯🇵' },
+  { code: 'ru', name: 'Russian', nativeName: 'Русский', flagEmoji: '🇷🇺' },
+  { code: 'ar', name: 'Arabic', nativeName: 'العربية', flagEmoji: '🇸🇦' },
+  { code: 'auto', name: 'Auto Detect', nativeName: 'Auto Detect', flagEmoji: '✨' }
+];
+
 export const SUPPORTED_PAIRS: Record<string, LanguagePairConfig> = {
   'en-en': {
     sourceLang: 'en',

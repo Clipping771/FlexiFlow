@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isEditableElement, detectSelectionType, getSelectionData } from '../selection';
+import { isEditableElement, detectSelectionType, getSelectionData, splitIntoParagraphs, splitIntoSentences } from '../selection';
 
 describe('Selection & Editable Element Detection', () => {
   it('detects input fields and textareas as editable', () => {
@@ -184,9 +184,74 @@ describe('Selection & Editable Element Detection', () => {
     it('accurately detects multi-sentence paragraphs and multi-line blocks', () => {
       // Multiple sentences with terminal punctuation
       expect(detectSelectionType('First sentence here. Second sentence starts right here.')).toBe('paragraph');
+      // Multiple sentences WITHOUT terminal punctuation (e.g. user dragged mouse stopping before period)
+      expect(detectSelectionType('First sentence here. Second sentence starts right here')).toBe('paragraph');
+      // Multiple sentences with abbreviations and numbers
+      expect(detectSelectionType('Dr. Smith visited the U.S. last year. Revenue increased by 3.5% in Q4.')).toBe('paragraph');
       // Multi-line block
       expect(detectSelectionType('Paragraph line 1\nParagraph line 2')).toBe('paragraph');
     });
   });
+
+  describe('Smart Hierarchical Text Segmentation', () => {
+    it('splitIntoParagraphs correctly separates text blocks', () => {
+      const single = 'This is a single paragraph without breaks.';
+      expect(splitIntoParagraphs(single)).toEqual(['This is a single paragraph without breaks.']);
+
+      const multiDoubleNewline = 'First paragraph block.\n\nSecond paragraph block.\n\nThird paragraph block.';
+      expect(splitIntoParagraphs(multiDoubleNewline)).toEqual([
+        'First paragraph block.',
+        'Second paragraph block.',
+        'Third paragraph block.'
+      ]);
+
+      const multiWindowsNewline = 'Para 1 line.\r\n\r\nPara 2 line.';
+      expect(splitIntoParagraphs(multiWindowsNewline)).toEqual([
+        'Para 1 line.',
+        'Para 2 line.'
+      ]);
+    });
+
+    it('splitIntoSentences splits paragraphs into distinct sentences without false splits on abbreviations', () => {
+      const simple = 'First sentence here. Second sentence is here! Is this the third sentence?';
+      const simpleSplit = splitIntoSentences(simple);
+      expect(simpleSplit).toEqual([
+        'First sentence here.',
+        'Second sentence is here!',
+        'Is this the third sentence?'
+      ]);
+
+      // Abbreviations: Dr., U.S., e.g., numbers: 3.5%
+      const complex = 'Dr. Smith visited the U.S. last year. Revenue increased by 3.5% in Q4.';
+      const complexSplit = splitIntoSentences(complex);
+      expect(complexSplit.length).toBe(2);
+      expect(complexSplit[0]).toBe('Dr. Smith visited the U.S. last year.');
+      expect(complexSplit[1]).toBe('Revenue increased by 3.5% in Q4.');
+    });
+  });
+
+  describe('getSelectionData with Paragraphs', () => {
+    it('returns selectionType paragraph and preserves sentence structure when user selects a paragraph', () => {
+      const p = document.createElement('p');
+      p.textContent = 'Artificial intelligence is changing the world. Many new tools are emerging rapidly.';
+      document.body.appendChild(p);
+
+      const range = document.createRange();
+      range.selectNodeContents(p);
+
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+
+      const data = getSelectionData();
+      expect(data).not.toBeNull();
+      expect(data?.selectionType).toBe('paragraph');
+      expect(data?.cleanText).toContain('Artificial intelligence');
+      expect(data?.cleanText.endsWith('.')).toBe(true);
+
+      document.body.removeChild(p);
+    });
+  });
 });
+
 

@@ -550,11 +550,55 @@ export const HighlightExtractionResultSchema = z.preprocess((val: any) => {
   articleSummary: z.string().optional()
 }));
 
+export const ParagraphSentenceItemSchema = z.preprocess((val: any) => {
+  if (!val || typeof val !== 'object') return val;
+  const copy = { ...val };
+  copy.sentenceIndex = typeof copy.sentenceIndex === 'number' ? copy.sentenceIndex : 1;
+  copy.sentenceText = copy.sentenceText || copy.sentence || copy.text || copy.originalText || '';
+  copy.bengaliTranslation = copy.bengaliTranslation || copy.translation || copy.easyBengali || copy.meaning || '';
+  copy.phraseBreakdown = Array.isArray(copy.phraseBreakdown) ? copy.phraseBreakdown : (Array.isArray(copy.phrases) ? copy.phrases : []);
+  copy.grammaticalStructure = copy.grammaticalStructure || copy.grammar || '';
+  return copy;
+}, z.object({
+  sentenceIndex: z.number().default(1),
+  sentenceText: z.string().default(''),
+  bengaliTranslation: z.string().default(''),
+  phraseBreakdown: z.array(PhraseExplanationSchema).default([]),
+  grammaticalStructure: z.string().optional(),
+  toneOrRole: z.string().optional()
+}));
+
+export const ParagraphBlockItemSchema = z.preprocess((val: any) => {
+  if (!val || typeof val !== 'object') return val;
+  const copy = { ...val };
+  copy.paragraphIndex = typeof copy.paragraphIndex === 'number' ? copy.paragraphIndex : 1;
+  copy.paragraphText = copy.paragraphText || copy.paragraph || copy.text || '';
+  copy.mainIdea = copy.mainIdea || copy.summary || '';
+  copy.bengaliTranslation = copy.bengaliTranslation || copy.translation || '';
+  copy.sentences = Array.isArray(copy.sentences) ? copy.sentences : [];
+  return copy;
+}, z.object({
+  paragraphIndex: z.number().default(1),
+  paragraphText: z.string().default(''),
+  mainIdea: z.string().optional(),
+  summary: z.string().optional(),
+  bengaliTranslation: z.string().optional(),
+  sentences: z.array(ParagraphSentenceItemSchema).default([])
+}));
+
 export const ParagraphAnalysisSchema = z.preprocess((val: any) => {
   if (!val || typeof val !== 'object') return val;
   const copy = { ...val };
   copy.selectedText = copy.selectedText || copy.paragraph || copy.text || '';
   copy.selectionType = 'paragraph';
+  if (Array.isArray(copy.paragraphs)) {
+    if (!Array.isArray(copy.sentences) || copy.sentences.length === 0) {
+      copy.sentences = copy.paragraphs.flatMap((p: any) => Array.isArray(p.sentences) ? p.sentences : []);
+    }
+  }
+  if (Array.isArray(copy.sentences) && (!Array.isArray(copy.phraseBreakdown) || copy.phraseBreakdown.length === 0)) {
+    copy.phraseBreakdown = copy.sentences.flatMap((s: any) => Array.isArray(s.phraseBreakdown) ? s.phraseBreakdown : []);
+  }
   return copy;
 }, z.object({
   selectedText: z.string().default(''),
@@ -570,7 +614,9 @@ export const ParagraphAnalysisSchema = z.preprocess((val: any) => {
     bengali: z.string().optional().default('')
   })).default([]),
   argumentStructure: z.string().optional().default(''),
-  toneAndRegister: z.string().optional().default('Standard English')
+  toneAndRegister: z.string().optional().default('Standard English'),
+  paragraphs: z.array(ParagraphBlockItemSchema).optional(),
+  sentences: z.array(ParagraphSentenceItemSchema).optional()
 }));
 
 export const WritingAssistSchema = z.preprocess((val: any) => {

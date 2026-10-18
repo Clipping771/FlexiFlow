@@ -13,7 +13,7 @@ import { SettingsView } from './components/SettingsView';
 import { DEFAULT_SETTINGS } from '../services/storage/settings';
 import { WeaknessDetector } from '../services/weakness/detector';
 import { FSRSEngine } from '../services/fsrs/engine';
-import { Menu, X, BookOpen, RotateCw, Newspaper, Settings as SettingsIcon } from 'lucide-react';
+import { Menu, X, BookOpen, RotateCw, Newspaper, Settings as SettingsIcon, PanelRight } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './dashboard.css';
 
@@ -580,6 +580,61 @@ export const App: React.FC = () => {
       {/* Main content is shown on desktop always, and on narrow screens when sidebar drawer is closed */}
       {(!isNarrowScreen || !isSidebarOpen) && (
         <main className="main-content">
+          {/* Desktop Top Bar: Navigation Context, Status KPIs, and Quick Actions */}
+          {!isNarrowScreen && (
+            <header className="dashboard-top-bar">
+              <div className="breadcrumb-box">
+                <span className="breadcrumb-parent">LexiFlow</span>
+                <span className="breadcrumb-separator">/</span>
+                <span className="breadcrumb-active">{TAB_TITLES[activeTab]}</span>
+              </div>
+
+              <div className="top-bar-stats">
+                <div className="top-kpi-pill" title="Total captured vocabulary">
+                  <span className="top-kpi-dot"></span>
+                  <span className="top-kpi-label">Vocabulary:</span>
+                  <span className="top-kpi-val">{items.length}</span>
+                </div>
+
+                <div
+                  className={`top-kpi-pill ${dueItems.length > 0 ? 'kpi-warning' : ''}`}
+                  title="Items scheduled for active recall today"
+                  onClick={() => setActiveTab('review')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <span className="top-kpi-label">Due:</span>
+                  <span className="top-kpi-val">{dueItems.length}</span>
+                </div>
+
+                <div className="top-kpi-pill" title="Active AI provider">
+                  <span className="top-kpi-label">AI:</span>
+                  <span className="top-kpi-val" style={{ textTransform: 'capitalize' }}>
+                    {settings.aiProvider === 'gemini' ? 'Gemini 2.0 Flash' : settings.aiProvider}
+                  </span>
+                </div>
+
+                <div className="top-bar-actions">
+                  <button
+                    type="button"
+                    className="top-action-btn"
+                    onClick={handleToggleTheme}
+                    title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+                  >
+                    {theme === 'dark' ? '☀️' : '🌙'}
+                  </button>
+                  <button
+                    type="button"
+                    className="top-action-btn"
+                    onClick={handleOpenSidePanel}
+                    title="Open Native Side Panel"
+                  >
+                    <PanelRight size={14} />
+                  </button>
+                </div>
+              </div>
+            </header>
+          )}
+
           {isNarrowScreen && (
             <header className="narrow-top-bar">
               <button

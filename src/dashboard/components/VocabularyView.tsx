@@ -2,6 +2,24 @@ import React, { useState } from 'react';
 import { VocabularyItem } from '../../types';
 import { FSRSEngine } from '../../services/fsrs/engine';
 import { WeaknessDetector } from '../../services/weakness/detector';
+import {
+  Layers,
+  Star,
+  RotateCw,
+  AlertTriangle,
+  Search,
+  Volume2,
+  Trash2,
+  Maximize2,
+  Upload,
+  Download,
+  Sparkles,
+  Plus,
+  FileText,
+  Check,
+  X,
+  BookOpen
+} from 'lucide-react';
 import { playPronunciation } from '../../services/audio/voiceService';
 
 interface VocabularyViewProps {
@@ -132,7 +150,7 @@ export const VocabularyView: React.FC<VocabularyViewProps> = ({
   };
 
   return (
-    <div>
+    <div className="view-container">
       <div className="view-header">
         <div>
           <h2 className="view-title">Advanced Vocabulary Library</h2>
@@ -142,98 +160,118 @@ export const VocabularyView: React.FC<VocabularyViewProps> = ({
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="btn-secondary" onClick={() => setImportModalOpen(true)}>
-            📥 Import JSON
+            <Upload size={14} />
+            <span>Import JSON</span>
           </button>
           <button className="btn-secondary" onClick={onExport}>
-            📤 Export Backup
+            <Download size={14} />
+            <span>Export Backup</span>
           </button>
         </div>
       </div>
 
-      {/* Filter Tabs Bar */}
-      <div style={{
-        display: 'flex',
-        gap: '8px',
-        marginBottom: '16px',
-        borderBottom: '1px solid var(--line)',
-        paddingBottom: '12px',
-        flexWrap: 'wrap',
-        alignItems: 'center'
-      }}>
-        <button
-          className={`btn-secondary ${activeFilter === 'all' ? 'btn-primary' : ''}`}
-          style={{ fontSize: '13px', padding: '6px 14px' }}
-          onClick={() => setActiveFilter('all')}
-        >
-          All ({items.length})
-        </button>
-        <button
-          className={`btn-secondary ${activeFilter === 'starred' ? 'btn-primary' : ''}`}
-          style={{ fontSize: '13px', padding: '6px 14px' }}
-          onClick={() => setActiveFilter('starred')}
-        >
-          ⭐ Starred ({starredCount})
-        </button>
-        <button
-          className={`btn-secondary ${activeFilter === 'due' ? 'btn-primary' : ''}`}
-          style={{ fontSize: '13px', padding: '6px 14px' }}
-          onClick={() => setActiveFilter('due')}
-        >
-          🔄 Due for Review ({dueCount})
-        </button>
-        <button
-          className={`btn-secondary ${activeFilter === 'difficult' ? 'btn-primary' : ''}`}
-          style={{ fontSize: '13px', padding: '6px 14px' }}
-          onClick={() => setActiveFilter('difficult')}
-        >
-          ⚠️ Difficult / Weak ({difficultCount})
-        </button>
+      {/* Segmented Filter Control */}
+      <div className="filter-segmented-bar">
+        <div className="segmented-control">
+          <button
+            type="button"
+            className={`segmented-item ${activeFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setActiveFilter('all')}
+          >
+            <Layers size={14} />
+            <span>All</span>
+            <span className="seg-pill">{items.length}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`segmented-item ${activeFilter === 'starred' ? 'active' : ''}`}
+            onClick={() => setActiveFilter('starred')}
+          >
+            <Star size={14} />
+            <span>Starred</span>
+            <span className="seg-pill">{starredCount}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`segmented-item ${activeFilter === 'due' ? 'active' : ''}`}
+            onClick={() => setActiveFilter('due')}
+          >
+            <RotateCw size={14} />
+            <span>Due Review</span>
+            {dueCount > 0 && <span className="seg-pill alert">{dueCount}</span>}
+          </button>
+
+          <button
+            type="button"
+            className={`segmented-item ${activeFilter === 'difficult' ? 'active' : ''}`}
+            onClick={() => setActiveFilter('difficult')}
+          >
+            <AlertTriangle size={14} />
+            <span>Difficult</span>
+            {difficultCount > 0 && <span className="seg-pill warning">{difficultCount}</span>}
+          </button>
+        </div>
 
         {(activeFilter !== 'all' || collectionFilter !== 'all' || search.trim()) && (
           <button
-            className="btn-secondary"
-            style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text-muted)' }}
+            type="button"
+            className="btn-secondary btn-reset-filters"
             onClick={handleClearFilters}
           >
-            ✕ Reset Filters
+            <X size={13} />
+            <span>Reset Filters</span>
           </button>
         )}
       </div>
 
-      {/* Search and Sort Toolbar */}
-      <div className="toolbar" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
-        <input
-          type="text"
-          className="input-search"
-          placeholder="Search across words, definitions, translations, context, or notes..."
-          style={{ flex: 1, minWidth: '260px' }}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      {/* Modern Search and Sort Toolbar */}
+      <div className="dashboard-toolbar">
+        <div className="search-input-wrapper">
+          <Search size={15} className="search-icon" />
+          <input
+            type="text"
+            className="input-search"
+            placeholder="Search words, definitions, translations, context, or notes..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button
+              type="button"
+              className="search-clear-btn"
+              onClick={() => setSearch('')}
+              title="Clear search"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
 
-        <select
-          className="select-filter"
-          value={collectionFilter}
-          onChange={(e) => setCollectionFilter(e.target.value)}
-          style={{ minWidth: '150px' }}
-        >
-          {collections.map((col) => (
-            <option key={col} value={col}>
-              {col === 'all' ? 'All Collections' : col}
-            </option>
-          ))}
-        </select>
+        <div className="toolbar-controls">
+          <select
+            className="select-filter"
+            value={collectionFilter}
+            onChange={(e) => setCollectionFilter(e.target.value)}
+          >
+            {collections.map((col) => (
+              <option key={col} value={col}>
+                {col === 'all' ? 'All Collections' : col}
+              </option>
+            ))}
+          </select>
 
-        <select
-          className="select-filter"
-          value={sortOption}
-          onChange={(e) => setSortOption(e.target.value as SortOption)}
-          style={{ minWidth: '160px' }}
-        >
-          <option value="recent">Sort: Recently Added</option>
-          <option value="alphabetical">Sort: Alphabetical (A-Z)</option>
-          <option value="next_review">Sort: Next Review Date</option>
-        </select>
+          <select
+            className="select-filter"
+            value={sortOption}
+            onChange={(e) => setSortOption(e.target.value as SortOption)}
+          >
+            <option value="recent">Sort: Recently Added</option>
+            <option value="alphabetical">Sort: Alphabetical (A-Z)</option>
+            <option value="next_review">Sort: Next Review Date</option>
+          </select>
+        </div>
       </div>
 
       {/* Empty States */}
@@ -312,7 +350,7 @@ export const VocabularyView: React.FC<VocabularyViewProps> = ({
                         title={item.starred ? 'Unstar word' : 'Star word'}
                         aria-label="Star word"
                       >
-                        {item.starred ? '★' : '☆'}
+                        <Star size={14} fill={item.starred ? 'currentColor' : 'none'} />
                       </button>
                       <button
                         className={`vocab-icon-btn ${isHard ? 'active-flag' : ''}`}
@@ -320,7 +358,7 @@ export const VocabularyView: React.FC<VocabularyViewProps> = ({
                         title={item.isMarkedDifficult ? 'Marked difficult (click to unmark)' : 'Mark word as difficult'}
                         aria-label="Mark difficulty"
                       >
-                        {isHard ? '🚩' : '⚐'}
+                        <AlertTriangle size={14} />
                       </button>
                     </div>
 
@@ -331,7 +369,7 @@ export const VocabularyView: React.FC<VocabularyViewProps> = ({
                         title="Pronounce"
                         aria-label="Pronounce"
                       >
-                        🔊
+                        <Volume2 size={14} />
                       </button>
                       <button
                         className="vocab-icon-btn"
@@ -339,7 +377,7 @@ export const VocabularyView: React.FC<VocabularyViewProps> = ({
                         title="View Full Details"
                         aria-label="View Details"
                       >
-                        👁️
+                        <Maximize2 size={13} />
                       </button>
                       {deleteConfirmId === item.id ? (
                         <div className="delete-confirm-box">
@@ -358,7 +396,7 @@ export const VocabularyView: React.FC<VocabularyViewProps> = ({
                             onClick={() => setDeleteConfirmId(null)}
                             title="Cancel"
                           >
-                            ✕
+                            <X size={12} />
                           </button>
                         </div>
                       ) : (
@@ -368,7 +406,7 @@ export const VocabularyView: React.FC<VocabularyViewProps> = ({
                           title="Delete from library"
                           aria-label="Delete word"
                         >
-                          🗑️
+                          <Trash2 size={13} />
                         </button>
                       )}
                     </div>
@@ -501,17 +539,19 @@ export const VocabularyView: React.FC<VocabularyViewProps> = ({
                 <h2 style={{ color: 'var(--text-main)', margin: 0, fontSize: '24px', fontWeight: 700, letterSpacing: '-0.025em' }}>{modalItem.word}</h2>
                 <button
                   className="btn-secondary"
-                  style={{ borderRadius: '50%', width: '28px', height: '28px', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}
+                  style={{ borderRadius: '50%', width: '28px', height: '28px', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                   onClick={() => playAudio(modalItem.word, modalItem.audioUrl)}
+                  title="Pronounce"
                 >
-                  🔊
+                  <Volume2 size={14} />
                 </button>
               </div>
               <button
-                style={{ background: 'none', border: 'none', color: 'var(--text-subtle)', fontSize: '20px', cursor: 'pointer', padding: '4px' }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-subtle)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
                 onClick={() => setModalItem(null)}
+                title="Close"
               >
-                ✕
+                <X size={18} />
               </button>
             </div>
 

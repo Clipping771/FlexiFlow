@@ -259,6 +259,24 @@ export interface SentenceAnalysisResult extends BaseAIAnalysis {
   toneAndRegister: string;
 }
 
+export interface ParagraphSentenceItem {
+  sentenceIndex: number;
+  sentenceText: string;
+  bengaliTranslation: string;
+  phraseBreakdown: PhraseExplanation[];
+  grammaticalStructure?: string;
+  toneOrRole?: string;
+}
+
+export interface ParagraphBlockItem {
+  paragraphIndex: number;
+  paragraphText: string;
+  mainIdea?: string;
+  summary?: string;
+  bengaliTranslation?: string;
+  sentences: ParagraphSentenceItem[];
+}
+
 export interface ParagraphAnalysisResult extends BaseAIAnalysis {
   selectionType: 'paragraph';
   mainIdea: string;
@@ -272,6 +290,9 @@ export interface ParagraphAnalysisResult extends BaseAIAnalysis {
   }>;
   argumentStructure: string;
   toneAndRegister: string;
+  // Hierarchical Smart Breakdown
+  paragraphs?: ParagraphBlockItem[];
+  sentences?: ParagraphSentenceItem[];
 }
 
 export type LinguisticAnalysisResult =
@@ -682,6 +703,7 @@ export interface UserSettings {
   dailyReviewLimit: number;
   sidePanelEnabled?: boolean;
   popupSize?: 'small' | 'medium' | 'large' | 'xlarge';
+  sourceLanguage?: string;
   targetLanguage?: string;
   customLanguages?: CustomLanguageConfig[];
   articleDrafts?: ArticleDraft[];
