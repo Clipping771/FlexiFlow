@@ -819,16 +819,10 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     expect(el.classList.contains('size-medium')).toBe(true);
     expect(el.getAttribute('data-size')).toBe('medium');
 
-    // In-popup zoom button cycles through sizes
+    // Mouse resizing is used; in-popup zoom button is removed from header
     popup.showStageA(mockWordStageA, 'context sentence', 'nearby paragraph');
-    const zoomBtn = el.querySelector('.lf-zoom-btn') as HTMLElement;
-    expect(zoomBtn).not.toBeNull();
-    zoomBtn.click();
-    expect(popup.getSize()).toBe('large');
-    expect(el.classList.contains('size-large')).toBe(true);
-    zoomBtn.click();
-    expect(popup.getSize()).toBe('xlarge');
-    expect(el.classList.contains('size-xlarge')).toBe(true);
+    const zoomBtn = el.querySelector('.lf-zoom-btn');
+    expect(zoomBtn).toBeNull();
   });
 
   // 18. Target Language Configuration (Bengali, Spanish, Hindi, etc.)
@@ -1003,5 +997,51 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     expect(el.textContent).toContain('AI Interpretation Unavailable / AI বিশ্লেষণ অনুপলব্ধ');
     expect(el.textContent).toContain('Provider connection timed out');
     expect(el.textContent).toContain('Deep phrase breakdown and contextual translation require an active AI provider');
+  });
+
+  // 23. Quick Mode vs Learn Mode functional adaptation
+  it('23. Quick Mode vs Learn Mode: adapts content, Why This Matters, Cloze Active Recall, and Save buttons', () => {
+    // Start in default Quick Mode
+    popup.setReadingMode('quick');
+    expect(popup.getReadingMode()).toBe('quick');
+
+    const testSentence = 'The resilient student adapted quickly to the university curriculum.';
+    popup.showStageA(
+      {
+        ...mockWordStageA,
+        selectedText: 'resilient',
+        whyItMatters: 'Highlights resilience as a crucial character trait.'
+      },
+      testSentence,
+      'paragraph context'
+    );
+    const el = popup.getElement();
+
+    // Quick Mode: streamlined immediate comprehension
+    expect(el.querySelector('.lf-reading-mode-btn')?.textContent).toContain('Quick');
+    expect(el.querySelector('.lf-active-recall-box')).toBeNull();
+    expect(el.querySelector('.lf-save-btn')?.textContent).toContain('+ Save');
+
+    // Switch to Learn Mode
+    popup.setReadingMode('learn');
+    expect(popup.getReadingMode()).toBe('learn');
+
+    // Learn Mode: adds Active Recall Challenge and Save with Context
+    const learnEl = popup.getElement();
+    expect(learnEl.querySelector('.lf-reading-mode-btn')?.textContent).toContain('Learn');
+    const activeRecall = learnEl.querySelector('.lf-active-recall-box');
+    expect(activeRecall).not.toBeNull();
+    expect(activeRecall?.textContent).toContain('Active Recall Challenge');
+    expect(activeRecall?.textContent).toContain('student adapted quickly');
+    expect(learnEl.querySelector('.lf-save-btn')?.textContent).toContain('Save with Context');
+
+    // Reveal cloze answer toggle
+    const revealBtn = learnEl.querySelector('.lf-reveal-cloze-btn') as HTMLElement;
+    expect(revealBtn).not.toBeNull();
+    const answerEl = learnEl.querySelector('.lf-cloze-answer') as HTMLElement;
+    expect(answerEl.hasAttribute('hidden') || answerEl.style.display === 'none').toBe(true);
+    revealBtn.click();
+    expect(answerEl.style.display).toBe('block');
+    expect(answerEl.textContent).toContain('resilient');
   });
 });

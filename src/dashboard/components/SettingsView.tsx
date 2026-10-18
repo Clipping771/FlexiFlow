@@ -714,52 +714,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          {/* Floating Popup Window Size */}
-          <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--line)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
-                Floating Popup Window Size:
-              </label>
-              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                Active Scale: <strong style={{ color: 'var(--blue)', textTransform: 'capitalize' }}>{form.popupSize || 'medium'}</strong>
-              </span>
-            </div>
-
-            <div className="size-grid">
-              {[
-                { id: 'small', label: 'Small', width: '370px', desc: 'Compact reading', boxW: 24, boxH: 16 },
-                { id: 'medium', label: 'Medium', width: '440px', desc: 'Standard balance (Best)', boxW: 30, boxH: 20 },
-                { id: 'large', label: 'Large', width: '520px', desc: 'Larger text & spacing', boxW: 36, boxH: 24 },
-                { id: 'xlarge', label: 'Extra Large', width: '610px', desc: 'Maximum clarity & High-DPI', boxW: 42, boxH: 28 }
-              ].map((sizeOpt) => {
-                const isSelected = (form.popupSize || 'medium') === sizeOpt.id;
-                return (
-                  <button
-                    key={sizeOpt.id}
-                    type="button"
-                    className={`size-option-card ${isSelected ? 'selected' : ''}`}
-                    onClick={() => setForm({ ...form, popupSize: sizeOpt.id as UserSettings['popupSize'] })}
-                  >
-                    <div className="size-preview-mini" style={{ width: sizeOpt.boxW, height: sizeOpt.boxH }}>
-                      {isSelected && <Check size={12} color="var(--blue)" strokeWidth={3} />}
-                    </div>
-                    <span style={{ fontSize: '13px', fontWeight: isSelected ? 700 : 600, color: isSelected ? 'var(--blue)' : 'var(--text-main)' }}>
-                      {sizeOpt.label}
-                    </span>
-                    <span style={{ fontSize: '11px', color: isSelected ? 'var(--blue)' : 'var(--text-muted)', fontWeight: 600, marginTop: '2px' }}>
-                      {sizeOpt.width}
-                    </span>
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.3 }}>
-                      {sizeOpt.desc}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '10px' }}>
-              💡 Controls the width, height, and typography scale of the floating definition popup on web pages.
-            </div>
-          </div>
 
           {/* Target Translation Language Selector & Studio */}
           <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--line)' }}>

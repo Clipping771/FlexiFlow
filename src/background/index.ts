@@ -294,8 +294,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 
           case 'EXPLAIN_SENTENCE': {
             const { sentence } = payload as { sentence: string };
-            const provider = await AIService.getProvider();
-            const result = (await provider.analyze(sentence, 'sentence')) as any;
+            const result = (await AIService.analyzeSelection(sentence, 'sentence')) as any;
             const resMapped = {
               ...result,
               sentence: result.selectedText || sentence,

@@ -395,14 +395,13 @@ Return JSON adhering to PhraseAnalysisSchema:
 Strict educational instructions:
 1. Explain WHAT it means in very simple, beginner-friendly everyday English (Layer 1).
 2. Explain in natural, clear ${lang.targetLabel} (${lang.promptTargetInstruction}). All translation and explanation fields ("bengaliTranslation", "easyBengali", "explanationBengali") must be strictly written in ${lang.targetLabel} (${lang.targetNativeLabel}). Never output Bengali when target language is NOT Bengali. When target language is Bengali, write strictly in Bengali script.
-3. Contiguous Sentence Partitioning (Layer 2): You MUST partition the ENTIRE sentence from the first word to the last word into sequential, contiguous chunks in chronological order without omitting any words (100% sentence coverage). Every single word in the original sentence must be included across the chunks.
-4. Identify ALL significant clauses with type, subject & verb, role, what question it answers, dependency, standalone capability, and example (Layer 3).
-5. Build a Sentence Structure Map showing how clauses connect (Layer 4).
-6. Detail Important Grammar Rules present in the sentence using: what is it, where is it, why used, how it works, reusable formula, and common confusion (Layer 5).
-7. Explain logical connectors (e.g. despite, although, because, however) and contrast with similar terms (Layer 6).
-8. Provide word-level grammar for key words (Layer 7).
-9. Highlight common student mistakes, corrected examples, and natural alternatives (Layer 8).
-10. Provide a reusable sentence pattern, practice question, options, answer, and explanation (Layer 9).
+3. Contiguous Sentence Partitioning (Layer 2): You MUST partition the ENTIRE sentence from the first word to the last word into sequential, contiguous chunks in chronological order without omitting any words (100% sentence coverage).
+4. Clause Breakdown & Complexity: Classify sentence correctly as simple, compound, complex, or compound-complex using genuine coordination and subordination. NEVER determine complexity by clause count or comma splitting alone. Identify main/independent, subordinate/adverbial, relative, and noun clauses.
+5. Detailed Syntactic Constituents: For each clause, identify Subject, Verb/Verb Phrase, Direct and Indirect Objects, Complements, and Adverbials with clear, accessible English and ${lang.targetLabel} explanations.
+6. Conversational Language & Speech Repairs: Recognize conversational self-corrections (e.g. "sorry product"), interruptions, parentheticals, and discourse markers (e.g. "arguably"). NEVER classify conversational repairs as separate clauses or count them toward clause count! Explain that the speaker corrects the term in real-time.
+7. Strict Grounding: Syntactic analysis must derive SOLELY from the words in the original sentence. Never introduce external entities, places, or products (e.g. SpaceX, Texas, Roadster) unless explicitly present in the analyzed sentence text.
+8. Internal Phrase Structure: Provide internal breakdown for complex noun phrases (head noun, determiners, superlative adjectives, adverbs of stance).
+9. Detail Important Grammar Rules, Connectors, Word-Level Grammar, Common Misconceptions, and Practice.
 
 Return raw JSON adhering to SentenceAnalysisSchema:
 {
@@ -419,7 +418,7 @@ Return raw JSON adhering to SentenceAnalysisSchema:
   "bengaliTranslation": "Complete natural ${lang.targetLabel} translation (${lang.promptTargetInstruction})",
   "phraseBreakdown": [
     {
-      "phrase": "Contiguous sequential chunk of the sentence (in exact chronological order, covering 100% of the sentence from start to end without skipping words)",
+      "phrase": "Contiguous sequential chunk of the sentence",
       "easyEnglish": "Very simple everyday English explanation.",
       "easyBengali": "Natural ${lang.targetLabel} explanation",
       "grammaticalFunction": "Role performed by this chunk",
@@ -431,9 +430,21 @@ Return raw JSON adhering to SentenceAnalysisSchema:
   "clauses": [
     {
       "text": "Exact clause text",
-      "type": "main" | "subordinate" | "relative" | "participial" | "conditional" | "noun",
+      "type": "main" | "subordinate" | "relative" | "noun",
       "typeExplanation": "Simple explanation of this clause type",
-      "subjectAndVerb": "Subject: X, Verb: Y",
+      "subject": "Subject text",
+      "subjectExplanation": "Subject explanation in English",
+      "subjectExplanationBengali": "Subject explanation in ${lang.targetLabel}",
+      "verb": "Main finite verb",
+      "verbPhrase": "Full verb phrase",
+      "verbExplanation": "Verb explanation in English",
+      "verbExplanationBengali": "Verb explanation in ${lang.targetLabel}",
+      "directObject": "Direct object if present",
+      "directObjectExplanation": "Direct object explanation in English",
+      "directObjectExplanationBengali": "Direct object explanation in ${lang.targetLabel}",
+      "indirectObject": "Indirect object if present",
+      "complement": "Complement if present",
+      "clausePattern": "e.g. S + V + DO",
       "role": "Syntactic role",
       "questionAnswered": "What question does it answer?",
       "dependsOn": "Which clause it depends on",
@@ -442,6 +453,36 @@ Return raw JSON adhering to SentenceAnalysisSchema:
       "explanationBengali": "Clause explanation in ${lang.targetLabel}"
     }
   ],
+  "phraseConstituents": [
+    {
+      "phrase": "e.g. arguably his greatest invention",
+      "phraseType": "noun_phrase",
+      "phraseTypeLabel": "Complex Noun Phrase",
+      "headWord": "invention",
+      "roleInClause": "Direct Object",
+      "components": [
+        { "text": "arguably", "role": "adverb", "roleLabel": "Modal Adverb", "roleBengali": "Role in ${lang.targetLabel}", "explanation": "Qualifies assertion" }
+      ],
+      "explanation": "Phrase explanation",
+      "explanationBengali": "Natural explanation in ${lang.targetLabel}"
+    }
+  ],
+  "conversationalElements": [
+    {
+      "text": "sorry product",
+      "type": "self_correction",
+      "typeLabel": "Conversational Self-Correction",
+      "targetOriginal": "invention",
+      "correctedTo": "product",
+      "explanation": "The speaker initially uses 'invention' and immediately self-corrects to 'product'.",
+      "explanationBengali": "Correction explanation in ${lang.targetLabel}"
+    }
+  ],
+  "patternSummary": {
+    "formula": "Subject + Transitive Verb + Object NP + Conversational Repair",
+    "explanation": "Formula explanation in English",
+    "explanationBengali": "Pattern explanation in ${lang.targetLabel}"
+  },
   "structureMap": {
     "mainClause": "The main independent clause",
     "nodes": [
@@ -450,7 +491,7 @@ Return raw JSON adhering to SentenceAnalysisSchema:
         "relationType": "main" | "contrast" | "condition" | "reason" | "description",
         "connectsTo": "Root or Main clause",
         "explanation": "Simple explanation of relationship",
-        "bengaliExplanation": "বাংলা ব্যাখ্যা"
+        "bengaliExplanation": "Relationship explanation in ${lang.targetLabel}"
       }
     ]
   },
@@ -462,7 +503,7 @@ Return raw JSON adhering to SentenceAnalysisSchema:
       "whyUsed": "Purpose in this specific sentence",
       "howItWorks": "Beginner-friendly mechanism",
       "reusablePattern": "Reusable formula/pattern",
-      "example": { "english": "Example", "easyEnglish": "Simple meaning", "bengali": "বাংলা অর্থ" },
+      "example": { "english": "Example", "easyEnglish": "Simple meaning", "bengali": "${lang.targetLabel} meaning" },
       "commonConfusion": "Common student misunderstanding or contrast"
     }
   ],

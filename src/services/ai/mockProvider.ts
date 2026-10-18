@@ -35,6 +35,7 @@ import {
 import { getLanguageConfig } from '../../config/languages';
 import { AIProvider } from './types';
 import { HighlightIntelligenceService } from './highlightIntelligence';
+import { SyntaxEngine } from '../grammar/syntaxEngine';
 
 export class MockAIProvider implements AIProvider {
   name = 'mock';
@@ -392,9 +393,84 @@ export class MockAIProvider implements AIProvider {
       }
       return '传达本句中关键的情境信息与核心意图。';
     }
+    if (this.targetLang === 'en') {
+      if (lower.includes('researchers')) {
+        return 'Medical scientists and investigators leading the cancer research initiative.';
+      }
+      if (lower.includes('demand')) {
+        return 'Actively and firmly calling for necessary action and assistance.';
+      }
+      if (lower.includes('urgent funding')) {
+        return 'Immediate financial capital and research grants required without delay.';
+      }
+      if (lower.includes('transform')) {
+        return 'Dramatically improve and modernize medical treatment outcomes.';
+      }
+      if (lower.includes('ovarian cancer')) {
+        return 'Specific form of cancer affecting the female reproductive system.';
+      }
+      if (lower.includes('survival')) {
+        return 'Patient longevity, recovery rates, and long-term health outcomes.';
+      }
+      if (lower.includes('although') || lower.includes('even though')) {
+        return 'Even though the situation or condition was present.';
+      }
+      if (lower.includes('inflation')) {
+        return 'Rising cost of living and general price increases.';
+      }
+      if (lower.includes('central bank') || lower.includes('maintained')) {
+        return 'The central monetary authority kept interest rates steady.';
+      }
+      if (lower.includes('in recent months')) {
+        return 'Over the course of recent months.';
+      }
+      if (lower.includes('scrutiny')) {
+        return 'Under close regulatory examination and careful review.';
+      }
+      if (lower.includes('emerging technologies')) {
+        return 'Newly developing technological tools and platforms.';
+      }
+      if (lower.includes('critical infrastructure')) {
+        return 'Essential physical and technological foundations of society.';
+      }
+      return `Contextual explanation for "${chunk.trim()}".`;
+    }
+    if (this.targetLang === 'es') {
+      if (lower.includes('researchers')) {
+        return 'Científicos e investigadores médicos del cáncer.';
+      }
+      if (lower.includes('urgent funding')) {
+        return 'Financiación urgente y recursos económicos necesarios.';
+      }
+      if (lower.includes('transform')) {
+        return 'Transformar y mejorar radicalmente los resultados de salud.';
+      }
+      if (lower.includes('survival')) {
+        return 'Tasa de supervivencia y recuperación de las pacientes.';
+      }
+      return `Significado contextual de "${chunk.trim()}".`;
+    }
+    if (this.targetLang === 'hi') {
+      if (lower.includes('urgent funding')) {
+        return 'तत्काल आवश्यक वित्तीय अनुदान और संसाधन।';
+      }
+      return `"${chunk.trim()}" का प्रासंगिक संदर्भ और अर्थ।`;
+    }
     if (this.targetLang !== 'bn') {
       const lang = getLanguageConfig(this.targetLang);
       return `${lang.targetLabel}: Meaning of "${chunk.trim()}".`;
+    }
+    if (lower.includes('researchers')) {
+      return 'ক্যান্সার গবেষণায় নিয়োজিত বিজ্ঞানী দল';
+    }
+    if (lower.includes('urgent funding')) {
+      return 'জরুরি আর্থিক অনুদান বা তহবিল সহায়তা';
+    }
+    if (lower.includes('transform')) {
+      return 'আমূল পরিবর্তন ও চিকিৎসার ফলাফলের উন্নতি সাধন';
+    }
+    if (lower.includes('survival')) {
+      return 'রোগীদের বেঁচে থাকার হার ও দীর্ঘমেয়াদী সুস্থতা';
     }
     if (lower.includes('although') || lower.includes('even though')) {
       return 'যদিও পরিস্থিতি বা অবস্থা এমন ছিল';
@@ -425,121 +501,88 @@ export class MockAIProvider implements AIProvider {
     const phraseBreakdown = this.decomposeIntoPhraseBreakdown(clean);
     const lower = clean.toLowerCase();
 
-    // Layer 1: Sentence Structure Overview
-    const hasSubordinator = /(although|even though|because|since|if|unless|while|whereas|despite|after|before|when|which|that|who)\b/i.test(clean);
-    const hasCoordinator = /,\s*(and|but|or|so|yet|for|nor)\b/i.test(clean);
+    // Deep Syntactic Analysis via SyntaxEngine
+    const syntaxAnalysis = SyntaxEngine.analyze(clean, this.targetLang);
+    const {
+      structureOverview,
+      clauses,
+      phraseConstituents,
+      conversationalElements,
+      patternSummary,
+      structureMap,
+      difficultVocabulary
+    } = syntaxAnalysis;
 
-    let structureType: 'simple' | 'compound' | 'complex' | 'compound-complex' = 'simple';
-    let structureExplEng = 'A simple sentence containing one independent subject-verb clause.';
-    let structureExplBn = 'একটি সাধারণ বাক্য (Simple Sentence) যাতে একটিমাত্র স্বাধীন খণ্ডবাক্য (Independent clause) রয়েছে।';
-
-    if (hasSubordinator && hasCoordinator) {
-      structureType = 'compound-complex';
-      structureExplEng = 'Compound-complex sentence: contains at least two independent clauses and one or more dependent clauses.';
-      structureExplBn = 'যৌগিক-জটিল বাক্য (Compound-Complex Sentence): এতে দুই বা ততোধিক প্রধান খণ্ডবাক্য এবং অন্তত একটি নির্ভরশীল খণ্ডবাক্য যুক্ত রয়েছে।';
-    } else if (hasSubordinator) {
-      structureType = 'complex';
-      structureExplEng = 'Complex sentence: combines an independent main clause with a dependent subordinate clause or modifier.';
-      structureExplBn = 'জটিল বাক্য (Complex Sentence): এতে একটি প্রধান খণ্ডবাক্য ও এক বা একাধিক নির্ভরশীল বা শর্তবাচক খণ্ডবাক্য রয়েছে।';
-    } else if (hasCoordinator) {
-      structureType = 'compound';
-      structureExplEng = 'Compound sentence: joins two or more independent clauses using a coordinating conjunction.';
-      structureExplBn = 'যৌগিক বাক্য (Compound Sentence): দুটি স্বাধীন খণ্ডবাক্য সংযোজক অব্যয় দিয়ে যুক্ত রয়েছে।';
-    }
-
-    // Layer 3: Deep Clause Analysis
-    const clauses: SyntacticClause[] = [];
-    const parts = clean.split(/(?:,\s*(?=[a-z])|;\s*)/i).map(p => p.trim()).filter(Boolean);
-
-    if (parts.length >= 2) {
-      const firstIsSub = /(despite|although|even though|if|because|while|when|after|before|since)\b/i.test(parts[0]);
-      if (firstIsSub) {
-        clauses.push({
-          text: parts[0],
-          type: 'subordinate',
-          typeExplanation: 'Dependent adverbial construction supplying contextual contrast, condition, or background.',
-          subjectAndVerb: parts[0].includes(' ') ? `Introductory marker: "${parts[0].split(/\s+/)[0]}" with contextual modifier` : undefined,
-          role: 'Adverbial Context / Concession',
-          questionAnswered: 'Under what background condition or obstacle did the main action occur?',
-          dependsOn: 'The main independent clause that follows',
-          standalone: 'No, it relies on the subsequent clause to complete the thought',
-          example: 'Despite the heavy rain, the match continued.',
-          explanationBengali: 'নির্ভরশীল খণ্ডবাক্য যা মূল ঘটনার প্রেক্ষাপট ও বিপরীত শর্ত তুলে ধরে।'
-        });
-        clauses.push({
-          text: parts.slice(1).join(', '),
-          type: 'main',
-          typeExplanation: 'Independent clause that contains the primary subject and verb and expresses a complete thought.',
-          subjectAndVerb: 'Contains the core subject performing the main finite verb action',
-          role: 'Primary Proposition (Main Clause)',
-          questionAnswered: 'What is the primary action or claim being made?',
-          dependsOn: 'None (grammatical core of the sentence)',
-          standalone: 'Yes, it forms a complete grammatical sentence on its own',
-          example: 'The team completed the mission successfully.',
-          explanationBengali: 'প্রধান স্বাধীন খণ্ডবাক্য যা বাক্যের মূল বক্তব্যটি স্বয়ংসম্পূর্ণভাবে প্রকাশ করে।'
-        });
-      } else {
-        clauses.push({
-          text: parts[0],
-          type: 'main',
-          typeExplanation: 'Independent clause establishing the central assertion.',
-          subjectAndVerb: 'Core subject and predicate',
-          role: 'Primary Proposition (Main Clause)',
-          questionAnswered: 'What happened or what is the main statement?',
-          dependsOn: 'None',
-          standalone: 'Yes, it can stand independently as a complete thought',
-          example: 'She made the final decision.',
-          explanationBengali: 'মূল স্বাধীন খণ্ডবাক্য যা বক্তব্যের ভিত্তি তৈরি করে।'
-        });
-        clauses.push({
-          text: parts.slice(1).join(', '),
-          type: 'subordinate',
-          typeExplanation: 'Supporting clause or modifier adding qualification, condition, or limitation.',
-          subjectAndVerb: 'Subordinate elements and qualifiers',
-          role: 'Syntactic Modifier / Extension',
-          questionAnswered: 'What additional condition or detail qualifies the action?',
-          dependsOn: 'The preceding main clause',
-          standalone: 'No, it depends on the preceding main clause',
-          example: 'without losing any quality.',
-          explanationBengali: 'সহায়ক খণ্ডবাক্য বা শর্তবাচক অংশ যা মূল বক্তব্যকে আরও স্পষ্ট করে।'
-        });
-      }
-    } else {
-      clauses.push({
-        text: clean,
-        type: 'main',
-        typeExplanation: 'Complete independent clause expressing a unified assertion.',
-        subjectAndVerb: 'Subject + Finite Verb + Complement/Object',
-        role: 'Complete Main Clause',
-        questionAnswered: 'What is the complete thought expressed?',
-        dependsOn: 'None',
-        standalone: 'Yes, it expresses a complete thought',
-        example: clean,
-        explanationBengali: 'সম্পূর্ণ স্বাধীন খণ্ডবাক্য যা সরাসরি একটি পূর্ণাঙ্গ ভাব প্রকাশ করে।'
-      });
-    }
-
-    // Layer 4: Sentence Structure Map
-    const mainCl = clauses.find(c => c.type === 'main')?.text || clean;
-    const structureMap: SentenceStructureMap = {
-      mainClause: mainCl,
-      rootMainClause: mainCl,
-      branches: clauses.filter(c => c.type !== 'main').map(c => ({
-        clauseText: c.text,
-        relationType: (lower.includes('despite') || lower.includes('although') ? 'concession' : (lower.includes('because') ? 'reason' : 'condition')),
-        roleInSentence: c.role || 'Adverbial Modifier'
-      })),
-      nodes: clauses.map((c) => ({
-        clauseOrElement: c.text,
-        relationType: c.type === 'main' ? 'main' : (lower.includes('despite') || lower.includes('although') ? 'contrast' : (lower.includes('because') ? 'reason' : 'condition')),
-        connectsTo: c.type === 'main' ? 'Core Sentence' : mainCl,
-        explanation: c.type === 'main' ? 'The central independent message' : 'Supplies supporting contextual conditions or qualifications to the main clause',
-        bengaliExplanation: c.type === 'main' ? 'বাক্যের মূল কেন্দ্রীয় বার্তা' : 'মূল খণ্ডবাক্যের শর্ত বা প্রেক্ষাপট হিসেবে যুক্ত রয়েছে'
-      }))
-    };
+    const structureType = structureOverview.type as 'simple' | 'compound' | 'complex' | 'compound-complex';
+    const structureExplEng = structureOverview.explanation;
+    const structureExplBn = structureOverview.explanationBengali;
 
     // Layer 5: Important Grammar Rules
     const grammarRules: GrammarRuleDetail[] = [];
+    if (conversationalElements.some(e => e.type === 'self_correction')) {
+      const repair = conversationalElements.find(e => e.type === 'self_correction')!;
+      grammarRules.push({
+        ruleName: 'Conversational Self-Correction (Speech Repair)',
+        whatIsIt: 'A speech repair where the speaker starts with an initial word or phrase and immediately substitutes a more precise or intended term without creating a new clause.',
+        whereIsIt: repair.text,
+        whyUsed: 'Reflects real-time conversational adjustment and natural spoken English nuance.',
+        howItWorks: 'The repair marker (e.g. "sorry", "I mean") introduces the replacement word ("product") immediately following the original term ("invention"). It does not constitute a subordinate or coordinate clause.',
+        reusablePattern: '[Original Term], sorry + [Corrected Term]',
+        example: {
+          english: 'She arrived on Tuesday, sorry Wednesday.',
+          easyEnglish: 'She came on Wednesday, but first said Tuesday by mistake.',
+          bengali: this.targetLang === 'en'
+            ? 'She came on Wednesday, but first said Tuesday by mistake.'
+            : (this.targetLang === 'es'
+              ? 'Llegó el martes, perdón, el miércoles.'
+              : 'তিনি মঙ্গলবার এসেছিলেন, দুঃখিত বুধবার।')
+        },
+        commonConfusion: 'Learners sometimes count speech repairs as separate clauses. They are conversational repairs, not grammatical clauses.'
+      });
+    }
+
+    if (lower.includes('arguably')) {
+      grammarRules.push({
+        ruleName: 'Modal Adverb of Stance: "Arguably"',
+        whatIsIt: '"Arguably" is an evaluative stance adverb used to qualify a strong claim or superlative.',
+        whereIsIt: 'arguably',
+        whyUsed: 'Signals that the assertion can be defended with plausible reasons without claiming absolute, undisputed factual certainty.',
+        howItWorks: 'Modifies the entire noun phrase or adjective ("arguably his greatest invention").',
+        reusablePattern: '[Subject] + [Verb] + arguably + [Superlative Noun Phrase]',
+        example: {
+          english: 'This is arguably the most influential book of the century.',
+          easyEnglish: 'Many people agree this book is the most important one, though some may differ.',
+          bengali: this.targetLang === 'en'
+            ? 'Many people agree this book is the most important one, though some may differ.'
+            : (this.targetLang === 'es'
+              ? 'Este es posiblemente el libro más influyente del siglo.'
+              : 'এটি যুক্তিগ্রাহ্যভাবে এই শতাব্দীর সবচেয়ে প্রভাবশালী বই।')
+        },
+        commonConfusion: 'Do not confuse "arguably" (can be supported by sound argument) with "argumentatively" (in a contentious or quarrelsome manner).'
+      });
+    }
+
+    if (lower.includes('researchers demand urgent funding') || lower.includes('to transform')) {
+      grammarRules.push({
+        ruleName: 'Infinitive of Purpose: to + Base Verb',
+        whatIsIt: 'An infinitive phrase ("to transform...") functioning as an adverbial of purpose answering "Why?".',
+        whereIsIt: 'to transform Australian ovarian cancer survival',
+        whyUsed: 'Explains the ultimate goal or intended impact of the urgent funding demand concisely.',
+        howItWorks: 'Follows the direct object ("urgent funding") to modify the verb action by expressing purpose without requiring a full "in order that" clause.',
+        reusablePattern: '[Subject] + demand + [Direct Object] + to + [Verb]...',
+        example: {
+          english: 'Doctors requested new equipment to improve patient care.',
+          easyEnglish: 'Doctors asked for new tools so they could give patients better care.',
+          bengali: this.targetLang === 'en'
+            ? 'Doctors asked for new tools so they could give patients better care.'
+            : (this.targetLang === 'es'
+              ? 'Los médicos solicitaron nuevos equipos para mejorar la atención médica.'
+              : 'রোগীদের সেবার মান উন্নত করতে চিকিৎসকেরা নতুন সরঞ্জামের আবেদন করেছিলেন।')
+        },
+        commonConfusion: 'Do not use "for to" or "for improve". English expresses purpose directly with "to + base verb".'
+      });
+    }
+
     if (lower.includes('despite') || lower.includes('in spite of')) {
       grammarRules.push({
         ruleName: 'Preposition of Contrast: Despite + Noun Phrase / -ing',
@@ -551,7 +594,11 @@ export class MockAIProvider implements AIProvider {
         example: {
           english: 'Despite severe weather warnings, the flight landed on schedule.',
           easyEnglish: 'Even though the weather was very bad, the plane landed on time.',
-          bengali: 'খারাপ আবহাওয়া সত্ত্বেও বিমানটি সময়মতো অবতরণ করেছিল।'
+          bengali: this.targetLang === 'en'
+            ? 'Even though the weather was very bad, the plane landed on time.'
+            : (this.targetLang === 'es'
+              ? 'A pesar del mal tiempo, el vuelo aterrizó a tiempo.'
+              : 'খারাপ আবহাওয়া সত্ত্বেও বিমানটি সময়মতো অবতরণ করেছিল।')
         },
         commonConfusion: 'Learners often mistakenly write "Despite of", which is grammatically incorrect. "Despite" takes no "of" (contrast with "in spite of").'
       });
@@ -566,39 +613,30 @@ export class MockAIProvider implements AIProvider {
         example: {
           english: 'Although the challenge was difficult, she solved it quickly.',
           easyEnglish: 'Even though it was hard, she solved it in a short time.',
-          bengali: 'যদিও সমস্যাটি কঠিন ছিল, সে দ্রুত এর সমাধান করেছিল।'
+          bengali: this.targetLang === 'en'
+            ? 'Even though it was hard, she solved it in a short time.'
+            : (this.targetLang === 'es'
+              ? 'Aunque el desafío era difícil, ella lo resolvió rápidamente.'
+              : 'যদিও সমস্যাটি কঠিন ছিল, সে দ্রুত এর সমাধান করেছিল।')
         },
         commonConfusion: 'Do not use "but" in the second clause when you start with "Although" (Avoid: "Although it rained, but we went out").'
       });
-    }
-
-    if (lower.includes('without') && lower.includes('ing')) {
+    } else if (grammarRules.length === 0) {
       grammarRules.push({
-        ruleName: 'Preposition + Gerund Construction (without + -ing)',
-        whatIsIt: 'The preposition "without" followed by a gerund indicates an accompanying circumstance that was avoided or omitted.',
-        whereIsIt: clean.match(/without\s+\w+ing[^,.]*/i)?.[0] || 'without compromising...',
-        whyUsed: 'Shows that an action was carried out while successfully preventing a negative side-effect or compromise.',
-        howItWorks: 'Any preposition followed by a verb requires the verb to take the "-ing" gerund form.',
-        reusablePattern: '[Action] + without + [Verb-ing] + [Object]',
-        example: {
-          english: 'They completed the renovation without exceeding the budget.',
-          easyEnglish: 'They finished repairing the house and did not spend extra money.',
-          bengali: 'বাজেট অতিক্রম না করেই তারা সংস্কার কাজ সম্পন্ন করেছিল।'
-        },
-        commonConfusion: 'Never use a bare infinitive after "without" (e.g. avoid: "without compromise quality"). Always use the gerund form.'
-      });
-    } else {
-      grammarRules.push({
-        ruleName: 'Core Transitive Predication with Adverbial Modifiers',
+        ruleName: 'Core Transitive Predication with Modified Noun Phrase',
         whatIsIt: 'A standard English sentence pattern where an agent performs an action on an object with contextual qualifiers.',
         whereIsIt: clean.slice(0, 45) + '...',
         whyUsed: 'Conveys action and consequence with precision and clarity.',
-        howItWorks: 'The subject precedes the transitive verb, followed by direct objects and modifying prepositional phrases.',
-        reusablePattern: '[Subject] + [Transitive Verb] + [Direct Object] + [Modifier]',
+        howItWorks: 'The subject precedes the transitive verb, followed by direct objects and modifying phrases.',
+        reusablePattern: '[Subject] + [Transitive Verb] + [Direct Object NP]',
         example: {
-          english: 'The organization implemented the new policy without delay.',
-          easyEnglish: 'The group started using the new rule right away.',
-          bengali: 'সংস্থাটি কোনো বিলম্ব ছাড়াই নতুন নীতি কার্যকর করেছিল।'
+          english: 'The author published her latest novel.',
+          easyEnglish: 'The writer released her newest book.',
+          bengali: this.targetLang === 'en'
+            ? 'The writer released her newest book.'
+            : (this.targetLang === 'es'
+              ? 'La autora publicó su última novela.'
+              : 'লেখক তার সর্বশেষ উপন্যাস প্রকাশ করেছিলেন।')
         },
         commonConfusion: 'Ensure the subject and verb agree in number and tense throughout modifying phrases.'
       });
@@ -626,99 +664,134 @@ export class MockAIProvider implements AIProvider {
         contrastWithSimilar: '"Despite" takes a noun phrase, whereas "Although" requires a full clause with subject and finite verb.'
       });
     }
-    if (lower.includes('by ')) {
-      connectors.push({
-        connector: 'by',
-        meaning: 'Through the means, manner, or method of doing something.',
-        grammaticalPattern: 'by + [Gerund -ing / Noun Phrase]',
-        logicalRelationship: 'Means / Instrument / Method',
-        whyAppropriate: 'Explains the concrete mechanism or procedure through which the action was achieved.',
-        contrastWithSimilar: 'Contrast with "with" (which typically introduces an instrument or tool, while "by" introduces an action or method).'
-      });
-    }
-    if (lower.includes('without')) {
-      connectors.push({
-        connector: 'without',
-        meaning: 'Not having, experiencing, or accompanied by something.',
-        grammaticalPattern: 'without + [Noun / -ing Gerund]',
-        logicalRelationship: 'Negative Condition / Manner',
-        whyAppropriate: 'Highlights that high standards were rigorously maintained with zero compromise.',
-        contrastWithSimilar: 'Can be rephrased positively as "while ensuring" or negatively as "and did not sacrifice".'
-      });
-    }
 
-    // Layer 7: Word-Level Grammar in Context
-    const words = clean.split(/\s+/).map(w => w.replace(/^[^\w]+|[^\w]+$/g, '')).filter(w => w.length > 4);
-    const keyWord1 = words[0] || 'maintain';
-    const keyWord2 = words[Math.min(3, words.length - 1)] || 'standard';
-    const wordLevelGrammar: WordLevelGrammarDetail[] = [
-      {
-        word: keyWord1,
-        partOfSpeech: lower.includes('despite') && keyWord1.toLowerCase() === 'despite' ? 'Preposition' : 'Noun / Verb / Modifier',
-        syntacticRole: 'Functions as a key structural anchor or modifier in the clause',
-        wordForms: [keyWord1.toLowerCase(), `${keyWord1.toLowerCase()}s`, `${keyWord1.toLowerCase()}ed`, `${keyWord1.toLowerCase()}ing`],
-        usageNotes: 'Requires careful attention to dependent prepositions and collocation partners.'
-      },
-      {
-        word: keyWord2,
-        partOfSpeech: 'Noun / Adjective in context',
-        syntacticRole: 'Specifies the target object or condition being discussed',
-        wordForms: [keyWord2.toLowerCase(), `${keyWord2.toLowerCase()}s`],
-        usageNotes: 'Commonly paired with verbs of preservation and achievement.'
-      }
-    ];
+    // Layer 7: Word-Level Grammar in Context strictly from words in sentence
+    const wordLevelGrammar: WordLevelGrammarDetail[] = difficultVocabulary.slice(0, 3).map(v => ({
+      word: v.word,
+      partOfSpeech: v.partOfSpeech || 'Word',
+      syntacticRole: v.grammaticalRole || 'Constituent in clause',
+      wordForms: [v.word.toLowerCase(), `${v.word.toLowerCase()}s`],
+      usageNotes: `Occurs as a ${v.grammaticalRole || 'constituent'} in this sentence.`
+    }));
 
     // Layer 8: Common Mistakes & Alternative Constructions
-    const commonMistakesAndAlternatives: MistakeAndAlternative = {
-      commonMistake: lower.includes('despite')
-        ? 'Using "Despite of" instead of "Despite", or putting a full sentence clause after "despite" without "the fact that".'
-        : 'Confusing passive voice and active participle structures in long sentences.',
-      correctedExample: lower.includes('despite')
-        ? 'Incorrect: "Despite of disruptions..." ➔ Correct: "Despite disruptions..."'
-        : 'Incorrect: "The company maintained with compromise..." ➔ Correct: "maintained without compromising..."',
-      naturalAlternative: lower.includes('despite')
-        ? clean.replace(/despite/i, 'Even though there were').replace(/,\s*the/i, ', the')
-        : `Even though challenges existed, the organization successfully preserved its commitments.`,
-      nuanceDifference: 'The original phrasing is more formal and concise; the alternative is more conversational and direct for everyday speech.'
-    };
+    const commonMistakesAndAlternatives: MistakeAndAlternative = conversationalElements.some(e => e.type === 'self_correction')
+      ? {
+          commonMistake: 'Misclassifying the self-correction ("sorry product") as a subordinate or coordinate clause.',
+          correctedExample: 'Grammatical analysis: 1 independent clause with a conversational repair ("sorry product").',
+          naturalAlternative: clean.replace(/,\s*sorry\s+\w+/i, ''),
+          nuanceDifference: 'The original captures authentic spontaneous speech; the alternative is formal written style without repairs.'
+        }
+      : {
+          commonMistake: lower.includes('despite')
+            ? 'Using "Despite of" instead of "Despite", or putting a full sentence clause after "despite" without "the fact that".'
+            : 'Confusing the subject noun phrase with modifying prepositions.',
+          correctedExample: lower.includes('despite')
+            ? 'Incorrect: "Despite of disruptions..." ➔ Correct: "Despite disruptions..."'
+            : `Ensure subject-verb agreement with the head noun.`,
+          naturalAlternative: lower.includes('despite')
+            ? clean.replace(/despite/i, 'Even though there were').replace(/,\s*the/i, ', the')
+            : `The action was carried out with clarity and focus.`,
+          nuanceDifference: 'The alternative shifts tone between formal written prose and direct conversational delivery.'
+        };
 
     // Layer 9: Learn & Practise
-    const practice: GrammarPractice = {
-      reusablePattern: lower.includes('despite')
-        ? 'Despite + [Noun Phrase], [Subject] + [Verb] + [Object].'
-        : '[Subject] + [Verb] + [Object] + without + [Verb-ing].',
-      practiceQuestion: lower.includes('despite')
-        ? 'Fill in the blank: "______ the severe storm, the rescue team reached the village safely."'
-        : 'Fill in the blank: "She solved the difficult puzzle ______ asking for any hints."',
-      options: lower.includes('despite')
-        ? ['A) Despite of', 'B) Despite', 'C) Although of', 'D) In spite']
-        : ['A) without', 'B) with no', 'C) not', 'D) without of'],
-      answer: lower.includes('despite') ? 'B) Despite' : 'A) without',
-      explanation: lower.includes('despite')
-        ? '"Despite" directly precedes the noun phrase "the severe storm" without the preposition "of".'
-        : '"Without" is the appropriate preposition followed by the gerund "asking".'
-    };
+    const practice: GrammarPractice = conversationalElements.some(e => e.type === 'self_correction')
+      ? {
+          reusablePattern: patternSummary.formula,
+          practiceQuestion: 'In the sentence "The Tesla boss revealed arguably his greatest invention, sorry product", how many clauses are present?',
+          options: [
+            'A) Exactly 1 independent clause (simple sentence)',
+            'B) 2 clauses (one main clause and one subordinate clause for "sorry product")',
+            'C) 2 coordinate clauses joined by comma',
+            'D) 3 clauses'
+          ],
+          answer: 'A) Exactly 1 independent clause (simple sentence)',
+          explanation: '"sorry product" is an immediate conversational self-correction (speech repair), not a separate clause.'
+        }
+      : {
+          reusablePattern: patternSummary.formula,
+          practiceQuestion: `Identify the main structural pattern demonstrated in this sentence.`,
+          options: [
+            `A) ${patternSummary.formula}`,
+            'B) Fragment without subject',
+            'C) Inverted question',
+            'D) Imperative sentence'
+          ],
+          answer: `A) ${patternSummary.formula}`,
+          explanation: `The sentence follows the validated syntactic pattern: ${patternSummary.formula}.`
+        };
+
+    // Strictly grounded paraphrase and target language translation (NO external hallucinations)
+    let paraphrase = `This sentence expresses that ${clauses[0]?.subject || 'the subject'} performed the action of ${clauses[0]?.verb || 'verb'}${clauses[0]?.directObject ? ' regarding ' + clauses[0].directObject : ''}.`;
+    let mainMessage = `The primary statement conveys: ${clean}`;
+    let bengaliTranslation: string;
+
+    if (this.targetLang === 'en') {
+      bengaliTranslation = paraphrase;
+    } else if (this.targetLang === 'zh') {
+      bengaliTranslation = '该句子清晰表达了核心主谓宾语义结构，包含具体论述与修饰成分。';
+    } else if (this.targetLang === 'es') {
+      bengaliTranslation = 'Esta oración expresa claramente la estructura gramatical central y el mensaje principal.';
+    } else if (this.targetLang === 'hi') {
+      bengaliTranslation = 'यह वाक्य मुख्य उद्देश्य और क्रिया के संयोजन के साथ मुख्य संदेश व्यक्त करता है।';
+    } else {
+      bengaliTranslation = 'বাক্যটিতে উদ্দেশ্য ও সমাপিকা ক্রিয়ার সমন্বয়ে একটি মূল বক্তব্য প্রকাশিত হয়েছে।';
+    }
+
+    if (clean.toLowerCase().includes('tesla boss revealed arguably his greatest invention, sorry product')) {
+      paraphrase = 'The leader of Tesla announced what many regard as his greatest creation, immediately self-correcting the term "invention" to "product".';
+      mainMessage = 'The speaker announces Tesla\'s top offering while self-correcting the description from "invention" to "product".';
+      if (this.targetLang === 'en') {
+        bengaliTranslation = paraphrase;
+      } else if (this.targetLang === 'es') {
+        bengaliTranslation = 'El líder de Tesla reveló posiblemente su mayor creación, corrigiéndose de "invención" a "producto".';
+      } else {
+        bengaliTranslation = 'টেসলার শীর্ষ প্রধান কর্মকর্তা প্রকাশ করলেন তর্কাতীতভাবে তার সর্বশ্রেষ্ঠ উদ্ভাবন, দুঃখিত পণ্য।';
+      }
+    } else if (clean.toLowerCase().includes('estelle ravenscroft')) {
+      paraphrase = 'Estelle Ravenscroft, a 79-year-old from Busselton near Perth, was on vacation on the Indonesian island when she accidentally slipped and fell into an open stairwell.';
+      mainMessage = 'Estelle Ravenscroft was holidaying on the Indonesian island when she slipped and fell into an open stairwell.';
+      if (this.targetLang === 'en') {
+        bengaliTranslation = paraphrase;
+      } else if (this.targetLang === 'es') {
+        bengaliTranslation = 'Estelle Ravenscroft, de 79 años, de Busselton, estaba de vacaciones en la isla indonesia cuando resbaló y cayó.';
+      } else {
+        bengaliTranslation = 'পার্থের প্রায় ২২০ কিমি দক্ষিণে অবস্থিত বাঘেলটনের ৭৯ বছর বয়সী এস্টেল রেভেনসক্রফ্ট ইন্দোনেশিয়ার দ্বীপে ছুটি কাটাচ্ছিলেন, যখন তিনি পা পিছলে একটি খোলা সিঁড়ির খাঁদে পড়ে যান।';
+      }
+    } else if (clean.toLowerCase().includes('researchers demand urgent funding')) {
+      paraphrase = 'Researchers are urgently calling for financial resources to improve survival rates for Australian women diagnosed with ovarian cancer.';
+      mainMessage = 'Medical researchers demand immediate funding to enhance ovarian cancer survival in Australia.';
+      if (this.targetLang === 'en') {
+        bengaliTranslation = paraphrase;
+      } else if (this.targetLang === 'es') {
+        bengaliTranslation = 'Los investigadores exigen financiación urgente para transformar la supervivencia del cáncer de ovario en Australia.';
+      } else if (this.targetLang === 'hi') {
+        bengaliTranslation = 'शोधकर्ताओं ने ऑस्ट्रेलियाई डिम्बग्रंथि कैंसर के जीवित रहने की दर में सुधार के लिए तत्काल धन की मांग की है।';
+      } else {
+        bengaliTranslation = 'গবেষকেরা অস্ট্রেলিয়ায় ডিম্বাশয়ের ক্যান্সারে বেঁচে থাকার হার পরিবর্তনের জন্য জরুরি অর্থায়নের দাবি জানাচ্ছেন।';
+      }
+    }
 
     const raw: SentenceAnalysisResult = {
       selectedText: clean,
       selectionType: 'sentence',
-      plainEnglishParaphrase: `This statement emphasizes that despite potential challenges or uncertainties, an essential principle or course of action is preserved.`,
-      overallMeaning: `The sentence balances contextual conditions against a primary assertive claim.`,
-      mainMessage: `Even with notable obstacles or concerns in place, the core objectives and quality were successfully upheld.`,
+      plainEnglishParaphrase: paraphrase,
+      overallMeaning: paraphrase,
+      mainMessage,
       sentenceStructure: {
         type: structureType,
         explanation: structureExplEng,
-        explanationBengali: this.targetLang === 'zh'
-          ? (structureType === 'compound-complex' ? '复合复杂句：包含两个或多个独立分句及至少一个从属分句。' : (structureType === 'complex' ? '复合句：包含一个主句及一个或多个从属从句。' : (structureType === 'compound' ? '并列句：包含通过并列连词连接的两个独立分句。' : '简单句：包含一个单一的独立主谓分句。')))
-          : (this.targetLang === 'bn' ? structureExplBn : `${getLanguageConfig(this.targetLang).targetLabel}: ${structureExplEng}`)
+        explanationBengali: structureExplBn
       },
-      bengaliTranslation: this.targetLang === 'zh'
-        ? '句子主旨：尽管面临潜在挑战与不确定性，核心原则与应对措施仍得到了有效落实。'
-        : (this.targetLang === 'bn'
-          ? 'বাক্যটির মূল অর্থ: বিদ্যমান ঝুঁকি বা প্রতিকূল পরিস্থিতি সত্ত্বেও মূল লক্ষ্য এবং কার্যকারিতা সফলভাবে বজায় রাখা হয়েছে।'
-          : `${getLanguageConfig(this.targetLang).targetLabel}: Even with notable obstacles, core objectives and quality were preserved.`),
+      bengaliTranslation,
       phraseBreakdown,
       clauses,
+      phraseConstituents,
+      conversationalElements,
+      patternSummary,
+      clauseRelationship: syntaxAnalysis.clauseRelationship,
+      relevantGrammarFeatures: syntaxAnalysis.relevantGrammarFeatures,
       structureMap,
       grammarRules,
       connectors,
@@ -726,17 +799,11 @@ export class MockAIProvider implements AIProvider {
       commonMistakesAndAlternatives,
       practice,
       grammaticalHighlights: [
-        `${structureType.toUpperCase()} sentence with dependent condition markers`,
-        'Formal journalistic / academic tone with balanced contrast'
+        `${structureType.toUpperCase()} sentence structure (${clauses.length} clause${clauses.length === 1 ? '' : 's'})`,
+        conversationalElements.length > 0 ? 'Contains conversational self-correction / discourse stance markers' : 'Standard academic / journalistic construction'
       ],
-      difficultVocabulary: [
-        {
-          word: words.find(w => w.length > 7) || 'disruptions',
-          meaningInContext: 'Disturbances or interruptions to an established process',
-          bengali: this.targetLang === 'zh' ? '干扰与阻碍' : (this.targetLang === 'bn' ? 'বিঘ্ন বা প্রতিবন্ধকতা' : 'disruptions')
-        }
-      ],
-      toneAndRegister: 'Formal / Professional English'
+      difficultVocabulary,
+      toneAndRegister: conversationalElements.length > 0 ? 'Conversational / Spoken English with Real-Time Repair' : 'Standard / Journalistic English'
     };
 
     return SentenceAnalysisSchema.parse(raw);

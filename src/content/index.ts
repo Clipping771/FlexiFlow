@@ -924,7 +924,7 @@ class ContentScriptManager {
     if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage || !chrome.runtime.id) {
       // Standalone browser / demo environment fallback
       try {
-        const mock = new MockAIProvider();
+        const mock = new MockAIProvider(this.userSettings?.targetLanguage || 'bn');
         if (type === 'ANALYZE_STAGE_A') {
           return (await mock.analyzeStageA(payload.text, payload.contextSentence, payload.paragraphContext)) as unknown as T;
         }

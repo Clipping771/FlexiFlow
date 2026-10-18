@@ -90,6 +90,82 @@ export const PhraseExplanationSchema = z.preprocess((val: any) => {
   simplerExample: z.string().optional()
 }));
 
+export const PhraseComponentSchema = z.preprocess((val: any) => {
+  if (!val || typeof val !== 'object') return val;
+  const copy = { ...val };
+  copy.text = copy.text || copy.word || copy.token || '';
+  copy.role = copy.role || copy.partOfSpeech || 'modifier';
+  copy.roleLabel = copy.roleLabel || copy.label || copy.role || 'Modifier';
+  copy.roleBengali = copy.roleBengali || copy.bengaliLabel || copy.bengali || '';
+  copy.explanation = copy.explanation || copy.desc || '';
+  copy.explanationBengali = copy.explanationBengali || copy.bengaliExplanation || '';
+  return copy;
+}, z.object({
+  text: z.string().default(''),
+  role: z.string().default('modifier'),
+  roleLabel: z.string().default('Modifier'),
+  roleBengali: z.string().default(''),
+  explanation: z.string().default(''),
+  explanationBengali: z.string().optional()
+}));
+
+export const PhraseConstituentSchema = z.preprocess((val: any) => {
+  if (!val || typeof val !== 'object') return val;
+  const copy = { ...val };
+  copy.phrase = copy.phrase || copy.text || '';
+  copy.phraseType = copy.phraseType || copy.type || 'noun_phrase';
+  copy.phraseTypeLabel = copy.phraseTypeLabel || copy.label || 'Noun Phrase';
+  copy.headWord = copy.headWord || copy.head || '';
+  copy.roleInClause = copy.roleInClause || copy.role || '';
+  copy.components = Array.isArray(copy.components) ? copy.components : [];
+  copy.explanation = copy.explanation || '';
+  copy.explanationBengali = copy.explanationBengali || copy.bengaliExplanation || '';
+  return copy;
+}, z.object({
+  phrase: z.string().default(''),
+  phraseType: z.string().default('noun_phrase'),
+  phraseTypeLabel: z.string().default('Noun Phrase'),
+  headWord: z.string().optional(),
+  roleInClause: z.string().optional(),
+  components: z.array(PhraseComponentSchema).default([]),
+  explanation: z.string().default(''),
+  explanationBengali: z.string().optional()
+}));
+
+export const ConversationalElementSchema = z.preprocess((val: any) => {
+  if (!val || typeof val !== 'object') return val;
+  const copy = { ...val };
+  copy.text = copy.text || copy.phrase || copy.element || '';
+  copy.type = copy.type || 'self_correction';
+  copy.typeLabel = copy.typeLabel || copy.label || 'Conversational Repair';
+  copy.targetOriginal = copy.targetOriginal || copy.original || copy.target || '';
+  copy.correctedTo = copy.correctedTo || copy.correction || copy.replacement || '';
+  copy.explanation = copy.explanation || '';
+  copy.explanationBengali = copy.explanationBengali || copy.bengaliExplanation || '';
+  return copy;
+}, z.object({
+  text: z.string().default(''),
+  type: z.string().default('self_correction'),
+  typeLabel: z.string().default('Conversational Repair'),
+  targetOriginal: z.string().optional(),
+  correctedTo: z.string().optional(),
+  explanation: z.string().default(''),
+  explanationBengali: z.string().default('')
+}));
+
+export const GrammaticalPatternSummarySchema = z.preprocess((val: any) => {
+  if (!val || typeof val !== 'object') return val;
+  const copy = { ...val };
+  copy.formula = copy.formula || copy.pattern || '';
+  copy.explanation = copy.explanation || '';
+  copy.explanationBengali = copy.explanationBengali || copy.bengaliExplanation || '';
+  return copy;
+}, z.object({
+  formula: z.string().default(''),
+  explanation: z.string().default(''),
+  explanationBengali: z.string().default('')
+}));
+
 export const SyntacticClauseSchema = z.preprocess((val: any) => {
   if (!val || typeof val !== 'object') return val;
   const copy = { ...val };
@@ -99,6 +175,30 @@ export const SyntacticClauseSchema = z.preprocess((val: any) => {
   copy.explanationBengali = copy.explanationBengali || copy.bengaliExplanation || copy.bengali || copy.explanation || '';
   copy.typeExplanation = copy.typeExplanation || copy.definition || '';
   copy.subjectAndVerb = copy.subjectAndVerb || copy.subjectVerb || '';
+  copy.subject = copy.subject || copy.subj || '';
+  copy.subjectExplanation = copy.subjectExplanation || '';
+  copy.subjectExplanationBengali = copy.subjectExplanationBengali || '';
+  copy.verb = copy.verb || copy.predicate || copy.mainVerb || '';
+  copy.verbPhrase = copy.verbPhrase || copy.verb || '';
+  copy.verbExplanation = copy.verbExplanation || '';
+  copy.verbExplanationBengali = copy.verbExplanationBengali || '';
+  copy.directObject = copy.directObject || copy.object || copy.do || '';
+  copy.directObjectExplanation = copy.directObjectExplanation || '';
+  copy.directObjectExplanationBengali = copy.directObjectExplanationBengali || '';
+  copy.indirectObject = copy.indirectObject || copy.io || '';
+  copy.indirectObjectExplanation = copy.indirectObjectExplanation || '';
+  copy.indirectObjectExplanationBengali = copy.indirectObjectExplanationBengali || '';
+  copy.complement = copy.complement || copy.comp || '';
+  copy.complementType = copy.complementType || '';
+  copy.complementExplanation = copy.complementExplanation || '';
+  copy.complementExplanationBengali = copy.complementExplanationBengali || '';
+  copy.adverbials = Array.isArray(copy.adverbials) ? copy.adverbials : [];
+  copy.clausePattern = copy.clausePattern || copy.pattern || '';
+  copy.category = copy.category || '';
+  copy.subordinator = copy.subordinator || copy.marker || '';
+  copy.tenseAspect = copy.tenseAspect || copy.tense || '';
+  copy.coordinatedVerbs = Array.isArray(copy.coordinatedVerbs) ? copy.coordinatedVerbs : [];
+  copy.functionDescription = copy.functionDescription || copy.function || '';
   copy.questionAnswered = copy.questionAnswered || copy.question || '';
   copy.dependsOn = copy.dependsOn || copy.dependency || '';
   copy.standalone = copy.standalone !== undefined ? String(copy.standalone) : undefined;
@@ -108,13 +208,68 @@ export const SyntacticClauseSchema = z.preprocess((val: any) => {
   text: z.string().default(''),
   type: z.string().default('main'),
   typeExplanation: z.string().optional(),
+  category: z.string().optional(),
+  subordinator: z.string().optional(),
   subjectAndVerb: z.string().optional(),
+  subject: z.string().optional(),
+  subjectExplanation: z.string().optional(),
+  subjectExplanationBengali: z.string().optional(),
+  verb: z.string().optional(),
+  verbPhrase: z.string().optional(),
+  tenseAspect: z.string().optional(),
+  coordinatedVerbs: z.array(z.string()).optional(),
+  verbExplanation: z.string().optional(),
+  verbExplanationBengali: z.string().optional(),
+  directObject: z.string().optional(),
+  directObjectExplanation: z.string().optional(),
+  directObjectExplanationBengali: z.string().optional(),
+  indirectObject: z.string().optional(),
+  indirectObjectExplanation: z.string().optional(),
+  indirectObjectExplanationBengali: z.string().optional(),
+  complement: z.string().optional(),
+  complementType: z.string().optional(),
+  complementExplanation: z.string().optional(),
+  complementExplanationBengali: z.string().optional(),
+  adverbials: z.array(z.object({
+    text: z.string().default(''),
+    type: z.string().optional(),
+    explanation: z.string().default(''),
+    explanationBengali: z.string().optional()
+  })).optional().default([]),
+  clausePattern: z.string().optional(),
+  functionDescription: z.string().optional(),
   role: z.string().default('Main Clause'),
   questionAnswered: z.string().optional(),
   dependsOn: z.string().optional(),
   standalone: z.string().optional(),
   example: z.string().optional(),
   explanationBengali: z.string().default('')
+}));
+
+export const ClauseRelationshipSchema = z.preprocess((val: any) => {
+  if (!val || typeof val !== 'object') return val;
+  const copy = { ...val };
+  copy.formula = copy.formula || copy.pattern || '';
+  copy.explanation = copy.explanation || copy.desc || '';
+  copy.explanationBengali = copy.explanationBengali || copy.bengaliExplanation || '';
+  return copy;
+}, z.object({
+  formula: z.string().default(''),
+  explanation: z.string().default(''),
+  explanationBengali: z.string().optional()
+}));
+
+export const RelevantGrammarFeatureSchema = z.preprocess((val: any) => {
+  if (!val || typeof val !== 'object') return val;
+  const copy = { ...val };
+  copy.feature = copy.feature || copy.name || copy.title || '';
+  copy.detail = copy.detail || copy.explanation || copy.desc || '';
+  copy.detailBengali = copy.detailBengali || copy.bengaliDetail || '';
+  return copy;
+}, z.object({
+  feature: z.string().default(''),
+  detail: z.string().default(''),
+  detailBengali: z.string().optional()
 }));
 
 export const SentenceStructureOverviewSchema = z.preprocess((val: any) => {
@@ -294,6 +449,12 @@ export const SentenceAnalysisSchema = z.preprocess((val: any) => {
   if (!Array.isArray(copy.difficultVocabulary)) {
     copy.difficultVocabulary = [];
   }
+  if (!Array.isArray(copy.phraseConstituents)) {
+    copy.phraseConstituents = [];
+  }
+  if (!Array.isArray(copy.conversationalElements)) {
+    copy.conversationalElements = [];
+  }
   copy.toneAndRegister = copy.toneAndRegister || copy.tone || 'Standard English';
   return copy;
 }, z.object({
@@ -306,6 +467,11 @@ export const SentenceAnalysisSchema = z.preprocess((val: any) => {
   bengaliTranslation: z.string().default(''),
   phraseBreakdown: z.array(PhraseExplanationSchema).default([]),
   clauses: z.array(SyntacticClauseSchema).default([]),
+  phraseConstituents: z.array(PhraseConstituentSchema).optional().default([]),
+  conversationalElements: z.array(ConversationalElementSchema).optional().default([]),
+  patternSummary: GrammaticalPatternSummarySchema.optional(),
+  clauseRelationship: ClauseRelationshipSchema.optional(),
+  relevantGrammarFeatures: z.array(RelevantGrammarFeatureSchema).optional().default([]),
   structureMap: SentenceStructureMapSchema.optional(),
   grammarRules: z.array(GrammarRuleDetailSchema).optional().default([]),
   connectors: z.array(ConnectorRelationshipSchema).optional().default([]),
@@ -316,7 +482,9 @@ export const SentenceAnalysisSchema = z.preprocess((val: any) => {
   difficultVocabulary: z.array(z.object({
     word: z.string().default(''),
     meaningInContext: z.string().optional().default(''),
-    bengali: z.string().optional().default('')
+    bengali: z.string().optional().default(''),
+    partOfSpeech: z.string().optional(),
+    grammaticalRole: z.string().optional()
   })).default([]),
   toneAndRegister: z.string().optional().default('Standard English')
 }).transform((data) => {

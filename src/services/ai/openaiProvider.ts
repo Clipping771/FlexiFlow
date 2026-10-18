@@ -135,12 +135,22 @@ Return a valid raw JSON object strictly adhering to this schema:
 In "bengaliTranslation" and "easyBengali", provide ${lang.promptTargetInstruction}.
 Important: All translation fields ("bengaliTranslation", "easyBengali", "explanationBengali") must be strictly written in ${lang.targetLabel} (${lang.targetNativeLabel}). Never output Bengali if the target language is NOT Bengali. If target language is Bengali, write strictly in Bengali script.
 Important: In "phraseBreakdown", you MUST partition the ENTIRE sentence from the first word to the last word into sequential, contiguous chunks without skipping any words (100% sentence coverage).
+Important Grammatical Instructions:
+1. Classify sentence complexity (simple, compound, complex, compound-complex) using true coordination and subordination, NOT clause count alone.
+2. For each clause, extract Subject, Verb, Direct Object, and Clause Pattern.
+3. Recognize conversational self-corrections (e.g. "sorry product") and discourse markers. NEVER classify conversational repairs as separate clauses!
+4. Strictly ground syntactic tree in the original sentence without introducing external details (e.g. no external names or locations not in sentence).
 Return a valid raw JSON object strictly adhering to this schema:
 {
   "selectedText": "${text}",
   "selectionType": "sentence",
   "plainEnglishParaphrase": "Very easy plain English paraphrase",
   "overallMeaning": "Overall meaning",
+  "sentenceStructure": {
+    "type": "simple" | "compound" | "complex" | "compound-complex",
+    "explanation": "Structure explanation in English",
+    "explanationBengali": "Structure explanation in ${lang.targetLabel}"
+  },
   "bengaliTranslation": "Complete natural ${lang.targetLabel} translation",
   "phraseBreakdown": [
     {
@@ -152,13 +162,28 @@ Return a valid raw JSON object strictly adhering to this schema:
   "clauses": [
     {
       "text": "Clause text",
-      "type": "main",
+      "type": "main" | "subordinate" | "relative" | "noun",
       "role": "Main Clause",
+      "subject": "Subject",
+      "verb": "Verb",
+      "directObject": "Direct object if present",
+      "clausePattern": "e.g. S + V + DO",
       "explanationBengali": "Clause explanation in ${lang.targetLabel}"
     }
   ],
+  "conversationalElements": [
+    {
+      "text": "e.g. sorry product",
+      "type": "self_correction",
+      "typeLabel": "Conversational Repair",
+      "targetOriginal": "invention",
+      "correctedTo": "product",
+      "explanation": "Self-correction in English",
+      "explanationBengali": "Correction explanation in ${lang.targetLabel}"
+    }
+  ],
   "grammaticalHighlights": ["Key grammar point"],
-  "difficultVocabulary": [{"word": "word", "meaningInContext": "meaning", "bengali": "translation"}],
+  "difficultVocabulary": [{"word": "word", "meaningInContext": "meaning", "bengali": "translation", "grammaticalRole": "role"}],
   "toneAndRegister": "Standard English"
 }`;
     } else {

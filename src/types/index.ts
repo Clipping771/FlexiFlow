@@ -58,9 +58,37 @@ export interface SyntacticClause {
   text: string;
   type: 'main' | 'subordinate' | 'relative' | 'participial' | 'conditional' | 'noun' | 'adverbial' | string;
   typeExplanation?: string;
+  category?: string;
+  subordinator?: string;
   subjectAndVerb?: string;
   subject?: string;
+  subjectExplanation?: string;
+  subjectExplanationBengali?: string;
   verb?: string;
+  verbPhrase?: string;
+  tenseAspect?: string;
+  coordinatedVerbs?: string[];
+  verbExplanation?: string;
+  verbExplanationBengali?: string;
+  directObject?: string;
+  directObjectExplanation?: string;
+  directObjectExplanationBengali?: string;
+  indirectObject?: string;
+  indirectObjectExplanation?: string;
+  indirectObjectExplanationBengali?: string;
+  complement?: string;
+  complementType?: 'subject_complement' | 'object_complement' | string;
+  complementExplanation?: string;
+  complementExplanationBengali?: string;
+  adverbials?: Array<{
+    text: string;
+    type?: string;
+    explanation: string;
+    explanationBengali?: string;
+  }>;
+  clausePattern?: string;
+  adverbialPhrase?: string;
+  functionDescription?: string;
   role: string;
   questionAnswered?: string;
   dependsOn?: string;
@@ -70,6 +98,58 @@ export interface SyntacticClause {
   examplePattern?: string;
   explanationBengali: string;
   whyItMatters?: string;
+}
+
+export interface ClauseRelationshipInfo {
+  formula: string;
+  explanation: string;
+  explanationBengali?: string;
+}
+
+export interface RelevantGrammarFeature {
+  feature: string;
+  text?: string;
+  explanation?: string;
+  explanationBengali?: string;
+  detail: string;
+  detailBengali?: string;
+}
+
+
+export interface PhraseComponent {
+  text: string;
+  role: string;
+  roleLabel: string;
+  roleBengali: string;
+  explanation: string;
+  explanationBengali?: string;
+}
+
+export interface PhraseConstituent {
+  phrase: string;
+  phraseType: 'noun_phrase' | 'verb_phrase' | 'prepositional_phrase' | 'adverbial_phrase' | 'adjective_phrase' | string;
+  phraseTypeLabel: string;
+  headWord?: string;
+  roleInClause?: string;
+  components: PhraseComponent[];
+  explanation: string;
+  explanationBengali?: string;
+}
+
+export interface ConversationalElement {
+  text: string;
+  type: 'self_correction' | 'parenthetical' | 'discourse_marker' | 'interruption' | string;
+  typeLabel: string;
+  targetOriginal?: string;
+  correctedTo?: string;
+  explanation: string;
+  explanationBengali: string;
+}
+
+export interface GrammaticalPatternSummary {
+  formula: string;
+  explanation: string;
+  explanationBengali: string;
 }
 
 export interface SentenceStructureMapBranch {
@@ -168,7 +248,14 @@ export interface SentenceAnalysisResult extends BaseAIAnalysis {
     word: string;
     meaningInContext: string;
     bengali: string;
+    partOfSpeech?: string;
+    grammaticalRole?: string;
   }>;
+  phraseConstituents?: PhraseConstituent[];
+  conversationalElements?: ConversationalElement[];
+  patternSummary?: GrammaticalPatternSummary;
+  clauseRelationship?: ClauseRelationshipInfo;
+  relevantGrammarFeatures?: RelevantGrammarFeature[];
   toneAndRegister: string;
 }
 
@@ -285,7 +372,14 @@ export interface SentenceXRayResult {
     word: string;
     meaningInContext: string;
     bengali: string;
+    partOfSpeech?: string;
+    grammaticalRole?: string;
   }>;
+  phraseConstituents?: PhraseConstituent[];
+  conversationalElements?: ConversationalElement[];
+  patternSummary?: GrammaticalPatternSummary;
+  clauseRelationship?: ClauseRelationshipInfo;
+  relevantGrammarFeatures?: RelevantGrammarFeature[];
   toneAndRegister: string;
 }
 

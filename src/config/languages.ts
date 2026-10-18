@@ -25,6 +25,18 @@ export interface LanguagePairConfig {
 }
 
 export const SUPPORTED_PAIRS: Record<string, LanguagePairConfig> = {
+  'en-en': {
+    sourceLang: 'en',
+    targetLang: 'en',
+    sourceLabel: 'English',
+    targetLabel: 'English',
+    targetNativeLabel: 'English',
+    targetNativeHeader: 'Simple English',
+    flagEmoji: '🇬🇧',
+    pairId: 'en-en',
+    promptTutorRole: 'elite linguistic tutor specializing in explaining complex English grammar and syntax in simple, beginner-friendly English',
+    promptTargetInstruction: 'Simple, beginner-friendly English explanation using short sentences and familiar vocabulary. Strict rule: Write exclusively in English. Never output Bengali or any other language.'
+  },
   'en-bn': {
     sourceLang: 'en',
     targetLang: 'bn',
