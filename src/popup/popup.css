@@ -2342,3 +2342,22 @@ body {
   color: #10b981;
   border: 1px solid rgba(16, 185, 129, 0.2);
 }
+
+.popup-interactive-word {
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 1px 2px;
+  transition: all 0.15s ease;
+  display: inline;
+}
+
+.popup-interactive-word:hover {
+  background: rgba(0, 113, 227, 0.15);
+  color: #0071e3;
+  text-decoration: underline;
+}
+
+[data-theme="dark"] .popup-interactive-word:hover {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+}

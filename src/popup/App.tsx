@@ -899,6 +899,30 @@ export const App: React.FC = () => {
   const wordResult = result as WordAnalysisResult | null;
   const phraseResult = result as PhraseAnalysisResult | null;
 
+  const renderInteractiveWords = (text?: string) => {
+    if (!text) return null;
+    const tokens = text.match(/[\p{L}\p{N}]+|[^\p{L}\p{N}\s]+|\s+/gu) || [text];
+    return tokens.map((token, i) => {
+      const isWord = /^[\p{L}\p{N}]+$/u.test(token);
+      if (!isWord) return <React.Fragment key={i}>{token}</React.Fragment>;
+      const cleanWord = token.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '').trim();
+      if (!cleanWord) return <React.Fragment key={i}>{token}</React.Fragment>;
+      return (
+        <span
+          key={i}
+          className="popup-interactive-word"
+          onClick={(e) => {
+            e.stopPropagation();
+            executeSearch(cleanWord);
+          }}
+          title={`Inspect "${cleanWord}"`}
+        >
+          {token}
+        </span>
+      );
+    });
+  };
+
   /* ------------------------------------------------------------- */
   /* STANDALONE POPUP HOST: 100% Identical to Website Popup       */
   /* ------------------------------------------------------------- */
@@ -1269,7 +1293,11 @@ export const App: React.FC = () => {
             {!loading && result && (
               <div className="lookup-result-box">
                 <div className="result-top-row">
-                  <span className="result-term-title">{result.selectedText}</span>
+                  <span className="result-term-title">
+                    {result.selectionType === 'sentence' || result.selectionType === 'paragraph'
+                      ? renderInteractiveWords(result.selectedText)
+                      : result.selectedText}
+                  </span>
                   <button
                     type="button"
                     className="result-pronounce-btn"
@@ -1289,10 +1317,38 @@ export const App: React.FC = () => {
                 )}
 
                 <div className="result-definition-text">
-                  {(result as WordAnalysisResult).contextualMeaning ||
+                  {renderInteractiveWords(
+                    (result as WordAnalysisResult).contextualMeaning ||
                     (result as WordAnalysisResult).simpleEnglishExplanation ||
-                    (result as SentenceAnalysisResult).plainEnglishParaphrase}
+                    (result as SentenceAnalysisResult).plainEnglishParaphrase ||
+                    ''
+                  )}
                 </div>
+
+                {isSentenceMode && sentenceResult?.phraseBreakdown && sentenceResult.phraseBreakdown.length > 0 && (
+                  <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #86868b)' }}>
+                      Phrase Breakdown (Click any word):
+                    </div>
+                    {sentenceResult.phraseBreakdown.map((item, idx) => (
+                      <div key={idx} style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', border: '1px solid var(--border-color, rgba(255,255,255,0.08))' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent, #0071e3)' }}>
+                          {renderInteractiveWords(item.phrase)}
+                        </div>
+                        {item.easyEnglish && (
+                          <div style={{ fontSize: '12px', color: 'var(--text-main)', marginTop: '2px' }}>
+                            {renderInteractiveWords(item.easyEnglish)}
+                          </div>
+                        )}
+                        {item.bengaliMeaning && (
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted, #86868b)', marginTop: '2px' }}>
+                            {item.bengaliMeaning}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <div className="result-action-footer">
                   <button

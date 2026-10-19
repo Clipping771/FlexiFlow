@@ -645,16 +645,23 @@ class ContentScriptManager {
           return Boolean(res?.success);
         },
         onSelectWord: (word: string, contextSentence?: string) => {
-          if (this.currentAnchorRect) {
-            this.lastAnalyzedText = word;
-            this.executeAnalysis(
-              word,
-              'word',
-              contextSentence || this.currentText,
-              this.currentNearbyParagraph,
-              this.currentAnchorRect
-            );
-          }
+          const anchor = this.currentAnchorRect || this.popupView?.getElement().getBoundingClientRect() || ({
+            top: window.innerHeight / 3,
+            bottom: window.innerHeight / 3 + 20,
+            left: window.innerWidth / 2 - 50,
+            right: window.innerWidth / 2 + 50,
+            width: 100,
+            height: 20
+          } as DOMRect);
+          this.currentAnchorRect = anchor;
+          this.lastAnalyzedText = word;
+          this.executeAnalysis(
+            word,
+            'word',
+            contextSentence || this.currentText,
+            this.currentNearbyParagraph,
+            anchor
+          );
         },
         onResize: () => {
           this.updatePosition(false);

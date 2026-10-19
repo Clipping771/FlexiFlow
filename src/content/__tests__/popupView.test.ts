@@ -1180,4 +1180,93 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     expect(answerEl.style.display).toBe('block');
     expect(answerEl.textContent).toContain('resilient');
   });
+
+  // 20. All source language words across the popup are clickable
+  it('20. All source language words across the popup are clickable like the original sentence', async () => {
+    // A. Word Mode: Easy English, Example sentence, Grammatical Role
+    popup.showStageA(
+      {
+        ...mockWordStageA,
+        selectedText: 'adopt',
+        easyEnglish: 'To legally take another person child into your family or begin using a method.',
+        example: 'The organization chose to adopt modern methodologies.',
+        grammaticalRole: 'Functions as transitive verb'
+      },
+      'We must adopt modern methodologies.',
+      'Nearby paragraph'
+    );
+    const wordEl = popup.getElement();
+
+    // Check Easy English words are clickable tokens
+    const easyEnglishTokens = wordEl.querySelectorAll('.lf-easy-english-text .lf-sentence-word');
+    expect(easyEnglishTokens.length).toBeGreaterThan(0);
+    const methodToken = Array.from(easyEnglishTokens).find(
+      (t) => t.getAttribute('data-word') === 'method'
+    ) as HTMLElement;
+    expect(methodToken).toBeDefined();
+    methodToken.click();
+    expect(onSelectWord).toHaveBeenCalledWith('method', 'We must adopt modern methodologies.');
+
+    // Check Natural Example words are clickable tokens with example context
+    const exampleTokens = wordEl.querySelectorAll('.lf-example-text .lf-sentence-word');
+    expect(exampleTokens.length).toBeGreaterThan(0);
+    const modernToken = Array.from(exampleTokens).find(
+      (t) => t.getAttribute('data-word') === 'modern'
+    ) as HTMLElement;
+    expect(modernToken).toBeDefined();
+    modernToken.click();
+    expect(onSelectWord).toHaveBeenCalledWith('modern', 'The organization chose to adopt modern methodologies.');
+
+    // B. Sentence Mode: Phrase breakdown sub-phrases & Easy English
+    popup.showSentence(mockSentenceResult, '', '');
+    const sentEl = popup.getElement();
+
+    const phraseTokens = sentEl.querySelectorAll('.lf-phrase-orig .lf-sentence-word');
+    expect(phraseTokens.length).toBeGreaterThan(0);
+
+    const phraseEasyTokens = sentEl.querySelectorAll('.lf-phrase-english .lf-sentence-word');
+    expect(phraseEasyTokens.length).toBeGreaterThan(0);
+
+    // Click word inside a phrase breakdown
+    const phraseWord = phraseTokens[0] as HTMLElement;
+    const clickedWord = phraseWord.getAttribute('data-word');
+    expect(clickedWord).toBeTruthy();
+    phraseWord.click();
+    expect(onSelectWord).toHaveBeenCalledWith(clickedWord, mockSentenceResult.selectedText);
+
+    // C. Sentence Mode Clauses Tab: Clause exact text is clickable
+    const clausesTabBtn = Array.from(sentEl.querySelectorAll('.lf-tab')).find(
+      (t) => t.getAttribute('data-tab') === 'clauses'
+    ) as HTMLButtonElement;
+    expect(clausesTabBtn).toBeDefined();
+    clausesTabBtn.click();
+
+    const clauseTextTokens = sentEl.querySelectorAll('.lf-clause-card .lf-sentence-word');
+    expect(clauseTextTokens.length).toBeGreaterThan(0);
+
+    // D. Ask AI Chat Responses: Words in question, key takeaway, body, and examples are clickable
+    (popup as any).followUpList = [
+      {
+        question: 'Why did they cross-reference field observations?',
+        answer: 'They verified the hypothesis by comparing historical archives with observations.',
+        keyTakeaway: 'Cross-referencing improves reliability of scientific findings.',
+        bengaliSummary: 'তথ্য যাচাই করা হয়েছে।',
+        examples: [
+          { english: 'Researchers cross-reference multiple data sets.', bengali: 'গবেষকরা একাধিক ডেটা যাচাই করেন।' }
+        ]
+      }
+    ];
+    (popup as any).showAskAI = true;
+    (popup as any).activeSentenceTab = 'ask-ai';
+    (popup as any).render();
+
+    const aiTokens = sentEl.querySelectorAll('.lf-chat-ai .lf-sentence-word');
+    expect(aiTokens.length).toBeGreaterThan(0);
+
+    const firstAIToken = aiTokens[0] as HTMLElement;
+    const aiWord = firstAIToken.getAttribute('data-word');
+    expect(aiWord).toBeTruthy();
+    firstAIToken.click();
+    expect(onSelectWord).toHaveBeenCalledWith(aiWord, expect.any(String));
+  });
 });

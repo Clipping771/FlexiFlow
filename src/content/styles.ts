@@ -678,10 +678,10 @@ export const POPUP_STYLES = `
 }
 
 .lf-tab.active {
-  color: #0071e3;
-  background: #ffffff;
+  color: #ffffff;
+  background: #0071e3;
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 6px rgba(0, 113, 227, 0.25);
 }
 
 /* Quick AI Prompt Box */
@@ -2315,25 +2315,31 @@ export const POPUP_STYLES = `
 
 .lexiflow-popup[data-theme="dark"] .lf-tabs,
 .lexiflow-popup.theme-dark .lf-tabs {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4) !important;
 }
 
 .lexiflow-popup[data-theme="dark"] .lf-tab,
 .lexiflow-popup.theme-dark .lf-tab {
-  color: #94a3b8;
+  color: #94a3b8 !important;
+  background: transparent !important;
+  border: none !important;
 }
 
 .lexiflow-popup[data-theme="dark"] .lf-tab:hover,
 .lexiflow-popup.theme-dark .lf-tab:hover {
-  color: #f8fafc;
+  color: #f8fafc !important;
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 .lexiflow-popup[data-theme="dark"] .lf-tab.active,
 .lexiflow-popup.theme-dark .lf-tab.active {
-  background: rgba(255, 255, 255, 0.1);
-  color: #f8fafc;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  background: #0071e3 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(0, 113, 227, 0.45) !important;
+  border: none !important;
 }
 
 /* All readable definitions, explanations and translations in Dark Mode: Crisp Pure White */
@@ -2870,6 +2876,10 @@ export const POPUP_STYLES = `
     background: #ffffff !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+  }
+  .lexiflow-popup[data-theme="dark"],
+  .lexiflow-popup.theme-dark {
+    background: #1c1c1e !important;
   }
 }
 
