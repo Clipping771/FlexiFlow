@@ -54,7 +54,7 @@ export class OllamaProvider implements AIProvider {
 
     for (const ep of candidateEndpoints) {
       try {
-        console.log(`[LexiFlow Ollama] Dispatching request to endpoint: ${ep}, active model: ${this.model}`);
+        console.debug(`[LexiFlow Ollama] Dispatching request to endpoint: ${ep}, active model: ${this.model}`);
         
         // 1. Primary attempt: /api/chat
         let chatRes = await fetch(`${ep}/api/chat`, {
@@ -75,7 +75,7 @@ export class OllamaProvider implements AIProvider {
             console.warn(`[LexiFlow Ollama] Model "${this.model}" not found at ${ep}. Attempting model auto-discovery from /api/tags...`);
             const discovered = await this.autoDiscoverModel(ep);
             if (discovered && discovered !== this.model) {
-              console.log(`[LexiFlow Ollama] Discovered and switched to active model: "${discovered}"`);
+              console.debug(`[LexiFlow Ollama] Discovered and switched to active model: "${discovered}"`);
               this.model = discovered;
               chatRes = await fetch(`${ep}/api/chat`, {
                 method: 'POST',
@@ -369,7 +369,7 @@ Return a valid raw JSON object strictly adhering to this schema:
 
   async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
     const lang = getLanguageConfig(this.targetLang);
-    console.log(`[LexiFlow Ollama] Extracting highlights using model: "${this.model}" at ${this.endpoint}`);
+    console.debug(`[LexiFlow Ollama] Extracting highlights using model: "${this.model}" at ${this.endpoint}`);
 
     const prompt = `You are LexiFlow AI, an elite university reading instructor and bilingual language acquisition tutor.
 Your mission is to identify the words, collocations, phrasal verbs, idioms, and discourse connectors that provide the GREATEST PEDAGOGICAL LEARNING VALUE for an English learner reading this specific article.

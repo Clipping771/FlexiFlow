@@ -54,6 +54,9 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
   }
 }
 
+// Hosts the content script may ask us to fetch pronunciation audio from (must match manifest host_permissions).
+const AUDIO_FETCH_HOSTS = new Set(['translate.google.com', 'ssl.gstatic.com', 'dict.youdao.com']);
+
 // Track the active normal browser window ID for reliable Side Panel dispatching
 let lastFocusedNormalWindowId: number | null = null;
 
@@ -501,7 +504,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
           case 'FETCH_AUDIO_BASE64': {
             const { url } = payload as { url: string };
             try {
-              const res = await fetch(url);
+              // Only proxy known pronunciation hosts; never act as an open fetch relay.
+              const parsed = new URL(url);
+              if (parsed.protocol !== 'https:' || !AUDIO_FETCH_HOSTS.has(parsed.hostname)) {
+                sendResponse({ success: false, error: 'Audio host not allowed' });
+                break;
+              }
+              const res = await fetch(parsed.href);
               if (!res.ok) {
                 sendResponse({ success: false, error: `HTTP ${res.status}` });
                 break;

@@ -68,7 +68,7 @@ export class AIService {
         const model = (userSettings.selectedModel && userSettings.selectedModel !== 'llama3.2')
           ? userSettings.selectedModel
           : 'gemma4:31b-cloud';
-        console.log(`[LexiFlow AIService] Instantiating OllamaProvider with endpoint: ${ep}, model: ${model}`);
+        console.debug(`[LexiFlow AIService] Instantiating OllamaProvider with endpoint: ${ep}, model: ${model}`);
         return new OllamaProvider(
           ep,
           model,
@@ -180,7 +180,7 @@ export class AIService {
     return CacheManager.getInstance().executeDeduplicated(key, async () => {
       const provider = await this.getProvider(userSettings);
 
-      console.log(`[LexiFlow AIService] extractHighlights starting with provider: "${providerName}", isLiveAI: ${isLiveAI}`);
+      console.debug(`[LexiFlow AIService] extractHighlights starting with provider: "${providerName}", isLiveAI: ${isLiveAI}`);
 
       // 1. If an actual AI provider is configured and available (cloud with API key OR local Ollama)
       if (isLiveAI && provider.extractHighlights) {
@@ -189,7 +189,7 @@ export class AIService {
           if (aiResult && Array.isArray(aiResult.items) && aiResult.items.length > 0) {
             const processed = HighlightIntelligenceService.processCandidates(aiResult, rawText);
             processed.sourceMode = 'ai_reasoning';
-            console.log(`[LexiFlow AIService] AI extraction succeeded with ${processed.items.length} items (provider: ${providerName})`);
+            console.debug(`[LexiFlow AIService] AI extraction succeeded with ${processed.items.length} items (provider: ${providerName})`);
             return processed;
           } else {
             console.warn(`[LexiFlow AIService] AI provider ${providerName} returned 0 items.`);
@@ -200,7 +200,7 @@ export class AIService {
       }
 
       // 2. Honest curated offline fallback when AI provider is unconfigured, mock, or failed
-      console.log(`[LexiFlow AIService] Using curated offline fallback for highlights`);
+      console.debug(`[LexiFlow AIService] Using curated offline fallback for highlights`);
       const mock = new MockAIProvider(targetLang);
       const rawMock = await mock.extractHighlights(rawText, pageTitle);
       const processedMock = HighlightIntelligenceService.processCandidates(rawMock, rawText);

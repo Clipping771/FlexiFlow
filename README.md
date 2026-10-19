@@ -41,6 +41,9 @@ LexiFlow AI is an intelligent reading companion for Google Chrome that helps use
    - Click **Load unpacked**
    - Select the `dist/` directory generated in the repository root.
 
+`npm run build` produces a minified production bundle without sourcemaps.
+For local development use `npm run build:dev`: readable output with inline sourcemaps, plus the offline mock fallback that lets `demo/reading_test.html` work outside the extension (`node scripts/serve.cjs`).
+
 ---
 
 ## Testing & Verification
@@ -49,12 +52,18 @@ Run the automated test suite:
 npm test
 ```
 
+Run everything CI runs (typecheck, tests, production build):
+```bash
+npm run ci
+```
+
 ---
 
 ## Architecture & Configuration
 See:
-- [IMPLEMENTATION_PLAN.md](file:///c:/Innovation/Lexiflow/IMPLEMENTATION_PLAN.md)
-- [IMPLEMENTATION_STATUS.md](file:///c:/Innovation/Lexiflow/IMPLEMENTATION_STATUS.md)
-- [ARCHITECTURE.md](file:///c:/Innovation/Lexiflow/ARCHITECTURE.md)
-- [TESTING.md](file:///c:/Innovation/Lexiflow/TESTING.md)
-- [KNOWN_LIMITATIONS.md](file:///c:/Innovation/Lexiflow/KNOWN_LIMITATIONS.md)
+- [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)
+- [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [TESTING.md](TESTING.md)
+- [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)
+- [PRIVACY.md](PRIVACY.md)

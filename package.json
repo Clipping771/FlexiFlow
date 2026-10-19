@@ -1,13 +1,15 @@
 {
   "name": "lexiflow",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Contextual English reading companion Chrome extension with AI-powered explanations in Bengali and other languages",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:dev": "node scripts/build.mjs --dev",
+    "typecheck": "tsc --noEmit -p .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "ci": "npm run typecheck && npm test && npm run build",
     "eval:live": "vite-node scripts/evaluate-live.mjs"
   },
   "dependencies": {
@@ -28,5 +30,6 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "vitest": "^5.0.4"
-  }
+  },
+  "private": true
 }

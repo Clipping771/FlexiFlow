@@ -21,7 +21,6 @@ import {
 } from '../types';
 import { DEFAULT_SETTINGS } from '../services/storage/settings';
 import { registerCustomLanguages } from '../config/languages';
-import { MockAIProvider } from '../services/ai/mockProvider';
 import { BengaliService } from '../services/bengali';
 import { DictionaryService, dictionaryResultToStageA } from '../services/dictionary';
 import { CacheManager } from '../services/cache';
@@ -191,7 +190,6 @@ class ContentScriptManager {
     }
 
     try {
-      console.log(`[LexiFlow] Requesting highlight extraction for: "${title}" (${cleanExcerpt.length} chars)`);
       const res = await this.sendMessage<HighlightExtractionResult>('IDENTIFY_PAGE_HIGHLIGHTS', {
         rawText: cleanExcerpt,
         pageTitle: title
@@ -930,8 +928,10 @@ class ContentScriptManager {
 
   private async sendMessage<T>(type: string, payload?: any): Promise<T | null> {
     if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage || !chrome.runtime.id) {
-      // Standalone browser / demo environment fallback
+      // Standalone browser / demo environment fallback (dev builds only; stripped from production)
+      if (!__LEXIFLOW_DEMO__) return null;
       try {
+        const { MockAIProvider } = await import('../services/ai/mockProvider');
         const mock = new MockAIProvider(this.userSettings?.targetLanguage || 'bn');
         if (type === 'ANALYZE_STAGE_A') {
           return (await mock.analyzeStageA(payload.text, payload.contextSentence, payload.paragraphContext)) as unknown as T;

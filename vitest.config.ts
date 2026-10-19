@@ -1,6 +1,9 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  define: {
+    __LEXIFLOW_DEMO__: true
+  },
   test: {
     environment: 'jsdom',
     globals: true,

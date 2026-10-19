@@ -1340,9 +1340,9 @@ export const App: React.FC = () => {
                             {renderInteractiveWords(item.easyEnglish)}
                           </div>
                         )}
-                        {item.bengaliMeaning && (
+                        {item.easyBengali && (
                           <div style={{ fontSize: '12px', color: 'var(--text-muted, #86868b)', marginTop: '2px' }}>
-                            {item.bengaliMeaning}
+                            {item.easyBengali}
                           </div>
                         )}
                       </div>
@@ -1453,7 +1453,7 @@ export const App: React.FC = () => {
                     }}>
                       <div className="recent-word-info">
                         <span className="recent-word-term">{item.word}</span>
-                        {item.bengali && <span className="recent-word-bn">{item.bengali}</span>}
+                        {item.bengaliMeaning && <span className="recent-word-bn">{item.bengaliMeaning}</span>}
                       </div>
                       <button
                         type="button"
