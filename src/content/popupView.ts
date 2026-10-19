@@ -166,7 +166,7 @@ export class PopupView {
     const isLearn = this.readingMode === 'learn';
     return `
       <button type="button" class="lf-btn-icon lf-reading-mode-btn ${isLearn ? 'learn-mode' : ''}" title="Reading Mode: ${isLearn ? 'Learn Mode (Click for Quick Mode)' : 'Quick Mode (Click for Learn Mode)'}" aria-label="Toggle Reading Mode">
-        ${isLearn ? `${lfIcon('brain')} Learn` : `${lfIcon('bolt')} Quick`}
+        ${isLearn ? `${lfIcon('brain')} <span class="lf-mode-text">Learn</span>` : `${lfIcon('bolt')} <span class="lf-mode-text">Quick</span>`}
       </button>
     `;
   }
@@ -543,8 +543,8 @@ export class PopupView {
           let newLeft = init.left;
           let newTop = init.top;
 
-          const minW = 280;
-          const minH = 200;
+          const minW = 310;
+          const minH = 220;
           const maxW = Math.max(minW, window.innerWidth - 16);
           const maxH = Math.max(minH, window.innerHeight - 16);
 
@@ -703,14 +703,14 @@ export class PopupView {
 
           <!-- Honest live AI loading indicator with luxury shimmering effect -->
           <div class="lf-ai-shimmer-card">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <div class="lf-skeleton-pulse-dot"></div>
-                <span style="font-size: 12.5px; font-weight: 700; color: #0071e3; letter-spacing: -0.01em;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; overflow: hidden;">
+                <div class="lf-skeleton-pulse-dot" style="flex-shrink: 0;"></div>
+                <span style="font-size: 12px; font-weight: 700; color: #0071e3; letter-spacing: -0.01em; line-height: 1.35; overflow: hidden; text-overflow: ellipsis;">
                   Analyzing phrase breakdown & ${escapeHtml(targetLabel)} translation with AI...
                 </span>
               </div>
-              <span class="lf-ai-live-badge">${lfIcon('sparkles')} Live AI</span>
+              <span class="lf-ai-live-badge" style="flex-shrink: 0; white-space: nowrap;">${lfIcon('sparkles')} Live AI</span>
             </div>
 
             <!-- Shimmering placeholder breakdown lines -->
@@ -1251,7 +1251,7 @@ export class PopupView {
     this.render();
   }
 
-  private render(options?: { preserveScroll?: boolean; scrollToAskAI?: boolean }): void {
+  private render(options?: { preserveScroll?: boolean; scrollToAskAI?: boolean; scrollToExpanded?: boolean }): void {
     const contentEl = this.element.querySelector('.lf-content');
     const prevScrollTop = contentEl ? contentEl.scrollTop : 0;
 
@@ -1274,6 +1274,25 @@ export class PopupView {
             askPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           }
         }, 40);
+      } else if (options?.scrollToExpanded) {
+        setTimeout(() => {
+          const target = (this.element.querySelector('#lf-sentence-expanded-section') ||
+            this.element.querySelector('#lf-para-expanded-section') ||
+            this.element.querySelector('.lf-gb-container')) as HTMLElement | null;
+          if (target && newContentEl) {
+            if (typeof target.scrollIntoView === 'function') {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            const offset = target.offsetTop - (newContentEl.offsetTop || 0);
+            if (offset > 0) {
+              if (typeof newContentEl.scrollTo === 'function') {
+                newContentEl.scrollTo({ top: offset - 8, behavior: 'smooth' });
+              } else {
+                newContentEl.scrollTop = offset - 8;
+              }
+            }
+          }
+        }, 50);
       } else if ((options?.preserveScroll || prevScrollTop > 0) && prevScrollTop > 0) {
         newContentEl.scrollTop = prevScrollTop;
       }
@@ -1557,7 +1576,7 @@ export class PopupView {
             ${lfIcon('flag')} Report
           </button>
           <button class="lf-btn-action lf-save-btn ${this.isSaved ? 'saved' : ''}" title="${this.readingMode === 'learn' ? 'Save with context sentence and Active Recall for spaced review' : 'Quick save vocabulary'}">
-            ${this.isSaved ? (this.readingMode === 'learn' ? '✓ Saved with Context' : '✓ Saved') : (this.readingMode === 'learn' ? 'Save with Context' : '+ Save')}
+            ${this.isSaved ? (this.readingMode === 'learn' ? '✓ Saved<span class="lf-label-extra"> with Context</span>' : '✓ Saved') : (this.readingMode === 'learn' ? 'Save<span class="lf-label-extra"> with Context</span>' : '+ Save')}
           </button>
         </div>
       </div>
@@ -1754,7 +1773,7 @@ export class PopupView {
             aria-controls="lf-sentence-expanded-section"
             title="Expand Grammar and Clause analysis"
           >
-            ${lfIcon('puzzle')} Grammar &amp; Clauses
+            ${lfIcon('puzzle')} Grammar<span class="lf-label-extra"> &amp; Clauses</span>
           </button>
           <button type="button" class="lf-btn-action secondary lf-qa-toggle-btn" title="Ask AI about this sentence" aria-label="Ask AI">
             ${lfIcon('message')} Ask AI
@@ -1765,7 +1784,7 @@ export class PopupView {
             ${lfIcon('flag')} Report
           </button>
           <button class="lf-btn-action lf-save-btn ${this.isSaved ? 'saved' : ''}">
-            ${this.isSaved ? (this.readingMode === 'learn' ? '✓ Saved with Context' : '✓ Saved') : (this.readingMode === 'learn' ? 'Save with Context' : '+ Save')}
+            ${this.isSaved ? (this.readingMode === 'learn' ? '✓ Saved<span class="lf-label-extra"> with Context</span>' : '✓ Saved') : (this.readingMode === 'learn' ? 'Save<span class="lf-label-extra"> with Context</span>' : '+ Save')}
           </button>
         </div>
       </div>
@@ -3873,8 +3892,21 @@ export class PopupView {
     });
 
     el.querySelector('#lf-sentence-expand-toggle')?.addEventListener('click', () => {
-      this.isSentenceAnalysisExpanded = !this.isSentenceAnalysisExpanded;
-      this.render();
+      const contentEl = el.querySelector('.lf-content') as HTMLElement | null;
+      const expandedEl = el.querySelector('#lf-sentence-expanded-section') as HTMLElement | null;
+
+      // If already expanded and currently scrolled into view, toggle collapse
+      if (this.isSentenceAnalysisExpanded && contentEl && expandedEl && contentEl.scrollTop >= (expandedEl.offsetTop - 80)) {
+        this.isSentenceAnalysisExpanded = false;
+        this.render();
+      } else {
+        // Expand and smoothly scroll directly to Grammar & Clauses
+        this.isSentenceAnalysisExpanded = true;
+        if (this.activeSentenceTab === 'ask-ai') {
+          this.activeSentenceTab = 'breakdown';
+        }
+        this.render({ scrollToExpanded: true });
+      }
     });
 
     el.querySelector('.lf-looks-wrong-btn')?.addEventListener('click', (e) => {
@@ -4089,8 +4121,16 @@ export class PopupView {
     });
 
     el.querySelector('#lf-para-expand-toggle')?.addEventListener('click', () => {
-      this.isSentenceAnalysisExpanded = !this.isSentenceAnalysisExpanded;
-      this.render();
+      const contentEl = el.querySelector('.lf-content') as HTMLElement | null;
+      const expandedEl = el.querySelector('#lf-para-expanded-section') as HTMLElement | null;
+
+      if (this.isSentenceAnalysisExpanded && contentEl && expandedEl && contentEl.scrollTop >= (expandedEl.offsetTop - 80)) {
+        this.isSentenceAnalysisExpanded = false;
+        this.render();
+      } else {
+        this.isSentenceAnalysisExpanded = true;
+        this.render({ scrollToExpanded: true });
+      }
     });
 
     el.querySelector('.lf-report-trigger-btn')?.addEventListener('click', () => {

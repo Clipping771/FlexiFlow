@@ -27,6 +27,10 @@ export const POPUP_STYLES = `
   width: 410px;
   max-width: min(440px, calc(100vw - 16px));
   max-height: min(540px, calc(100vh - 20px));
+  min-width: 310px;
+  min-height: 220px;
+  container-type: inline-size;
+  container-name: popup;
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.95);
@@ -90,23 +94,25 @@ export const POPUP_STYLES = `
   font-size: 14px;
 }
 .lexiflow-popup.size-small .lf-header {
-  padding: 8px 12px;
-  min-height: 42px;
+  padding: 8px 10px;
+  min-height: 40px;
+  gap: 5px;
 }
 .lexiflow-popup.size-small .lf-heading-word {
-  max-width: 180px;
+  max-width: 170px;
   font-size: var(--lf-font-title);
 }
 .lexiflow-popup.size-small .lf-heading-sentence {
-  font-size: 14px;
+  font-size: 13.5px;
 }
 .lexiflow-popup.size-small .lf-tabs {
-  margin: 4px 10px 0 10px;
-  padding: 2.5px;
+  margin: 4px 8px 0 8px;
+  padding: 2px;
+  gap: 1.5px;
 }
 .lexiflow-popup.size-small .lf-tab {
-  padding: 5px 8px;
-  font-size: 12.5px;
+  padding: 4px 6px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 .lexiflow-popup.size-small .lf-content {
@@ -114,12 +120,18 @@ export const POPUP_STYLES = `
   padding: 10px 12px 18px 12px;
 }
 .lexiflow-popup.size-small .lf-footer {
-  height: 38px;
-  padding: 0 10px;
+  min-height: 38px;
+  height: auto;
+  padding: 5px 8px;
+  gap: 5px;
 }
 .lexiflow-popup.size-small .lf-btn-action {
-  padding: 4px 11px;
-  font-size: 12px;
+  padding: 0 8px;
+  height: 26px;
+  font-size: 11px;
+}
+.lexiflow-popup.size-small .lf-label-extra {
+  display: none;
 }
 
 .lexiflow-popup.size-medium {
@@ -427,16 +439,17 @@ export const POPUP_STYLES = `
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 9px 12px;
   border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
   background: rgba(255, 255, 255, 0.85);
   flex-shrink: 0;
-  gap: 8px;
-  min-height: 46px;
+  gap: 6px;
+  min-height: 44px;
   cursor: default;
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
+  overflow: hidden;
 }
 
 .lf-header.dragging {
@@ -465,9 +478,10 @@ export const POPUP_STYLES = `
 .lf-title-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .lf-word {
@@ -495,6 +509,11 @@ export const POPUP_STYLES = `
   font-weight: 600;
   color: #1d1d1f;
   letter-spacing: -0.015em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .lf-back-sentence-btn {
@@ -528,7 +547,7 @@ export const POPUP_STYLES = `
   border-radius: 99px;
   letter-spacing: 0.03em;
   white-space: nowrap;
-  flex-shrink: 0;
+  flex-shrink: 1;
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -543,7 +562,7 @@ export const POPUP_STYLES = `
 .lf-actions-top {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   flex-shrink: 0;
   cursor: default;
 }
@@ -573,6 +592,7 @@ export const POPUP_STYLES = `
   pointer-events: auto !important;
   user-select: none;
   touch-action: manipulation;
+  flex-shrink: 0;
 }
 
 .lf-btn-icon:hover {
@@ -605,7 +625,7 @@ export const POPUP_STYLES = `
 .lf-reading-mode-btn {
   font-size: 11px;
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 6px;
   background: rgba(0, 113, 227, 0.08);
   color: #0071e3;
@@ -615,6 +635,8 @@ export const POPUP_STYLES = `
   gap: 3px;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .lf-reading-mode-btn.learn-mode {
@@ -654,12 +676,20 @@ export const POPUP_STYLES = `
   border-radius: 9px;
   gap: 2px;
   flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.lf-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .lf-tab {
-  flex: 1;
-  padding: 6px 10px;
-  font-size: var(--lf-font-tab, 13.5px);
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: var(--lf-font-tab, 13px);
   font-weight: 600;
   color: #6e6e73;
   background: none;
@@ -669,6 +699,8 @@ export const POPUP_STYLES = `
   transition: all 0.14s ease;
   text-align: center;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   user-select: none;
   font-family: inherit;
 }
@@ -768,6 +800,8 @@ export const POPUP_STYLES = `
 }
 
 .lf-content {
+  position: relative;
+  scroll-behavior: smooth;
   padding: 12px 14px 22px 14px;
   flex: 1 1 auto;
   min-height: 0;
@@ -781,6 +815,11 @@ export const POPUP_STYLES = `
   scrollbar-gutter: stable;
   scrollbar-width: thin !important;
   scrollbar-color: #0071e3 rgba(0, 0, 0, 0.08) !important;
+}
+
+#lf-sentence-expanded-section,
+#lf-para-expanded-section {
+  scroll-margin-top: 12px;
 }
 
 .lf-content::-webkit-scrollbar {
@@ -1067,7 +1106,8 @@ export const POPUP_STYLES = `
   color: #6e6e73;
   flex-shrink: 0;
   min-height: 40px;
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .lf-footer-left,
@@ -1076,6 +1116,7 @@ export const POPUP_STYLES = `
   align-items: center;
   gap: 5px;
   min-width: 0;
+  flex-shrink: 0;
 }
 
 /* Solid Blue Button (No Gradient, No Glow) */
@@ -1096,6 +1137,8 @@ export const POPUP_STYLES = `
   white-space: nowrap;
   flex-shrink: 0;
   font-family: inherit;
+  user-select: none;
+  pointer-events: auto !important;
 }
 
 .lf-btn-action:hover {
@@ -1319,6 +1362,8 @@ export const POPUP_STYLES = `
   align-items: center;
   gap: 3px;
   letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .lexiflow-popup[data-theme="dark"] .lf-ai-shimmer-card,
@@ -3871,5 +3916,97 @@ export const POPUP_STYLES = `
 .lexiflow-popup.theme-dark .lf-para-tabs-compact {
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Container Queries & Fallback Responsive Styles for Popup Resizing & Small Screens */
+@container popup (max-width: 375px) {
+  .lf-header {
+    padding: 6px 10px !important;
+    gap: 4px !important;
+    min-height: 40px !important;
+  }
+  .lf-pos {
+    display: none !important;
+  }
+  .lf-reading-mode-btn .lf-mode-text {
+    display: none !important;
+  }
+  .lf-reading-mode-btn {
+    padding: 2px 5px !important;
+  }
+  .lf-btn-icon {
+    min-width: 25px !important;
+    min-height: 25px !important;
+    padding: 3px !important;
+  }
+  .lf-tabs {
+    margin: 4px 8px 0 8px !important;
+    padding: 2px !important;
+    gap: 1px !important;
+  }
+  .lf-tab {
+    padding: 4px 4px !important;
+    font-size: 11px !important;
+  }
+  .lf-footer {
+    padding: 5px 8px !important;
+    gap: 4px !important;
+    min-height: 36px !important;
+  }
+  .lf-footer-left,
+  .lf-footer-right {
+    gap: 3px !important;
+  }
+  .lf-btn-action {
+    height: 26px !important;
+    padding: 0 7px !important;
+    font-size: 11px !important;
+    gap: 3px !important;
+  }
+  .lf-label-extra {
+    display: none !important;
+  }
+}
+
+@container popup (max-width: 320px) {
+  .lf-footer {
+    justify-content: center !important;
+  }
+  .lf-footer-left,
+  .lf-footer-right {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .lexiflow-popup {
+    min-width: 300px;
+  }
+  .lf-header {
+    padding: 6px 10px;
+    gap: 4px;
+  }
+  .lf-pos {
+    display: none;
+  }
+  .lf-reading-mode-btn .lf-mode-text {
+    display: none;
+  }
+  .lf-tabs {
+    margin: 4px 8px 0 8px;
+    padding: 2px;
+  }
+  .lf-tab {
+    padding: 4px 4px;
+    font-size: 11.5px;
+  }
+  .lf-footer {
+    padding: 5px 8px;
+    gap: 4px;
+  }
+  .lf-label-extra {
+    display: none;
+  }
 }
 `;
