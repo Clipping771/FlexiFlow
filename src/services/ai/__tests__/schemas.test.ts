@@ -28,7 +28,24 @@ describe('AI-Native Output Validation & Schemas', () => {
       expect(parsed.data.bengaliTranslation).toBeTruthy();
       expect(parsed.data.whyFitsContext).toBeTruthy();
       expect(parsed.data.collocations.length).toBeGreaterThan(0);
+      expect(parsed.data.exampleBengali).toBeTruthy();
     }
+  });
+
+  it('parses exampleBengali and variations in WordAnalysisSchema', () => {
+    const parsed1 = WordAnalysisSchema.parse({
+      selectedText: 'inflicted',
+      examples: ['The storm inflicted severe damage on the coastal village.'],
+      exampleBengali: 'ঝড়টি উপকূলীয় গ্রামে মারাত্মক ক্ষয়ক্ষতি সাধন করেছিল।'
+    });
+    expect(parsed1.exampleBengali).toBe('ঝড়টি উপকূলীয় গ্রামে মারাত্মক ক্ষয়ক্ষতি সাধন করেছিল।');
+
+    const parsed2 = WordAnalysisSchema.parse({
+      selectedText: 'inflicted',
+      examples: ['The storm inflicted severe damage on the coastal village.'],
+      exampleTranslation: 'ঝড়টি উপকূলীয় গ্রামে মারাত্মক ক্ষয়ক্ষতি সাধন করেছিল।'
+    });
+    expect(parsed2.exampleBengali).toBe('ঝড়টি উপকূলীয় গ্রামে মারাত্মক ক্ষয়ক্ষতি সাধন করেছিল।');
   });
 
   it('validates Phrase Analysis schema for phrasal verbs, idioms, and collocations', async () => {

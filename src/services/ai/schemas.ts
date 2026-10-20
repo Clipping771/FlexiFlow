@@ -16,6 +16,7 @@ export const WordAnalysisSchema = z.preprocess((val: any) => {
   if (!Array.isArray(copy.examples)) {
     copy.examples = copy.examples ? [String(copy.examples)] : [];
   }
+  copy.exampleBengali = copy.exampleBengali || copy.exampleTranslation || copy.exampleTargetTranslation || copy.example_bengali || undefined;
   return copy;
 }, z.object({
   selectedText: z.string().default(''),
@@ -31,6 +32,7 @@ export const WordAnalysisSchema = z.preprocess((val: any) => {
   wordForms: z.array(z.string()).default([]),
   collocations: z.array(z.string()).default([]),
   examples: z.array(z.string()).default([]),
+  exampleBengali: z.string().optional(),
   synonyms: z.array(z.string()).optional(),
   antonyms: z.array(z.string()).optional(),
   registerAndTone: z.string().optional()

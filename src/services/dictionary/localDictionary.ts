@@ -21,6 +21,26 @@ export const OFFLINE_LEXICON: Record<string, Partial<DictionaryResult>> = {
       }
     ]
   },
+  inflict: {
+    word: 'inflict',
+    phonetics: [{ text: '/ɪnˈflɪkt/', audio: '' }],
+    bengaliMeaning: 'আরোপ করা বা চাপিয়ে দেওয়া',
+    bengaliExplanation: 'কাউকে আঘাত, ক্ষতি বা অপ্রীতিকর পরিস্থিতির সম্মুখীন করা।',
+    meanings: [
+      {
+        partOfSpeech: 'verb',
+        definitions: [
+          {
+            definition: 'Cause (something unpleasant or painful) to be suffered by someone or something.',
+            example: 'The storm inflicted severe damage on the coastal village.',
+            exampleBengali: 'ঝড়টি উপকূলীয় গ্রামে মারাত্মক ক্ষয়ক্ষতি সাধন করেছিল।',
+            synonyms: ['impose', 'administer', 'deliver', 'wreak'],
+            antonyms: ['withhold', 'spare']
+          }
+        ]
+      }
+    ]
+  },
   mitigate: {
     word: 'mitigate',
     phonetics: [{ text: '/ˈmɪt.ɪ.ɡeɪt/', audio: '' }],

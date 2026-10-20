@@ -21,6 +21,7 @@ export interface WordAnalysisResult extends BaseAIAnalysis {
   wordForms?: string[];
   collocations: string[];
   examples: string[];
+  exampleBengali?: string;
   synonyms?: string[];
   antonyms?: string[];
   registerAndTone?: string;
@@ -626,6 +627,7 @@ export interface PhoneticItem {
 export interface DefinitionItem {
   definition: string;
   example?: string;
+  exampleBengali?: string;
   synonyms?: string[];
   antonyms?: string[];
 }

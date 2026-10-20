@@ -39,6 +39,21 @@ export interface PopupCallbacks {
   onUpdateSettings?: (updates: Partial<UserSettings>) => Promise<void>;
 }
 
+export function isValidExampleTranslation(text?: string): boolean {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  const placeholders = [
+    'উদাহরণ বাক্যের অর্থ',
+    'উদাহরণ',
+    'বাক্যে এর ব্যবহার।',
+    'বাক্যটিতে এর ভাবার্থ স্পষ্টভাবে প্রকাশ পেয়েছে।'
+  ];
+  if (placeholders.includes(trimmed)) return false;
+  if (/^Example sentence translated into/i.test(trimmed)) return false;
+  return true;
+}
+
 export class PopupView {
   private element: HTMLElement;
   private currentStageA: StageAExplanation | null = null;
@@ -1076,9 +1091,12 @@ export class PopupView {
     if (aiResult.example && exampleBox && exampleText) {
       exampleText.textContent = `"${aiResult.example}"`;
       exampleBox.style.display = 'block';
-      if (aiResult.exampleBengali && exampleBengali) {
+      if (isValidExampleTranslation(aiResult.exampleBengali) && exampleBengali) {
         exampleBengali.textContent = `(${aiResult.exampleBengali})`;
         exampleBengali.style.display = 'block';
+      } else if (exampleBengali) {
+        exampleBengali.textContent = '';
+        exampleBengali.style.display = 'none';
       }
     }
 
@@ -1440,7 +1458,7 @@ export class PopupView {
           <!-- 4. Natural Example -->
           <div class="lf-example-box" style="margin-bottom: 8px; padding-left: 8px; border-left: 2px solid rgba(0, 113, 227, 0.4); font-size: var(--lf-font-example, 14px); font-style: italic; display: ${a.example ? 'block' : 'none'};">
             <span class="lf-example-text">"${this.renderInteractiveSentence(a.example || '', a.example)}"</span>
-            <div class="lf-example-bengali" style="font-style: normal; font-size: var(--lf-font-context, 13px); margin-top: 2px; display: ${a.exampleBengali ? 'block' : 'none'};">(${escapeHtml(a.exampleBengali || '')})</div>
+            <div class="lf-example-bengali" style="font-style: normal; font-size: var(--lf-font-context, 13px); margin-top: 2px; display: ${isValidExampleTranslation(a.exampleBengali) ? 'block' : 'none'};">${isValidExampleTranslation(a.exampleBengali) ? `(${escapeHtml(a.exampleBengali || '')})` : ''}</div>
           </div>
 
           <!-- 4.5. Grammar Breakdown (Streamlined in Quick Mode, In-depth in Learn Mode) -->

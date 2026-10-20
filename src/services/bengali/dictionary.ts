@@ -27,6 +27,12 @@ export const BENGALI_LEXICON: Record<string, BengaliEntry> = {
     pos: "verb",
     nuance: "সমস্যাটি সম্পূর্ণ দূর করে না, বরং এর খারাপ প্রভাব বা ঝুঁকি কমায়।"
   },
+  inflict: {
+    bengali: "আরোপ করা / চাপিয়ে দেওয়া",
+    explanation: "কাউকে আঘাত, ক্ষতি, শাস্তি বা অপ্রীতিকর কষ্ট ভোগ করতে বাধ্য করা।",
+    pos: "verb",
+    nuance: "সাধারণত ক্ষতিকর বা বেদনাদায়ক বিষয় চাপিয়ে দিতে inflict ব্যবহৃত হয় (যেমন: inflict damage/pain)।"
+  },
   alleviate: {
     bengali: "লাঘব করা / কষ্ট হ্রাস করা",
     explanation: "যন্ত্রণা, কষ্ট বা বোঝা সাময়িকভাবে হালকা করা।",

@@ -4,7 +4,9 @@ import {
   WritingGoal,
   WritingAssistResult,
   FollowUpResponse,
-  HighlightExtractionResult
+  HighlightExtractionResult,
+  StageAExplanation,
+  StageBDetailedVocabulary
 } from '../../types';
 import { getLanguageConfig } from '../../config/languages';
 import {
@@ -18,6 +20,7 @@ import {
 } from './schemas';
 import { AIProvider } from './types';
 import { safeParseJSON } from './safeJson';
+import { validateStageA, validateStageB } from './validation';
 
 export class OllamaProvider implements AIProvider {
   name = 'ollama';
@@ -163,6 +166,184 @@ export class OllamaProvider implements AIProvider {
     return null;
   }
 
+  async analyzeStageA(
+    text: string,
+    contextSentence?: string,
+    paragraphContext?: string
+  ): Promise<StageAExplanation> {
+    const cleanText = text.trim();
+    const lang = getLanguageConfig(this.targetLang);
+    const systemPrompt = `You are an ${lang.promptTutorRole}.
+Your mission is to explain the selected word or phrase for someone reading a real webpage.
+Strict guidelines:
+1. "easyEnglish": Genuinely simple everyday English. Short sentence, conversational words, explain one idea at a time. No academic jargon.
+2. "easyBengali": ${lang.promptTargetInstruction}
+3. "contextMeaning": Explain what it specifically means in this sentence.
+4. "example": One natural, short example sentence illustrating this sense.
+5. "exampleBengali": Natural ${lang.targetLabel} translation of the example sentence.
+6. "confidence": "high", "medium", or "low". If sentence provides minimal clues, set to "low" and give an honest "uncertaintyReason".
+7. "contextualSenseId": "sense_1".
+
+Return JSON adhering to StageAContextualSchema:
+{
+  "selectedText": "${cleanText}",
+  "lemma": "base form",
+  "partOfSpeech": "word / noun / verb / etc.",
+  "easyEnglish": "Very simple everyday English explanation.",
+  "easyBengali": "${lang.targetNativeHeader}",
+  "contextMeaning": "Meaning in this sentence.",
+  "example": "Natural English sentence.",
+  "exampleBengali": "Example sentence translated into ${lang.targetLabel}.",
+  "confidence": "high" | "medium" | "low",
+  "uncertaintyReason": "Optional note if confidence is low",
+  "contextualSenseId": "sense_1"
+}`;
+
+    const prompt = `${systemPrompt}\nTarget: "${cleanText}"\nSentence Context: "${contextSentence || ''}"\nParagraph Context: "${(paragraphContext || '').slice(0, 300)}"`;
+
+    let raw = await this.callOllama(prompt);
+    let parsed: any;
+    try {
+      parsed = safeParseJSON(raw);
+    } catch {
+      raw = await this.callOllama(`${prompt}\n\nCRITICAL: Output ONLY valid JSON.`);
+      parsed = safeParseJSON(raw);
+    }
+
+    let validation = validateStageA(parsed, this.targetLang);
+    if (!validation.isValid) {
+      console.warn('[LexiFlow Ollama] Stage A validation failed, retrying once...', validation.errors);
+      const correctionPrompt = `${prompt}\n\nYour previous response had validation errors:\n${validation.errors.join('\n')}\nPlease correct these errors and ensure "${lang.targetLabel}" explanation and all required fields are present.`;
+      const retryRaw = await this.callOllama(correctionPrompt);
+      try {
+        const retryParsed = safeParseJSON(retryRaw);
+        const retryVal = validateStageA(retryParsed, this.targetLang);
+        if (retryVal.isValid && retryVal.data) {
+          if (cleanText && (!retryVal.data.selectedText || retryVal.data.selectedText.trim() !== cleanText)) {
+            retryVal.data.selectedText = cleanText;
+          }
+          return retryVal.data;
+        }
+      } catch (err) {
+        console.warn('[LexiFlow Ollama] Stage A retry parse error:', err);
+      }
+    }
+
+    if (validation.isValid && validation.data) {
+      if (cleanText && (!validation.data.selectedText || validation.data.selectedText.trim() !== cleanText)) {
+        validation.data.selectedText = cleanText;
+      }
+      return validation.data;
+    }
+
+    return {
+      selectedText: cleanText,
+      lemma: parsed?.lemma || cleanText.toLowerCase(),
+      partOfSpeech: parsed?.partOfSpeech || 'word',
+      easyEnglish: parsed?.easyEnglish || 'Used in this sentence to convey a specific idea.',
+      easyBengali: parsed?.easyBengali || 'প্রাসঙ্গিক অর্থ',
+      contextMeaning: parsed?.contextMeaning || 'Meaning in this context.',
+      example: parsed?.example || contextSentence,
+      exampleBengali: parsed?.exampleBengali || undefined,
+      confidence: 'medium',
+      contextualSenseId: 'sense_1'
+    };
+  }
+
+  async analyzeStageB(
+    lemma: string,
+    partOfSpeech: string = 'word',
+    contextualSenseId: string = 'sense_1'
+  ): Promise<StageBDetailedVocabulary> {
+    const cleanLemma = lemma.trim().toLowerCase();
+    const lang = getLanguageConfig(this.targetLang);
+    const systemPrompt = `You are an elite bilingual lexicographer. Provide a comprehensive, structured vocabulary entry for "${cleanLemma}".
+Strict guidelines:
+1. ORDER SENSES SO THE CONTEXTUAL SENSE IS FIRST in the "senses" array with id "${contextualSenseId}".
+2. Provide easy English and natural ${lang.targetLabel} (${lang.promptTargetInstruction}) for every sense.
+3. For each sense provide 1-2 natural examples with natural ${lang.targetLabel} translations.
+4. Synonyms must be sense-specific.
+5. Antonyms: ONLY GENUINE DIRECT OPPOSITES. NEVER invent an antonym if none exists; leave as empty array [].
+6. Collocations, idioms / phrasal verbs, word forms, and confusing words if applicable.
+
+Return JSON adhering to StageBDetailedVocabularySchema:
+{
+  "lemma": "${cleanLemma}",
+  "partOfSpeech": "${partOfSpeech}",
+  "contextualSenseId": "${contextualSenseId}",
+  "senses": [
+    {
+      "id": "${contextualSenseId}",
+      "partOfSpeech": "${partOfSpeech}",
+      "easyEnglish": "Simple everyday English definition.",
+      "easyBengali": "${lang.targetNativeHeader}",
+      "isContextual": true,
+      "registerOrType": "standard",
+      "examples": [{"english": "Natural example.", "bengali": "Example translated into ${lang.targetLabel}."}],
+      "synonyms": [{"word": "synonym", "easyEnglish": "Simple meaning", "easyBengali": "Meaning in ${lang.targetLabel}"}],
+      "antonyms": []
+    }
+  ],
+  "collocations": [{"english": "common phrase", "bengali": "${lang.targetLabel}"}],
+  "idiomsAndPhrases": [{"phrase": "idiom", "easyEnglish": "simple meaning", "easyBengali": "${lang.targetLabel}"}],
+  "wordForms": [{"form": "${cleanLemma}", "partOfSpeech": "${partOfSpeech}"}],
+  "confusingWords": []
+}`;
+
+    const prompt = `${systemPrompt}\nWord: "${cleanLemma}"\nPart of Speech: "${partOfSpeech}"\nContextual Sense ID: "${contextualSenseId}"`;
+
+    let raw = await this.callOllama(prompt);
+    let parsed: any;
+    try {
+      parsed = safeParseJSON(raw);
+    } catch {
+      raw = await this.callOllama(`${prompt}\n\nCRITICAL: Output ONLY valid JSON.`);
+      parsed = safeParseJSON(raw);
+    }
+
+    let validation = validateStageB(parsed, cleanLemma, this.targetLang);
+    if (!validation.isValid) {
+      console.warn('[LexiFlow Ollama] Stage B validation failed, retrying once...', validation.errors);
+      const correctionPrompt = `${prompt}\n\nYour previous response had validation errors:\n${validation.errors.join('\n')}\nPlease ensure the contextual sense is ordered first, all ${lang.targetLabel} fields are accurate, and return valid JSON.`;
+      const retryRaw = await this.callOllama(correctionPrompt);
+      try {
+        const retryParsed = safeParseJSON(retryRaw);
+        const retryVal = validateStageB(retryParsed, cleanLemma, this.targetLang);
+        if (retryVal.isValid && retryVal.data) {
+          return retryVal.data;
+        }
+      } catch (err) {
+        console.warn('[LexiFlow Ollama] Stage B retry parse error:', err);
+      }
+    }
+
+    if (validation.isValid && validation.data) {
+      return validation.data;
+    }
+
+    return {
+      lemma: cleanLemma,
+      partOfSpeech,
+      contextualSenseId,
+      senses: [
+        {
+          id: contextualSenseId,
+          partOfSpeech,
+          easyEnglish: parsed?.senses?.[0]?.easyEnglish || `Main common meaning in daily English.`,
+          easyBengali: parsed?.senses?.[0]?.easyBengali || 'Main meaning',
+          isContextual: true,
+          registerOrType: 'standard',
+          examples: parsed?.senses?.[0]?.examples || [{ english: `He used the word ${cleanLemma} properly.`, bengali: `Example translation.` }],
+          synonyms: parsed?.senses?.[0]?.synonyms || [],
+          antonyms: parsed?.senses?.[0]?.antonyms || []
+        }
+      ],
+      collocations: parsed?.collocations || [],
+      idiomsAndPhrases: parsed?.idiomsAndPhrases || [],
+      wordForms: parsed?.wordForms || [{ form: cleanLemma, partOfSpeech }]
+    };
+  }
+
   async analyze(
     text: string,
     type: SelectionType,
@@ -188,6 +369,7 @@ Return a valid raw JSON object strictly adhering to this schema:
   "grammaticalNote": "Grammar or syntactic role",
   "collocations": ["collocation 1", "collocation 2"],
   "examples": ["example sentence 1"],
+  "exampleBengali": "Natural ${lang.targetLabel} translation of example sentence 1",
   "synonyms": ["synonym 1"],
   "antonyms": ["antonym 1"],
   "registerAndTone": "Tone description"

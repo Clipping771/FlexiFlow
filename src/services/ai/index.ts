@@ -98,6 +98,18 @@ export class AIService {
       }
       // Fallback: adapt from generic analyze
       const generic = await provider.analyze(text, 'word', contextSentence, paragraphContext) as any;
+      const example = generic.examples?.[0] || contextSentence;
+      let exampleBengali = generic.exampleBengali;
+      if (!exampleBengali || exampleBengali === 'উদাহরণ বাক্যের অর্থ' || exampleBengali === 'বাক্যে এর ব্যবহার।') {
+        if (example) {
+          try {
+            const tr = await provider.analyze(example, 'sentence') as any;
+            exampleBengali = tr.bengaliTranslation || tr.easyBengali || '';
+          } catch {
+            exampleBengali = undefined;
+          }
+        }
+      }
       return {
         selectedText: text,
         lemma: text.toLowerCase(),
@@ -105,8 +117,8 @@ export class AIService {
         easyEnglish: generic.simpleEnglishExplanation || generic.contextualMeaning || 'Contextual meaning.',
         easyBengali: generic.bengaliTranslation || 'বাংলা অর্থ',
         contextMeaning: generic.contextualMeaning || generic.whyFitsContext || 'Meaning in this context.',
-        example: generic.examples?.[0] || contextSentence,
-        exampleBengali: 'উদাহরণ বাক্যের অর্থ',
+        example,
+        exampleBengali: exampleBengali || undefined,
         confidence: 'high',
         contextualSenseId: 'sense_1'
       };
@@ -139,9 +151,20 @@ export class AIService {
             easyEnglish: generic.simpleEnglishExplanation || 'Primary meaning.',
             easyBengali: generic.bengaliTranslation || 'প্রধান অর্থ',
             isContextual: true,
-            examples: (generic.examples || []).map((e: string) => ({ english: e, bengali: 'উদাহরণ' })),
-            synonyms: (generic.synonyms || []).map((s: string) => ({ word: s, easyEnglish: 'Similar word', easyBengali: 'সমার্থক শব্দ' })),
-            antonyms: []
+            examples: (generic.examples || []).map((e: string, idx: number) => ({
+              english: e,
+              bengali: idx === 0 && generic.exampleBengali ? generic.exampleBengali : ''
+            })),
+            synonyms: (generic.synonyms || []).map((s: string) => ({
+              word: s,
+              easyEnglish: 'Similar word',
+              easyBengali: ''
+            })),
+            antonyms: (generic.antonyms || []).map((a: string) => ({
+              word: a,
+              easyEnglish: 'Opposite word',
+              easyBengali: ''
+            }))
           }
         ],
         collocations: (generic.collocations || []).map((c: string) => ({ english: c })),

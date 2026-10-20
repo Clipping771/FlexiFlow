@@ -72,8 +72,11 @@ export class MockAIProvider implements AIProvider {
       ? `In this sentence, "${clean}" describes the specific situation being talked about.`
       : `Used here in its most natural sense.`;
 
-    const exEnglish = contextSentence || `She understood the meaning of ${clean} immediately.`;
-    const exBengali = `সে বাক্যটিতে এর ভাবার্থ সহজে বুঝতে পেরেছিল।`;
+    const isInflict = lemma === 'inflict' || lemma === 'inflicted';
+    const exEnglish = contextSentence || (isInflict ? 'The storm inflicted severe damage on the coastal village.' : `She understood the meaning of ${clean} immediately.`);
+    const exBengali = isInflict
+      ? 'ঝড়টি উপকূলীয় গ্রামে মারাত্মক ক্ষয়ক্ষতি সাধন করেছিল।'
+      : `সে বাক্যটিতে এর ভাবার্থ সহজে বুঝতে পেরেছিল।`;
 
     return {
       selectedText: clean,
@@ -208,6 +211,9 @@ export class MockAIProvider implements AIProvider {
       examples: contextSentence
         ? [`"${contextSentence.slice(0, 100)}..."`]
         : [`Technically, the requirements were fulfilled correctly.`],
+      exampleBengali: (word.toLowerCase() === 'inflict' || word.toLowerCase() === 'inflicted')
+        ? 'ঝড়টি উপকূলীয় গ্রামে মারাত্মক ক্ষয়ক্ষতি সাধন করেছিল।'
+        : 'সে বাক্যটিতে এর ভাবার্থ সহজে বুঝতে পেরেছিল।',
       synonyms: ['accurate', 'precise'],
       antonyms: [],
       registerAndTone: 'Standard English'

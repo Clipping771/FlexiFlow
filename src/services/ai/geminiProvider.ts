@@ -243,7 +243,7 @@ Return JSON adhering to StageAContextualSchema:
       easyBengali: parsed?.easyBengali && /[\u0980-\u09FF]/.test(parsed.easyBengali) ? parsed.easyBengali : 'প্রাসঙ্গিক অর্থ',
       contextMeaning: parsed?.contextMeaning || 'Meaning in this context.',
       example: parsed?.example || contextSentence,
-      exampleBengali: parsed?.exampleBengali || 'বাক্যে এর ব্যবহার।',
+      exampleBengali: parsed?.exampleBengali || undefined,
       confidence: 'medium',
       contextualSenseId: 'sense_1'
     };
@@ -367,6 +367,7 @@ Return JSON adhering to WordAnalysisSchema:
   "grammaticalNote": "Grammar / syntactic role",
   "collocations": ["collocation 1", "collocation 2"],
   "examples": ["example 1", "example 2"],
+  "exampleBengali": "Natural ${lang.targetLabel} translation of example 1",
   "synonyms": ["synonym 1"],
   "antonyms": ["antonym 1"],
   "registerAndTone": "Tone description"
