@@ -1,8 +1,52 @@
 import { z } from 'zod';
 
+export function decodeHtmlEntities(str?: string): string {
+  if (!str || typeof str !== 'string') return (str as any) || '';
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;|&#39;|&apos;|&#x27;/g, "'")
+    .replace(/&#(\d+);/g, (_, dec) => {
+      try {
+        const code = parseInt(dec, 10);
+        return String.fromCharCode(code);
+      } catch {
+        return _;
+      }
+    })
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+      try {
+        const code = parseInt(hex, 16);
+        return String.fromCharCode(code);
+      } catch {
+        return _;
+      }
+    });
+}
+
+export function deepDecodeHtmlEntities(val: any): any {
+  if (typeof val === 'string') {
+    return decodeHtmlEntities(val);
+  }
+  if (Array.isArray(val)) {
+    return val.map(deepDecodeHtmlEntities);
+  }
+  if (val !== null && typeof val === 'object') {
+    const res: Record<string, any> = {};
+    for (const key of Object.keys(val)) {
+      res[key] = deepDecodeHtmlEntities(val[key]);
+    }
+    return res;
+  }
+  return val;
+}
+
 export const WordAnalysisSchema = z.preprocess((val: any) => {
   if (!val || typeof val !== 'object') return val;
-  const copy = { ...val };
+  const decoded = deepDecodeHtmlEntities(val);
+  const copy = { ...decoded };
   copy.selectedText = copy.selectedText || copy.word || copy.text || copy.target || '';
   copy.selectionType = 'word';
   copy.contextualMeaning = copy.contextualMeaning || copy.meaning || copy.definition || copy.contextMeaning || copy.simpleEnglishExplanation || '';
@@ -433,7 +477,8 @@ export const GrammarPracticeSchema = z.preprocess((val: any) => {
 
 export const SentenceAnalysisSchema = z.preprocess((val: any) => {
   if (!val || typeof val !== 'object') return val;
-  const copy = { ...val };
+  const decoded = deepDecodeHtmlEntities(val);
+  const copy = { ...decoded };
   copy.selectedText = copy.selectedText || copy.sentence || copy.text || '';
   copy.selectionType = 'sentence';
   copy.plainEnglishParaphrase = copy.plainEnglishParaphrase || copy.paraphrase || copy.overallMeaning || copy.simpleEnglish || '';
@@ -647,7 +692,8 @@ export const WritingAssistSchema = z.preprocess((val: any) => {
 
 export const FollowUpResponseSchema = z.preprocess((val: any) => {
   if (!val || typeof val !== 'object') return val;
-  const copy = { ...val };
+  const decoded = deepDecodeHtmlEntities(val);
+  const copy = { ...decoded };
   copy.question = copy.question || 'Question';
   copy.answer = copy.answer || copy.response || copy.explanation || '';
   copy.bengaliSummary = copy.bengaliSummary || copy.summary || copy.bengali || '';

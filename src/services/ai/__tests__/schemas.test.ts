@@ -126,4 +126,31 @@ describe('AI-Native Output Validation & Schemas', () => {
       expect(parsed.data.bengaliSummary).toBeTruthy();
     }
   });
+
+  it('automatically decodes HTML entities in FollowUpResponseSchema', () => {
+    const rawWithEntities = {
+      question: "What is India&#039;s policy &amp; goal?",
+      answer: "The government didn&#039;t want &quot;BIG-B&quot; without context.",
+      keyTakeaway: "India&#039;s position is clear.",
+      bengaliSummary: "ভারতের &#039;BIG-B&#039; নিয়ে সিদ্ধান্ত।",
+      suggestedFollowUps: ["Why didn&#039;t they join?"],
+      examples: [
+        {
+          english: "It wasn&#039;t easy.",
+          bengali: "এটি সহজ ছিল না।"
+        }
+      ]
+    };
+
+    const parsed = FollowUpResponseSchema.safeParse(rawWithEntities);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.question).toBe("What is India's policy & goal?");
+      expect(parsed.data.answer).toBe('The government didn\'t want "BIG-B" without context.');
+      expect(parsed.data.keyTakeaway).toBe("India's position is clear.");
+      expect(parsed.data.bengaliSummary).toBe("ভারতের 'BIG-B' নিয়ে সিদ্ধান্ত।");
+      expect(parsed.data.suggestedFollowUps[0]).toBe("Why didn't they join?");
+      expect(parsed.data.examples[0].english).toBe("It wasn't easy.");
+    }
+  });
 });
