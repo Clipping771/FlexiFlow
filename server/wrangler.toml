@@ -1,0 +1,18 @@
+name = "lexiflow-api"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Comma-separated list of origins allowed by CORS. Production should list only
+# chrome-extension://<EXTENSION_ID>; add http://localhost:* origins only in .dev.vars.
+ALLOWED_ORIGINS = "chrome-extension://REPLACE_WITH_EXTENSION_ID"
+
+# Secrets (set with `wrangler secret put <NAME>`, or in .dev.vars for local dev):
+#   JWT_SECRET  HMAC key for access tokens, at least 32 random bytes
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lexiflow"
+# Replace with the id printed by `wrangler d1 create lexiflow`.
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
