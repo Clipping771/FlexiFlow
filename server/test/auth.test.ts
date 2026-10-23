@@ -5,6 +5,7 @@ import type { Bindings } from '../src/env';
 import { GOOGLE_JWKS_URL, clearGoogleKeyCache } from '../src/lib/google';
 import { SIGNUPS_PER_IP_PER_DAY } from '../src/routes/auth';
 import { createTestD1, type TestD1 } from './d1';
+import { createTestKV } from './kv';
 
 const CLIENT_ID = 'test-client.apps.googleusercontent.com';
 const NONCE = 'nonce-123';
@@ -57,7 +58,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   d1 = await createTestD1();
-  env = { DB: d1.db, JWT_SECRET: 'test-secret-that-is-at-least-32-bytes-long', ALLOWED_ORIGINS: '', GOOGLE_CLIENT_ID: CLIENT_ID, GEMINI_API_KEY: '', GEMINI_MODEL: 'gemini-2.0-flash', UPGRADE_URL: '' };
+  env = { DB: d1.db, JWT_SECRET: 'test-secret-that-is-at-least-32-bytes-long', ALLOWED_ORIGINS: '', GOOGLE_CLIENT_ID: CLIENT_ID, GEMINI_API_KEY: '', GEMINI_MODEL: 'gemini-2.0-flash', UPGRADE_URL: '', CACHE: createTestKV().kv };
   clearGoogleKeyCache();
   published = [googleKey.publicJwk];
   jwksAvailable = true;

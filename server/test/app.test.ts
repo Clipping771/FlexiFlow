@@ -5,6 +5,7 @@ import { signAccessToken } from '../src/lib/tokens';
 import { dhakaDay, nextDhakaMidnight } from '../src/lib/time';
 import { effectivePlan } from '../src/lib/plans';
 import { createTestD1, type TestD1 } from './d1';
+import { createTestKV } from './kv';
 
 const SECRET = 'test-secret-that-is-at-least-32-bytes-long';
 const EXT_ORIGIN = 'chrome-extension://abcdefghijklmnop';
@@ -18,7 +19,7 @@ beforeEach(async () => {
     DB: d1.db,
     JWT_SECRET: SECRET,
     ALLOWED_ORIGINS: `${EXT_ORIGIN}, http://localhost:8787`,
-    GOOGLE_CLIENT_ID: 'test-client.apps.googleusercontent.com', GEMINI_API_KEY: '', GEMINI_MODEL: 'gemini-2.0-flash', UPGRADE_URL: ''
+    GOOGLE_CLIENT_ID: 'test-client.apps.googleusercontent.com', GEMINI_API_KEY: '', GEMINI_MODEL: 'gemini-2.0-flash', UPGRADE_URL: '', CACHE: createTestKV().kv
   };
 });
 

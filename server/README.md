@@ -1,7 +1,7 @@
 # LexiFlow Cloud API
 
 Cloudflare Worker (Hono + D1) that will hold the AI keys, accounts and usage limits for the extension.
-Design: [CLOUD_BACKEND_DESIGN.md](../CLOUD_BACKEND_DESIGN.md). Done so far: M2 (skeleton, schema, health, `/v1/me`) M3 (Google sign-in, refresh rotation, logout) and M4 (metered Stage A/B AI endpoints).
+Design: [CLOUD_BACKEND_DESIGN.md](../CLOUD_BACKEND_DESIGN.md). Done so far: M2 (skeleton, schema, health, `/v1/me`) M3 (Google sign-in, refresh rotation, logout) M4 (metered Stage A/B AI endpoints) and M5 (shared cache, kill switch, cost report).
 
 ## Local development
 
@@ -32,9 +32,28 @@ Errors always use `{ error: { code, message } }` with the codes in design §7.
 A session is `{ accessToken, refreshToken, expiresIn, user, plan }`; access tokens last one hour.
 
 AI requests run: plan lookup → input limits (`413 INPUT_TOO_LONG`) → per-minute rate limit (`429`, `Retry-After`)
-→ atomic credit reservation (`402 QUOTA_EXCEEDED`) → Gemini, with one retry that feeds validation errors back
-→ commit, or refund and `503 AI_UNAVAILABLE`. Only built-in target languages are accepted. `usage_events` records
+→ shared KV cache → on a miss, the kill switch (`503 AI_PAUSED`) → atomic credit reservation (`402 QUOTA_EXCEEDED`)
+→ Gemini, with one retry that feeds validation errors back → commit, or refund and `503 AI_UNAVAILABLE`.
+Cache hits are charged like any answer (`cached: true`) but cost no model call, and are served even while paused. Only built-in target languages are accepted. `usage_events` records
 counts, tokens and latency, never the text.
+
+## Running costs
+
+- **Cache.** Stage A/B answers are cached in KV for 30 days under keys that include `PROMPT_VERSION`; Stage A keys
+  hold only a hash of the reader's sentence. Bump `PROMPT_VERSION` after changing prompt text to retire old entries.
+- **Budget.** Every model call adds its estimated cost to `spend_daily` (failed attempts included). When Free-plan
+  spend reaches `FREE_DAILY_BUDGET_USD`, new Free lookups pause until Dhaka midnight and `ALERT_WEBHOOK_URL` is
+  notified once. Keep `GEMINI_*_USD_PER_MTOK` in `wrangler.toml` in line with the model's current prices.
+- **Manual kill switch.** Pause without a deploy, and resume by deleting the key:
+
+  ```bash
+  npx wrangler kv key put --remote --binding CACHE control:kill_switch free   # or: all
+  npx wrangler kv key delete --remote --binding CACHE control:kill_switch
+  ```
+
+- **Cost report.** `npm run report:costs` (local D1) or `npm run report:costs -- --remote --days 30` prints requests,
+  cache hit rate, refunds, credits and estimated model cost per endpoint and day. *Cost per charged credit* is the
+  number to compare with what a credit earns in each plan before setting prices.
 
 ## Google sign-in setup
 
@@ -48,6 +67,7 @@ counts, tokens and latency, never the text.
 
 ```bash
 npx wrangler d1 create lexiflow           # put the printed id in wrangler.toml
+npx wrangler kv namespace create CACHE    # put the printed id in wrangler.toml
 npx wrangler secret put JWT_SECRET
 npx wrangler secret put GEMINI_API_KEY
 npm run db:migrate:remote

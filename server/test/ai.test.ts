@@ -4,6 +4,7 @@ import type { Bindings } from '../src/env';
 import { signAccessToken } from '../src/lib/tokens';
 import { PLAN_LIMITS } from '../src/lib/plans';
 import { createTestD1, type TestD1 } from './d1';
+import { createTestKV } from './kv';
 
 const SECRET = 'test-secret-that-is-at-least-32-bytes-long';
 const GEMINI_HOST = 'https://generativelanguage.googleapis.com/';
@@ -74,7 +75,7 @@ beforeEach(async () => {
     GOOGLE_CLIENT_ID: 'test-client',
     GEMINI_API_KEY: 'gemini-test-key',
     GEMINI_MODEL: 'gemini-2.0-flash',
-    UPGRADE_URL: 'https://lexiflow.test/pro'
+    UPGRADE_URL: 'https://lexiflow.test/pro', CACHE: createTestKV().kv
   };
   geminiReplies = [];
   geminiRequests = [];

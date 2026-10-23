@@ -14,9 +14,22 @@ GOOGLE_CLIENT_ID = "REPLACE_WITH_CLIENT_ID.apps.googleusercontent.com"
 GEMINI_MODEL = "gemini-2.0-flash"
 UPGRADE_URL = "https://lexiflow.app/pro"
 
+# Spend estimates and the Free-plan budget (CLOUD_BACKEND_DESIGN.md §5.4). Prices are USD per
+# million tokens for GEMINI_MODEL; check Google's current pricing when changing the model.
+GEMINI_INPUT_USD_PER_MTOK = "0.10"
+GEMINI_OUTPUT_USD_PER_MTOK = "0.40"
+FREE_DAILY_BUDGET_USD = "5"
+
 # Secrets (set with `wrangler secret put <NAME>`, or in .dev.vars for local dev):
 #   JWT_SECRET      HMAC key for access tokens, at least 32 random bytes
 #   GEMINI_API_KEY  Google AI Studio key used for every cloud AI call
+#   ALERT_WEBHOOK_URL  optional Slack/Discord webhook for budget alerts
+
+# Shared response cache. The key "control:kill_switch" in it is the manual kill switch.
+[[kv_namespaces]]
+binding = "CACHE"
+# Replace with the id printed by `wrangler kv namespace create CACHE`.
+id = "00000000000000000000000000000000"
 
 [[d1_databases]]
 binding = "DB"

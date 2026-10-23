@@ -18,11 +18,19 @@ export function isSupportedTargetLang(code: string): boolean {
   return code !== 'en' && Object.prototype.hasOwnProperty.call(SUPPORTED_PAIRS, `en-${code}`);
 }
 
-/** Raised when the model's output stays unusable after one retry; the caller refunds. */
-export class InvalidModelOutputError extends Error {
-  constructor(readonly errors: string[]) {
-    super('Model output failed validation');
-    this.name = 'InvalidModelOutputError';
+/**
+ * A task that produced no usable answer: the model call failed, or its output stayed invalid after one retry.
+ * Carries the tokens already spent so the caller can account for them while refunding the reader.
+ */
+export class TaskFailedError extends Error {
+  constructor(
+    readonly reason: 'model_error' | 'invalid_output',
+    readonly tokensIn: number,
+    readonly tokensOut: number,
+    readonly errors: string[] = []
+  ) {
+    super(reason === 'model_error' ? 'Model call failed' : 'Model output failed validation');
+    this.name = 'TaskFailedError';
   }
 }
 
@@ -54,7 +62,12 @@ async function runValidated<T>(
     const user = attempt === 0
       ? prompt.user
       : lastErrors.length ? correction(lastErrors) : withJsonOnlyReminder(prompt.user);
-    const res = await generateGeminiJson({ ...gemini, system: prompt.system, user, maxTokens: prompt.maxTokens });
+    let res;
+    try {
+      res = await generateGeminiJson({ ...gemini, system: prompt.system, user, maxTokens: prompt.maxTokens });
+    } catch {
+      throw new TaskFailedError('model_error', tokensIn, tokensOut);
+    }
     tokensIn += res.tokensIn;
     tokensOut += res.tokensOut;
 
@@ -69,7 +82,7 @@ async function runValidated<T>(
     if (result.isValid && result.data) return { data: result.data, tokensIn, tokensOut };
     lastErrors = result.errors;
   }
-  throw new InvalidModelOutputError(lastErrors);
+  throw new TaskFailedError('invalid_output', tokensIn, tokensOut, lastErrors);
 }
 
 export interface StageAInput {

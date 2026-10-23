@@ -166,6 +166,7 @@ BYOK provider আর সার্ভার, দুজনেই এই মডি�
 - **দিন হিসাব হবে Asia/Dhaka (UTC+6) সময়ে।** রিসেট হবে রাত ১২টায়, আর ইউজারকে "রাত ১২টায় রিসেট" দেখানো হবে।
 - লিমিটগুলো কোডে hardcode না করে `plans` কনফিগে (Worker env বা D1 টেবিল) রাখুন, যাতে deploy ছাড়াই বদলানো যায়।
 - **Rate limit বাস্তবায়ন (M4):** Durable Object বা KV-র বদলে D1-এর `rate_limits` টেবিলে প্রতি ইউজারের ১ মিনিটের fixed window গোনা হয় (একটা atomic UPSERT)। Quota-র জন্য D1-এ এমনিতেই লিখতে হয়, তাই নতুন কোনো সার্ভিস লাগেনি। ট্রাফিক অনেক বাড়লে Durable Object-এ সরানো যাবে।
+- **Kill switch বাস্তবায়ন (M5):** খরচের হিসাব KV-র বদলে D1-এর `spend_daily` টেবিলে রাখা হয়, কারণ KV-তে atomic ভাবে যোগ করা যায় না, ফলে একসাথে অনেক request এলে হিসাব কম হতো। ব্যর্থ attempt-এর token-ও খরচে ধরা হয়। হাতে বন্ধ করার switch থাকে KV-তে (`control:kill_switch` = `free` বা `all`), যাতে deploy ছাড়াই সঙ্গে সঙ্গে বন্ধ করা যায়। বন্ধ থাকলেও cache-এ থাকা উত্তর দেওয়া হয়, কারণ তাতে কোনো খরচ নেই।
 
 ### ৫.৩ Reserve → Commit/Refund (race condition এড়াতে)
 
@@ -197,7 +198,7 @@ UPDATE usage_daily
 
 | Endpoint | Cache key | শেয়ার করা যাবে? |
 |---|---|---|
-| `stage-b` | `sb:{PROMPT_VERSION}:{lang}:{lemma}:{pos}` | হ্যাঁ। শব্দ-ভিত্তিক, ব্যক্তিগত কিছু নেই। **সবচেয়ে বেশি সাশ্রয় এখানে।** |
+| `stage-b` | `sb:{PROMPT_VERSION}:{lang}:{lemma}:{pos}:{senseId}` | হ্যাঁ। শব্দ-ভিত্তিক, ব্যক্তিগত কিছু নেই। **সবচেয়ে বেশি সাশ্রয় এখানে।** |
 | `stage-a` | `sa:{v}:{lang}:{text}:{hash(contextSentence)}` | হ্যাঁ, শুধু hash রাখা হবে, বাক্য না |
 | `compare-words` | `cw:{v}:{lang}:{sorted(a,b)}` | হ্যাঁ |
 | `explain-sentence`, `article`, `follow-up`, `evaluate-usage`, `assist-writing` | — | না। এগুলোতে ইউজারের ব্যক্তিগত লেখা থাকতে পারে |
@@ -249,6 +250,7 @@ Base URL: `https://api.lexiflow.app/v1`
 | 413 | `INPUT_TOO_LONG` | ছোট করে নির্বাচন করতে বলবে, `maxChars` দেখাবে |
 | 429 | `RATE_LIMITED` | `Retry-After` অনুযায়ী অপেক্ষা করে আবার চেষ্টা করবে |
 | 503 | `AI_UNAVAILABLE` | "কিছুক্ষণ পর চেষ্টা করুন" দেখাবে, credit refund হয়ে যাবে |
+| 503 | `AI_PAUSED` | Kill switch বা দৈনিক বাজেট শেষ। "নতুন lookup এখন বন্ধ" দেখাবে, সাথে আবার চালু হওয়ার সময়। Cache-এ থাকা শব্দ তখনও কাজ করে |
 | 400 | `INVALID_REQUEST` | Body ভুল বা অসম্পূর্ণ। এটা extension-এর bug, ইউজারের কিছু করার নেই |
 | 503 | `SERVICE_UNAVAILABLE` | Google-এর key আনা যায়নি বা সার্ভার সাময়িক বন্ধ। "কিছুক্ষণ পর চেষ্টা করুন" দেখাবে, লগইন অবস্থা মুছবে না |
 

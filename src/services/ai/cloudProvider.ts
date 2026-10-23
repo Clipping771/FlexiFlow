@@ -16,6 +16,7 @@ export type CloudAIErrorCode =
   | 'INPUT_TOO_LONG'
   | 'INVALID_REQUEST'
   | 'AI_UNAVAILABLE'
+  | 'AI_PAUSED'
   | 'NOT_AVAILABLE';
 
 /**
@@ -62,6 +63,14 @@ function toCloudError(status: number, envelope: ErrorEnvelope): Error {
       );
     case 'INPUT_TOO_LONG':
       return new CloudAIError('INPUT_TOO_LONG', `That selection is too long for LexiFlow Cloud. Select a shorter piece of text.`, details);
+    case 'AI_PAUSED': {
+      const resume = formatTime(details.resetAt);
+      return new CloudAIError(
+        'AI_PAUSED',
+        `${message || 'LexiFlow Cloud is paused right now.'}${resume ? ` New lookups resume at ${resume}.` : ''}`,
+        details
+      );
+    }
     case 'INVALID_REQUEST':
       return new CloudAIError('INVALID_REQUEST', message || 'LexiFlow Cloud could not read this request.', details);
     case 'AUTH_REQUIRED':

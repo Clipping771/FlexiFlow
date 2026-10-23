@@ -10,6 +10,7 @@ export type ErrorCode =
   | 'RATE_LIMITED'
   | 'AI_UNAVAILABLE'
   | 'SERVICE_UNAVAILABLE'
+  | 'AI_PAUSED'
   | 'INVALID_REQUEST'
   | 'NOT_FOUND'
   | 'INTERNAL';

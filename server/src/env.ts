@@ -12,6 +12,15 @@ export interface Bindings {
   GEMINI_MODEL: string;
   /** Where the "upgrade to Pro" button in QUOTA_EXCEEDED errors points. */
   UPGRADE_URL: string;
+  /** Shared response cache, also holding the manual kill switch key. */
+  CACHE: KVNamespace;
+  /** Model list prices used for spend estimates, USD per million tokens. */
+  GEMINI_INPUT_USD_PER_MTOK?: string;
+  GEMINI_OUTPUT_USD_PER_MTOK?: string;
+  /** Free-plan model spend per day before new Free requests pause. */
+  FREE_DAILY_BUDGET_USD?: string;
+  /** Optional Slack/Discord-style webhook for budget alerts (wrangler secret). */
+  ALERT_WEBHOOK_URL?: string;
 }
 
 export interface Variables {

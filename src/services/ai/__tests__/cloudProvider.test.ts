@@ -60,6 +60,7 @@ describe('CloudProvider', () => {
     [413, { error: { code: 'INPUT_TOO_LONG', maxChars: 600 } }, 'INPUT_TOO_LONG', 'Select a shorter piece of text.'],
     [400, { error: { code: 'INVALID_REQUEST', message: 'This target language is not available on LexiFlow Cloud yet.' } }, 'INVALID_REQUEST', 'not available on LexiFlow Cloud'],
     [503, { error: { code: 'AI_UNAVAILABLE', message: 'LexiFlow AI is busy right now.' } }, 'AI_UNAVAILABLE', 'busy right now'],
+    [503, { error: { code: 'AI_PAUSED', message: 'Pausing new Free lookups for today.', resetAt: '2026-10-24T00:00:00+06:00' } }, 'AI_PAUSED', 'New lookups resume at'],
     [502, '<html>Bad gateway</html>', 'AI_UNAVAILABLE', 'unavailable right now (502)']
   ])('maps HTTP %s to %s', async (status, body, code, text) => {
     authorizedFetch.mockResolvedValue(reply(status, body));

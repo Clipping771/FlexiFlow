@@ -10,7 +10,8 @@
     "db:migrate:remote": "wrangler d1 migrations apply lexiflow --remote",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p test",
     "test": "vitest run",
-    "ci": "npm run typecheck && npm test"
+    "ci": "npm run typecheck && npm test",
+    "report:costs": "node scripts/cost-report.mjs"
   },
   "dependencies": {
     "hono": "^4.13.13"
