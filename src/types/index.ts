@@ -697,7 +697,7 @@ export interface UserSettings {
   autoPronounce?: boolean;
   showBengaliByDefault: boolean;
   theme: 'light' | 'dark' | 'system';
-  aiProvider: 'mock' | 'gemini' | 'openai' | 'anthropic' | 'ollama';
+  aiProvider: 'mock' | 'gemini' | 'openai' | 'anthropic' | 'ollama' | 'lexiflow';
   apiKey?: string;
   apiEndpoint?: string;
   selectedModel?: string;

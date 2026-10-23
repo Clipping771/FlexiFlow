@@ -36,7 +36,7 @@ Status: Draft (2026-10-23) · Scope: Phase 1 (ব্যবসা চালুর
 │ 1. CORS: শুধু chrome-extension://<EXTENSION_ID>               │
 │ 2. Auth: JWT যাচাই → userId, plan                            │
 │ 3. Validate: Zod দিয়ে input, দৈর্ঘ্যের সীমা                   │
-│ 4. Rate limit: প্রতি ইউজার প্রতি মিনিটে (Durable Object/KV)     │
+│ 4. Rate limit: প্রতি ইউজার প্রতি মিনিটে (D1, ১ মিনিটের window)  │
 │ 5. Quota reserve: D1-তে atomic UPDATE                         │
 │ 6. Shared cache lookup (KV) ──hit──► সরাসরি উত্তর             │
 │ 7. Prompt build (shared prompts module) → Gemini API          │
@@ -165,6 +165,7 @@ BYOK provider আর সার্ভার, দুজনেই এই মডি�
 
 - **দিন হিসাব হবে Asia/Dhaka (UTC+6) সময়ে।** রিসেট হবে রাত ১২টায়, আর ইউজারকে "রাত ১২টায় রিসেট" দেখানো হবে।
 - লিমিটগুলো কোডে hardcode না করে `plans` কনফিগে (Worker env বা D1 টেবিল) রাখুন, যাতে deploy ছাড়াই বদলানো যায়।
+- **Rate limit বাস্তবায়ন (M4):** Durable Object বা KV-র বদলে D1-এর `rate_limits` টেবিলে প্রতি ইউজারের ১ মিনিটের fixed window গোনা হয় (একটা atomic UPSERT)। Quota-র জন্য D1-এ এমনিতেই লিখতে হয়, তাই নতুন কোনো সার্ভিস লাগেনি। ট্রাফিক অনেক বাড়লে Durable Object-এ সরানো যাবে।
 
 ### ৫.৩ Reserve → Commit/Refund (race condition এড়াতে)
 

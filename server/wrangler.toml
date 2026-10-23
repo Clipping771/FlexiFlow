@@ -11,8 +11,12 @@ ALLOWED_ORIGINS = "chrome-extension://REPLACE_WITH_EXTENSION_ID"
 # https://<EXTENSION_ID>.chromiumapp.org/ (what chrome.identity.getRedirectURL() returns).
 GOOGLE_CLIENT_ID = "REPLACE_WITH_CLIENT_ID.apps.googleusercontent.com"
 
+GEMINI_MODEL = "gemini-2.0-flash"
+UPGRADE_URL = "https://lexiflow.app/pro"
+
 # Secrets (set with `wrangler secret put <NAME>`, or in .dev.vars for local dev):
-#   JWT_SECRET  HMAC key for access tokens, at least 32 random bytes
+#   JWT_SECRET      HMAC key for access tokens, at least 32 random bytes
+#   GEMINI_API_KEY  Google AI Studio key used for every cloud AI call
 
 [[d1_databases]]
 binding = "DB"

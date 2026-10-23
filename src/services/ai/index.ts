@@ -6,6 +6,7 @@ import { GeminiProvider } from './geminiProvider';
 import { MockAIProvider } from './mockProvider';
 import { OllamaProvider } from './ollamaProvider';
 import { OpenAIProvider } from './openaiProvider';
+import { CloudProvider } from './cloudProvider';
 import { TwoStageCacheService } from './cache';
 import { CacheManager } from '../cache';
 import { hashString } from '../cache/normalization';
@@ -36,6 +37,8 @@ export class AIService {
     }
 
     switch (effectiveProvider) {
+      case 'lexiflow':
+        return new CloudProvider(userSettings.targetLanguage || 'bn');
       case 'gemini':
         if (userSettings.apiKey?.trim()) {
           const model = (!userSettings.selectedModel || userSettings.selectedModel === 'gemini-1.5-flash')
@@ -266,7 +269,15 @@ export class AIService {
       }
 
       // Perform a minimal, fast verification with the configured target language
-      const res = await provider.analyze('resilient', 'word', 'They remained resilient during challenging times.');
+      const sample = 'They remained resilient during challenging times.';
+      // LexiFlow Cloud serves Stage A only for now, so test with that and map it to the word-analysis fields.
+      const res = provider instanceof CloudProvider
+        ? await provider.analyzeStageA('resilient', sample).then((a) => ({
+            selectedText: a.selectedText,
+            contextualMeaning: a.contextMeaning,
+            bengaliTranslation: a.easyBengali
+          }))
+        : await provider.analyze('resilient', 'word', sample);
       const latencyMs = Date.now() - start;
 
       const wordRes = res as any;
@@ -314,4 +325,5 @@ export * from './geminiProvider';
 export * from './openaiProvider';
 export * from './anthropicProvider';
 export * from './ollamaProvider';
+export * from './cloudProvider';
 export * from './safeJson';

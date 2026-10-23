@@ -18,7 +18,7 @@ beforeEach(async () => {
     DB: d1.db,
     JWT_SECRET: SECRET,
     ALLOWED_ORIGINS: `${EXT_ORIGIN}, http://localhost:8787`,
-    GOOGLE_CLIENT_ID: 'test-client.apps.googleusercontent.com'
+    GOOGLE_CLIENT_ID: 'test-client.apps.googleusercontent.com', GEMINI_API_KEY: '', GEMINI_MODEL: 'gemini-2.0-flash', UPGRADE_URL: ''
   };
 });
 

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { AppEnv } from './env';
 import { ApiError } from './lib/errors';
 import { corsForExtension } from './middleware/cors';
+import { ai } from './routes/ai';
 import { auth } from './routes/auth';
 import { health } from './routes/health';
 import { me } from './routes/me';
@@ -14,6 +15,7 @@ const v1 = new Hono<AppEnv>();
 v1.route('/health', health);
 v1.route('/auth', auth);
 v1.route('/me', me);
+v1.route('/ai', ai);
 app.route('/v1', v1);
 
 app.notFound((c) => c.json(new ApiError(404, 'NOT_FOUND', 'Route not found.').toBody(), 404));

@@ -440,10 +440,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span className="top-kpi-pill" style={{ padding: '6px 12px', fontSize: '12px' }}>
-            <span className="top-kpi-dot" style={{ background: form.aiProvider !== 'mock' && form.apiKey ? '#10b981' : '#f59e0b' }}></span>
+            <span className="top-kpi-dot" style={{ background: form.aiProvider === 'lexiflow' || (form.aiProvider !== 'mock' && form.apiKey) ? '#10b981' : '#f59e0b' }}></span>
             <span className="top-kpi-label">Active Engine:</span>
             <span className="top-kpi-val">
-              {form.aiProvider === 'gemini' && form.apiKey
+              {form.aiProvider === 'lexiflow'
+                ? 'LexiFlow Cloud'
+                : form.aiProvider === 'gemini' && form.apiKey
                 ? `Google Gemini (${form.selectedModel || 'gemini-2.0-flash'})`
                 : form.aiProvider === 'ollama'
                 ? `Local Ollama (${form.selectedModel || 'llama3.2'})`
@@ -968,6 +970,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 setCustomModelMode(false);
               }}
             >
+              <option value="lexiflow">LexiFlow Cloud (Sign in, no API key)</option>
               <option value="gemini">Google Gemini (Recommended &amp; Fast)</option>
               <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
               <option value="anthropic">Anthropic Claude (Claude 3.5 Sonnet)</option>
@@ -977,7 +980,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
 
           {/* API Key Input */}
-          {form.aiProvider !== 'mock' && form.aiProvider !== 'ollama' && (
+          {form.aiProvider !== 'mock' && form.aiProvider !== 'ollama' && form.aiProvider !== 'lexiflow' && (
             <div style={{ marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
@@ -1104,8 +1107,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           )}
 
+          {form.aiProvider === 'lexiflow' && (
+            <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Uses your LexiFlow Cloud account above: no API key needed, counted against your daily credits.
+              Word lookups (quick meaning and deep dive) run on LexiFlow Cloud today; Sentence X-Ray, writing help
+              and AI chat still need another provider.
+            </p>
+          )}
+
           {/* Model Selection Dropdown */}
-          {form.aiProvider !== 'mock' && (
+          {form.aiProvider !== 'mock' && form.aiProvider !== 'lexiflow' && (
             <div style={{ marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1243,7 +1254,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   alignItems: 'center',
                   gap: '6px'
                 }}
-                disabled={testingConnection || (form.aiProvider !== 'mock' && form.aiProvider !== 'ollama' && !form.apiKey?.trim())}
+                disabled={testingConnection || (form.aiProvider !== 'mock' && form.aiProvider !== 'ollama' && form.aiProvider !== 'lexiflow' && !form.apiKey?.trim())}
                 onClick={handleTestConnection}
               >
                 <Zap size={14} className={testingConnection ? 'spin' : ''} />

@@ -1,13 +1,14 @@
 # LexiFlow Cloud API
 
 Cloudflare Worker (Hono + D1) that will hold the AI keys, accounts and usage limits for the extension.
-Design: [CLOUD_BACKEND_DESIGN.md](../CLOUD_BACKEND_DESIGN.md). Done so far: M2 (skeleton, schema, health, `/v1/me`) and M3 (Google sign-in, refresh rotation, logout).
+Design: [CLOUD_BACKEND_DESIGN.md](../CLOUD_BACKEND_DESIGN.md). Done so far: M2 (skeleton, schema, health, `/v1/me`) M3 (Google sign-in, refresh rotation, logout) and M4 (metered Stage A/B AI endpoints).
 
 ## Local development
 
 ```bash
-npm install
-cp .dev.vars.example .dev.vars      # then set JWT_SECRET
+npm install                         # also run `npm install` in the repo root: the AI routes import the
+                                    # extension's shared prompts, validators and zod from ../src
+cp .dev.vars.example .dev.vars      # then set JWT_SECRET and GEMINI_API_KEY
 npm run db:migrate:local            # applies migrations/ to the local D1
 npm run dev                         # http://localhost:8787
 ```
@@ -24,9 +25,16 @@ npm run dev                         # http://localhost:8787
 | POST | `/v1/auth/google` | – | `{ idToken, nonce }` → session. Creates the account on first sign-in; max 5 new accounts per IP per 24 h |
 | POST | `/v1/auth/refresh` | – | `{ refreshToken }` → new session. Each refresh token works once; replaying one revokes that device's session |
 | POST | `/v1/auth/logout` | – | `{ refreshToken }` → `204`. Idempotent |
+| POST | `/v1/ai/stage-a` | Bearer JWT | `{ text, contextSentence?, paragraphContext?, targetLang }` → `{ data, usage, cached }`. 1 credit |
+| POST | `/v1/ai/stage-b` | Bearer JWT | `{ lemma, partOfSpeech?, contextualSenseId?, targetLang }` → `{ data, usage, cached }`. 1 credit |
 
 Errors always use `{ error: { code, message } }` with the codes in design §7.
 A session is `{ accessToken, refreshToken, expiresIn, user, plan }`; access tokens last one hour.
+
+AI requests run: plan lookup → input limits (`413 INPUT_TOO_LONG`) → per-minute rate limit (`429`, `Retry-After`)
+→ atomic credit reservation (`402 QUOTA_EXCEEDED`) → Gemini, with one retry that feeds validation errors back
+→ commit, or refund and `503 AI_UNAVAILABLE`. Only built-in target languages are accepted. `usage_events` records
+counts, tokens and latency, never the text.
 
 ## Google sign-in setup
 
@@ -41,6 +49,7 @@ A session is `{ accessToken, refreshToken, expiresIn, user, plan }`; access toke
 ```bash
 npx wrangler d1 create lexiflow           # put the printed id in wrangler.toml
 npx wrangler secret put JWT_SECRET
+npx wrangler secret put GEMINI_API_KEY
 npm run db:migrate:remote
 npm run deploy
 ```

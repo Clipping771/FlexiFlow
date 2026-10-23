@@ -9,6 +9,7 @@ import { setupOllamaOriginRules } from './ollamaRules';
 import { setupBadgeListeners, updateAllTabBadges } from './badgeService';
 import { EventLogger, ApprovedEventName } from '../services/logging/eventLogger';
 import { AuthService, CloudAuthError } from '../services/auth/authService';
+import { CloudAIError } from '../services/ai/cloudProvider';
 
 // Immediately ensure Ollama dynamic rules and Badge synchronization are registered
 setupOllamaOriginRules();
@@ -615,7 +616,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
         sendResponse({
           success: false,
           error: (err as Error).message,
-          ...(err instanceof CloudAuthError ? { code: err.code } : {})
+          ...(err instanceof CloudAuthError ? { code: err.code } : {}),
+          ...(err instanceof CloudAIError ? { code: err.code, details: err.details } : {})
         });
       }
     })();

@@ -57,7 +57,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   d1 = await createTestD1();
-  env = { DB: d1.db, JWT_SECRET: 'test-secret-that-is-at-least-32-bytes-long', ALLOWED_ORIGINS: '', GOOGLE_CLIENT_ID: CLIENT_ID };
+  env = { DB: d1.db, JWT_SECRET: 'test-secret-that-is-at-least-32-bytes-long', ALLOWED_ORIGINS: '', GOOGLE_CLIENT_ID: CLIENT_ID, GEMINI_API_KEY: '', GEMINI_MODEL: 'gemini-2.0-flash', UPGRADE_URL: '' };
   clearGoogleKeyCache();
   published = [googleKey.publicJwk];
   jwksAvailable = true;
