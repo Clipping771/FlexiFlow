@@ -1,8 +1,17 @@
 /** Credit cost per endpoint (CLOUD_BACKEND_DESIGN.md §5.1). */
 export const CREDIT_COSTS = {
   'stage-a': 1,
-  'stage-b': 1
+  'stage-b': 1,
+  analyze: 1,
+  'compare-words': 2,
+  'evaluate-usage': 2,
+  'assist-writing': 3,
+  'follow-up': 1,
+  highlights: 3
 } as const;
+
+/** /analyze costs more for longer selections: Sentence X-Ray and paragraphs produce far larger outputs. */
+export const ANALYZE_CREDITS = { word: 1, phrase: 1, sentence: 2, paragraph: 3 } as const;
 
 export type AiEndpoint = keyof typeof CREDIT_COSTS;
 

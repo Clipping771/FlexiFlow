@@ -4,12 +4,14 @@ export interface PlanLimits {
   dailyCredits: number;
   requestsPerMinute: number;
   maxSentenceChars: number;
+  /** Paragraph analysis, writing help and AI chat context. */
+  maxParagraphChars: number;
 }
 
 // Starting values from CLOUD_BACKEND_DESIGN.md §5.2. Revisit once usage_events shows real cost per credit.
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
-  free: { dailyCredits: 30, requestsPerMinute: 10, maxSentenceChars: 600 },
-  pro: { dailyCredits: 600, requestsPerMinute: 30, maxSentenceChars: 2000 }
+  free: { dailyCredits: 30, requestsPerMinute: 10, maxSentenceChars: 600, maxParagraphChars: 3000 },
+  pro: { dailyCredits: 600, requestsPerMinute: 30, maxSentenceChars: 2000, maxParagraphChars: 10000 }
 };
 
 /** A lapsed Pro subscription counts as Free. */

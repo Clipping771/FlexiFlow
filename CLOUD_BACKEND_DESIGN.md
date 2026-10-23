@@ -147,14 +147,13 @@ BYOK provider আর সার্ভার, দুজনেই এই মডি�
 |---|---|---|
 | `stage-a` | শব্দের দ্রুত অর্থ (popup-এর প্রথম অংশ) | 1 |
 | `stage-b` | বিস্তারিত vocabulary | 1 |
-| `analyze` | phrase বা সাধারণ বিশ্লেষণ | 1 |
+| `analyze` | শব্দ বা phrase 1; বাক্য (Sentence X-Ray) 2; paragraph 3 | 1–3 |
 | `follow-up` | AI chat-এ প্রশ্ন | 1 |
-| `explain-sentence` | Sentence X-Ray | 2 |
 | `compare-words` | Word Difference | 2 |
 | `evaluate-usage` | Usage Coach | 2 |
 | `assist-writing` | লেখায় সাহায্য | 3 |
 | `highlights` | পেজ হাইলাইট | 3 |
-| `article` | আর্টিকেল বিশ্লেষণ, প্রতি chunk (১২০০ শব্দ) | 5 |
+| `article` | আর্টিকেল বিশ্লেষণ, প্রতি chunk (১২০০ শব্দ) — **এখনো বানানো হয়নি:** কোনো provider-এর AI article prompt নেই, সবাই extension-এর নিজস্ব বিশ্লেষণ পায় | 5 |
 
 ### ৫.২ প্ল্যানের লিমিট (শুরুর প্রস্তাব, পরে আসল খরচ দেখে ঠিক করবেন)
 
@@ -201,7 +200,7 @@ UPDATE usage_daily
 | `stage-b` | `sb:{PROMPT_VERSION}:{lang}:{lemma}:{pos}:{senseId}` | হ্যাঁ। শব্দ-ভিত্তিক, ব্যক্তিগত কিছু নেই। **সবচেয়ে বেশি সাশ্রয় এখানে।** |
 | `stage-a` | `sa:{v}:{lang}:{text}:{hash(contextSentence)}` | হ্যাঁ, শুধু hash রাখা হবে, বাক্য না |
 | `compare-words` | `cw:{v}:{lang}:{sorted(a,b)}` | হ্যাঁ |
-| `explain-sentence`, `article`, `follow-up`, `evaluate-usage`, `assist-writing` | — | না। এগুলোতে ইউজারের ব্যক্তিগত লেখা থাকতে পারে |
+| `analyze` (বাক্য/paragraph), `highlights`, `follow-up`, `evaluate-usage`, `assist-writing` | — | না। এগুলোতে ইউজারের ব্যক্তিগত লেখা থাকতে পারে |
 
 - KV-তে TTL ৩০ দিন। `PROMPT_VERSION` বদলালে পুরোনো cache নিজে থেকেই অকেজো হয়ে যাবে।
 - "ভুল অর্থ রিপোর্ট" (`REPORT_WRONG_MEANING`) এলে ওই key-টা cache থেকে মুছে দেওয়ার endpoint থাকবে (Phase 1.5)।
@@ -227,13 +226,12 @@ Base URL: `https://api.lexiflow.app/v1`
 | `/ai/stage-a` | `{ text, contextSentence?, paragraphContext?, targetLang }` | `StageAExplanation` |
 | `/ai/stage-b` | `{ lemma, partOfSpeech?, contextualSenseId?, targetLang }` | `StageBDetailedVocabulary` |
 | `/ai/analyze` | `{ text, selectionType, contextSentence?, paragraphContext?, targetLang }` | `LinguisticAnalysisResult` |
-| `/ai/explain-sentence` | … | … |
-| `/ai/compare-words` | … | … |
-| `/ai/evaluate-usage` | … | … |
+| `/ai/compare-words` | `{ wordA, wordB, targetLang }` | `{ wordA, wordB }`: দুটো `LinguisticAnalysisResult` |
+| `/ai/evaluate-usage` | `{ targetWord, sentence, targetLang }` | `UsageCoachFeedback` |
 | `/ai/assist-writing` | `{ text, goal, targetLang }` | `WritingAssistResult` |
 | `/ai/follow-up` | `{ text, context, question, targetLang }` | `FollowUpResponse` |
 | `/ai/highlights` | `{ rawText, pageTitle?, targetLang }` | `HighlightExtractionResult` |
-| `/ai/article` | `{ rawText, title?, mode?, targetLang }` | `ArticleAnalysisResult` |
+| `/ai/article` | (এখনো নেই) | — |
 
 সফল উত্তরের রূপ:
 ```json

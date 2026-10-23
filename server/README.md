@@ -1,7 +1,7 @@
 # LexiFlow Cloud API
 
 Cloudflare Worker (Hono + D1) that will hold the AI keys, accounts and usage limits for the extension.
-Design: [CLOUD_BACKEND_DESIGN.md](../CLOUD_BACKEND_DESIGN.md). Done so far: M2 (skeleton, schema, health, `/v1/me`) M3 (Google sign-in, refresh rotation, logout) M4 (metered Stage A/B AI endpoints) and M5 (shared cache, kill switch, cost report).
+Design: [CLOUD_BACKEND_DESIGN.md](../CLOUD_BACKEND_DESIGN.md). Done so far: M2 (skeleton, schema, health, `/v1/me`) M3 (Google sign-in, refresh rotation, logout) M4 (metered Stage A/B AI endpoints) M5 (shared cache, kill switch, cost report), and the remaining AI endpoints.
 
 ## Local development
 
@@ -27,6 +27,12 @@ npm run dev                         # http://localhost:8787
 | POST | `/v1/auth/logout` | – | `{ refreshToken }` → `204`. Idempotent |
 | POST | `/v1/ai/stage-a` | Bearer JWT | `{ text, contextSentence?, paragraphContext?, targetLang }` → `{ data, usage, cached }`. 1 credit |
 | POST | `/v1/ai/stage-b` | Bearer JWT | `{ lemma, partOfSpeech?, contextualSenseId?, targetLang }` → `{ data, usage, cached }`. 1 credit |
+| POST | `/v1/ai/analyze` | Bearer JWT | `{ text, selectionType, contextSentence?, paragraphContext?, targetLang }`. Word/phrase 1 credit (cached), sentence (Sentence X-Ray) 2, paragraph 3 |
+| POST | `/v1/ai/compare-words` | Bearer JWT | `{ wordA, wordB, targetLang }` → `{ wordA, wordB }` analyses. 2 credits; each word uses the analyze cache |
+| POST | `/v1/ai/evaluate-usage` | Bearer JWT | `{ targetWord, sentence, targetLang }` → Usage Coach verdict and 0-100 collocation score. 2 credits |
+| POST | `/v1/ai/assist-writing` | Bearer JWT | `{ text, goal, targetLang }`. 3 credits |
+| POST | `/v1/ai/follow-up` | Bearer JWT | `{ text, context?, question, targetLang }`. 1 credit |
+| POST | `/v1/ai/highlights` | Bearer JWT | `{ rawText, pageTitle?, targetLang }`. 3 credits; page text is never cached |
 
 Errors always use `{ error: { code, message } }` with the codes in design §7.
 A session is `{ accessToken, refreshToken, expiresIn, user, plan }`; access tokens last one hour.
@@ -34,7 +40,10 @@ A session is `{ accessToken, refreshToken, expiresIn, user, plan }`; access toke
 AI requests run: plan lookup → input limits (`413 INPUT_TOO_LONG`) → per-minute rate limit (`429`, `Retry-After`)
 → shared KV cache → on a miss, the kill switch (`503 AI_PAUSED`) → atomic credit reservation (`402 QUOTA_EXCEEDED`)
 → Gemini, with one retry that feeds validation errors back → commit, or refund and `503 AI_UNAVAILABLE`.
-Cache hits are charged like any answer (`cached: true`) but cost no model call, and are served even while paused. Only built-in target languages are accepted. `usage_events` records
+Cache hits are charged like any answer (`cached: true`) but cost no model call, and are served even while paused.
+The shared zod schemas fill missing fields with defaults, so each endpoint also requires its answer-bearing fields
+(and Bengali script for `bn`) in the raw model output; an empty or filler answer is retried once, then refunded.
+Article analysis has no endpoint: the extension runs its built-in pipeline for every provider. Only built-in target languages are accepted. `usage_events` records
 counts, tokens and latency, never the text.
 
 ## Running costs

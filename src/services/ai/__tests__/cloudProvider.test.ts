@@ -86,12 +86,19 @@ describe('CloudProvider', () => {
     await expect(new CloudProvider().analyzeStageA('x')).rejects.toMatchObject({ code: 'NETWORK' });
   });
 
-  it('refuses features the server does not offer yet instead of faking a result', async () => {
-    const provider = new CloudProvider();
-    await expect(provider.analyze('A sentence.', 'sentence')).rejects.toMatchObject({ code: 'NOT_AVAILABLE', message: expect.stringContaining('Sentence X-Ray') });
-    await expect(provider.assistWriting('x', 'natural' as any)).rejects.toMatchObject({ code: 'NOT_AVAILABLE' });
-    await expect(provider.askFollowUp('x', 'y', 'z')).rejects.toMatchObject({ code: 'NOT_AVAILABLE' });
-    expect(authorizedFetch).not.toHaveBeenCalled();
+  it.each([
+    ['analyze', (p: CloudProvider) => p.analyze('A sentence.', 'sentence', 'ctx', 'para'), '/v1/ai/analyze',
+      { text: 'A sentence.', selectionType: 'sentence', contextSentence: 'ctx', paragraphContext: 'para' }],
+    ['assistWriting', (p: CloudProvider) => p.assistWriting('me go', 'natural'), '/v1/ai/assist-writing', { text: 'me go', goal: 'natural' }],
+    ['askFollowUp', (p: CloudProvider) => p.askFollowUp('word', 'ctx', 'Why?'), '/v1/ai/follow-up', { text: 'word', context: 'ctx', question: 'Why?' }],
+    ['extractHighlights', (p: CloudProvider) => p.extractHighlights('Page text.', 'Title'), '/v1/ai/highlights', { rawText: 'Page text.', pageTitle: 'Title' }],
+    ['compareWords', (p: CloudProvider) => p.compareWords('mitigate', 'alleviate'), '/v1/ai/compare-words', { wordA: 'mitigate', wordB: 'alleviate' }],
+    ['evaluateUsage', (p: CloudProvider) => p.evaluateUsage('mitigate', 'We mitigate.'), '/v1/ai/evaluate-usage', { targetWord: 'mitigate', sentence: 'We mitigate.' }]
+  ])('%s posts to its endpoint and returns the data', async (_name, invoke, path, body) => {
+    authorizedFetch.mockResolvedValue(reply(200, { data: { ok: true }, usage: { used: 1, limit: 30 }, cached: false }));
+    expect(await invoke(new CloudProvider('bn'))).toEqual({ ok: true });
+    expect(authorizedFetch.mock.calls[0][0]).toBe(path);
+    expect(sentBody()).toEqual({ ...body, targetLang: 'bn' });
   });
 
   it('is what AIService picks for the lexiflow provider, even with a stored API key', async () => {

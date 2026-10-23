@@ -19,6 +19,24 @@ export async function stageACacheKey(input: StageAKeyInput): Promise<string> {
   return `sa:${PROMPT_VERSION}:${input.targetLang}:${await sha256Hex(target)}:${context}`;
 }
 
+export interface AnalyzeKeyInput {
+  text: string;
+  type: string;
+  contextSentence?: string;
+  targetLang: string;
+}
+
+/**
+ * Word and phrase analyses are shareable like Stage A (the full prompt only sees the sentence, not the paragraph).
+ * Sentence and paragraph analyses are the reader's own text and are never cached: returns null.
+ */
+export async function analyzeCacheKey(input: AnalyzeKeyInput): Promise<string | null> {
+  if (input.type !== 'word' && input.type !== 'phrase') return null;
+  const target = await sha256Hex(input.text.trim().toLowerCase());
+  const context = await sha256Hex(input.contextSentence ?? '');
+  return `an:${PROMPT_VERSION}:${input.targetLang}:${input.type}:${target}:${context}`;
+}
+
 export interface StageBKeyInput {
   lemma: string;
   partOfSpeech?: string;

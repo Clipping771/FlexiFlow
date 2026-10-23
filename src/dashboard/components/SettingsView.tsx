@@ -1110,8 +1110,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {form.aiProvider === 'lexiflow' && (
             <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
               Uses your LexiFlow Cloud account above: no API key needed, counted against your daily credits.
-              Word lookups (quick meaning and deep dive) run on LexiFlow Cloud today; Sentence X-Ray, writing help
-              and AI chat still need another provider.
+              Word lookups and AI chat cost 1 credit, Sentence X-Ray, Word Difference and Usage Coach 2, and
+              paragraph analysis, writing help and page highlights 3. Article analysis runs on this device and is free.
             </p>
           )}
 

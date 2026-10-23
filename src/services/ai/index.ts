@@ -200,7 +200,7 @@ export class AIService {
     const providerName = userSettings.aiProvider || 'mock';
     const isOllama = providerName === 'ollama';
     const hasApiKey = Boolean(userSettings.apiKey?.trim());
-    const isLiveAI = (isOllama || hasApiKey) && providerName !== 'mock';
+    const isLiveAI = providerName === 'lexiflow' || ((isOllama || hasApiKey) && providerName !== 'mock');
     const key = `extractHighlights:${hashString(rawText.slice(0, 15000))}::${targetLang}::${providerName}::${isLiveAI ? 'ai' : 'offline'}`;
 
     return CacheManager.getInstance().executeDeduplicated(key, async () => {
@@ -269,15 +269,7 @@ export class AIService {
       }
 
       // Perform a minimal, fast verification with the configured target language
-      const sample = 'They remained resilient during challenging times.';
-      // LexiFlow Cloud serves Stage A only for now, so test with that and map it to the word-analysis fields.
-      const res = provider instanceof CloudProvider
-        ? await provider.analyzeStageA('resilient', sample).then((a) => ({
-            selectedText: a.selectedText,
-            contextualMeaning: a.contextMeaning,
-            bengaliTranslation: a.easyBengali
-          }))
-        : await provider.analyze('resilient', 'word', sample);
+      const res = await provider.analyze('resilient', 'word', 'They remained resilient during challenging times.');
       const latencyMs = Date.now() - start;
 
       const wordRes = res as any;

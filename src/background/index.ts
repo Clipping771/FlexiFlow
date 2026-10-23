@@ -329,8 +329,9 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
           case 'COMPARE_WORDS': {
             const { wordA, wordB } = payload as { wordA: string; wordB: string };
             const provider = await AIService.getProvider();
-            const resA = (await provider.analyze(wordA, 'word')) as any;
-            const resB = (await provider.analyze(wordB, 'word')) as any;
+            const [resA, resB] = (provider.compareWords
+              ? await provider.compareWords(wordA, wordB).then((r) => [r.wordA, r.wordB])
+              : [await provider.analyze(wordA, 'word'), await provider.analyze(wordB, 'word')]) as any[];
             sendResponse({
               success: true,
               data: {
@@ -355,6 +356,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
           case 'EVALUATE_USAGE': {
             const { targetWord, sentence } = payload as { targetWord: string; sentence: string };
             const provider = await AIService.getProvider();
+            if (provider.evaluateUsage) {
+              sendResponse({ success: true, data: await provider.evaluateUsage(targetWord, sentence) });
+              break;
+            }
+            // Providers without an evaluation prompt: rewrite only; the verdict and score below are not measured.
             const assist = await provider.assistWriting(sentence, 'natural');
             sendResponse({
               success: true,

@@ -5,7 +5,9 @@ import {
   WritingAssistResult,
   FollowUpResponse,
   StageAExplanation,
-  StageBDetailedVocabulary
+  StageBDetailedVocabulary,
+  HighlightExtractionResult,
+  UsageCoachFeedback
 } from '../../types';
 import { AuthService, CloudAuthError } from '../auth/authService';
 import { AIProvider } from './types';
@@ -16,8 +18,7 @@ export type CloudAIErrorCode =
   | 'INPUT_TOO_LONG'
   | 'INVALID_REQUEST'
   | 'AI_UNAVAILABLE'
-  | 'AI_PAUSED'
-  | 'NOT_AVAILABLE';
+  | 'AI_PAUSED';
 
 /**
  * A LexiFlow Cloud refusal. The message is written for the reader (the popup shows it as is);
@@ -87,7 +88,8 @@ function toCloudError(status: number, envelope: ErrorEnvelope): Error {
 
 /**
  * AI provider backed by LexiFlow Cloud (server/). Never falls back to offline results:
- * a refusal is surfaced to the reader (CLOUD_BACKEND_DESIGN.md §3.3).
+ * a refusal is surfaced to the reader (CLOUD_BACKEND_DESIGN.md §3.3). Article analysis stays on the
+ * extension's built-in pipeline, as for every provider.
  */
 export class CloudProvider implements AIProvider {
   name = 'lexiflow';
@@ -138,22 +140,28 @@ export class CloudProvider implements AIProvider {
     return this.post('/v1/ai/stage-b', { lemma, partOfSpeech, contextualSenseId });
   }
 
-  private notYet(feature: string): never {
-    throw new CloudAIError(
-      'NOT_AVAILABLE',
-      `${feature} is not on LexiFlow Cloud yet. Choose another AI provider in Settings to use it.`
-    );
+  analyze(text: string, type: SelectionType, contextSentence?: string, paragraphContext?: string): Promise<LinguisticAnalysisResult> {
+    return this.post('/v1/ai/analyze', { text, selectionType: type, contextSentence, paragraphContext });
   }
 
-  async analyze(_text: string, type: SelectionType): Promise<LinguisticAnalysisResult> {
-    return this.notYet(type === 'sentence' ? 'Sentence X-Ray' : type === 'paragraph' ? 'Paragraph analysis' : 'Full analysis');
+  assistWriting(text: string, goal: WritingGoal): Promise<WritingAssistResult> {
+    return this.post('/v1/ai/assist-writing', { text, goal });
   }
 
-  async assistWriting(_text: string, _goal: WritingGoal): Promise<WritingAssistResult> {
-    return this.notYet('Writing help');
+  askFollowUp(text: string, context: string, question: string): Promise<FollowUpResponse> {
+    return this.post('/v1/ai/follow-up', { text, context, question });
   }
 
-  async askFollowUp(_text: string, _context: string, _question: string): Promise<FollowUpResponse> {
-    return this.notYet('AI chat');
+  extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
+    return this.post('/v1/ai/highlights', { rawText, pageTitle });
+  }
+
+  /** Both word analyses in one metered request (2 credits); each word is cached on the server. */
+  compareWords(wordA: string, wordB: string): Promise<{ wordA: LinguisticAnalysisResult; wordB: LinguisticAnalysisResult }> {
+    return this.post('/v1/ai/compare-words', { wordA, wordB });
+  }
+
+  evaluateUsage(targetWord: string, sentence: string): Promise<UsageCoachFeedback> {
+    return this.post('/v1/ai/evaluate-usage', { targetWord, sentence });
   }
 }

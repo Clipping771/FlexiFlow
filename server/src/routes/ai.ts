@@ -1,9 +1,10 @@
 import { Hono, type Context } from 'hono';
 import type { AppEnv } from '../env';
-import { cacheGet, cachePut, stageACacheKey, stageBCacheKey } from '../lib/cache';
+import { analyzeCacheKey, cacheGet, cachePut, stageACacheKey, stageBCacheKey } from '../lib/cache';
 import { ApiError } from '../lib/errors';
 import { PLAN_LIMITS, type PlanLimits } from '../lib/plans';
 import {
+  ANALYZE_CREDITS,
   CREDIT_COSTS,
   type AiEndpoint,
   currentUsage,
@@ -21,7 +22,9 @@ import {
   runStageA,
   runStageB
 } from '../lib/stageTasks';
+import { runAnalyze, runAssistWriting, runCompareWords, runFollowUp, runHighlights, runUsageEvaluation } from '../lib/tasks';
 import { dhakaDay, nextDhakaMidnight } from '../lib/time';
+import type { SelectionType, WritingGoal } from '../../../src/types';
 import { loadUser } from '../lib/users';
 import { requireAuth } from '../middleware/auth';
 
@@ -74,7 +77,12 @@ async function readBody<K extends string>(
 interface TaskSpec<K extends string, T> {
   endpoint: AiEndpoint;
   fields: Record<K, Field>;
-  cacheKey: (input: Input<K>) => string | Promise<string>;
+  /** Shared cache key, or null for answers that must not be shared. */
+  cacheKey: (input: Input<K>) => string | null | Promise<string | null>;
+  /** Credits for this request when they depend on the input; defaults to CREDIT_COSTS[endpoint]. */
+  credits?: (input: Input<K>) => number;
+  /** Extra input rules that need several fields or the plan; runs before anything is charged. */
+  check?: (input: Input<K>, limits: PlanLimits) => void;
   run: (gemini: GeminiConfig, input: Input<K>) => Promise<TaskResult<T>>;
   /** Adapts a cached answer to this request, e.g. echoing the reader's exact selection. */
   fromCache?: (data: T, input: Input<K>) => T;
@@ -95,6 +103,7 @@ async function metered<K extends string, T>(c: Context<AppEnv>, spec: TaskSpec<K
   if (!user) throw new ApiError(401, 'AUTH_REQUIRED', 'Account not found. Sign in again.');
   const limits = PLAN_LIMITS[user.plan];
   const input = await readBody(c, spec.fields, limits);
+  spec.check?.(input, limits);
 
   const rate = await hitRateLimit(db, userId, limits.requestsPerMinute, now);
   if (!rate.ok) {
@@ -107,7 +116,7 @@ async function metered<K extends string, T>(c: Context<AppEnv>, spec: TaskSpec<K
   const day = dhakaDay(now);
   const resetAt = nextDhakaMidnight(now);
   const key = await spec.cacheKey(input);
-  const cached = await cacheGet<T>(c.env.CACHE, key);
+  const cached = key === null ? null : await cacheGet<T>(c.env.CACHE, key);
 
   if (cached === null) {
     const pause = await checkPause(c.env, user.plan, day);
@@ -123,7 +132,7 @@ async function metered<K extends string, T>(c: Context<AppEnv>, spec: TaskSpec<K
     }
   }
 
-  const credits = CREDIT_COSTS[endpoint];
+  const credits = spec.credits ? spec.credits(input) : CREDIT_COSTS[endpoint];
   const used = await reserveCredits(db, userId, day, credits, limits.dailyCredits);
   if (used === null) {
     await recordUsageEvent(db, { userId, endpoint, credits, cached: cached !== null, status: 'rejected' }, now);
@@ -167,7 +176,7 @@ async function metered<K extends string, T>(c: Context<AppEnv>, spec: TaskSpec<K
   }
 
   await addSpend(c.env, day, user.plan, estimateMicroUsd(c.env, result.tokensIn, result.tokensOut));
-  await cachePut(c.env.CACHE, key, result.data);
+  if (key !== null) await cachePut(c.env.CACHE, key, result.data);
   await recordUsageEvent(db, {
     userId,
     endpoint,
@@ -233,5 +242,113 @@ ai.post('/stage-b', (c) =>
         contextualSenseId: input.contextualSenseId,
         targetLang: input.targetLang!
       })
+  })
+);
+
+const SELECTION_TYPES = /^(word|phrase|sentence|paragraph)$/;
+const WRITING_GOALS = /^(clarity|academic|natural|simplify|formal|concise)$/;
+/** The highlights prompt reads the first 15,000 characters of the page. */
+const MAX_PAGE_CHARS = 20000;
+
+function tooLong(field: string, maxChars: number): ApiError {
+  return new ApiError(413, 'INPUT_TOO_LONG', `"${field}" is longer than ${maxChars} characters.`, { field, maxChars });
+}
+
+ai.post('/analyze', (c) =>
+  metered(c, {
+    endpoint: 'analyze',
+    fields: {
+      text: { required: true, max: (limits) => limits.maxParagraphChars },
+      selectionType: { required: true, max: 16, pattern: SELECTION_TYPES },
+      contextSentence: { max: (limits) => limits.maxSentenceChars },
+      paragraphContext: { max: MAX_PARAGRAPH_CHARS },
+      targetLang: TARGET_LANG
+    },
+    check: (input, limits) => {
+      const type = input.selectionType as SelectionType;
+      const max = type === 'paragraph' ? limits.maxParagraphChars : type === 'sentence' ? limits.maxSentenceChars : MAX_TARGET_CHARS;
+      if (input.text!.length > max) throw tooLong('text', max);
+    },
+    credits: (input) => ANALYZE_CREDITS[input.selectionType as SelectionType],
+    cacheKey: (input) =>
+      analyzeCacheKey({ text: input.text!, type: input.selectionType!, contextSentence: input.contextSentence, targetLang: input.targetLang! }),
+    run: (gemini, input) =>
+      runAnalyze(gemini, {
+        text: input.text!,
+        type: input.selectionType as SelectionType,
+        contextSentence: input.contextSentence,
+        paragraphContext: input.paragraphContext,
+        targetLang: input.targetLang!
+      }),
+    fromCache: (data, input) => ({ ...data, selectedText: input.text! }) as typeof data
+  })
+);
+
+ai.post('/compare-words', (c) =>
+  metered(c, {
+    endpoint: 'compare-words',
+    fields: {
+      wordA: { required: true, max: MAX_TARGET_CHARS },
+      wordB: { required: true, max: MAX_TARGET_CHARS },
+      targetLang: TARGET_LANG
+    },
+    // Each word is cached on its own inside the task.
+    cacheKey: () => null,
+    run: (gemini, input) => runCompareWords(gemini, c.env.CACHE, { wordA: input.wordA!, wordB: input.wordB!, targetLang: input.targetLang! })
+  })
+);
+
+ai.post('/evaluate-usage', (c) =>
+  metered(c, {
+    endpoint: 'evaluate-usage',
+    fields: {
+      targetWord: { required: true, max: MAX_TARGET_CHARS },
+      sentence: { required: true, max: (limits) => limits.maxSentenceChars },
+      targetLang: TARGET_LANG
+    },
+    cacheKey: () => null,
+    run: (gemini, input) => runUsageEvaluation(gemini, { targetWord: input.targetWord!, sentence: input.sentence!, targetLang: input.targetLang! })
+  })
+);
+
+ai.post('/assist-writing', (c) =>
+  metered(c, {
+    endpoint: 'assist-writing',
+    fields: {
+      text: { required: true, max: (limits) => limits.maxParagraphChars },
+      goal: { required: true, max: 16, pattern: WRITING_GOALS },
+      targetLang: TARGET_LANG
+    },
+    cacheKey: () => null,
+    run: (gemini, input) => runAssistWriting(gemini, { text: input.text!, goal: input.goal as WritingGoal, targetLang: input.targetLang! })
+  })
+);
+
+ai.post('/follow-up', (c) =>
+  metered(c, {
+    endpoint: 'follow-up',
+    fields: {
+      text: { required: true, max: (limits) => limits.maxParagraphChars },
+      context: { max: (limits) => limits.maxParagraphChars },
+      question: { required: true, max: 500 },
+      targetLang: TARGET_LANG
+    },
+    cacheKey: () => null,
+    run: (gemini, input) =>
+      runFollowUp(gemini, { text: input.text!, context: input.context ?? '', question: input.question!, targetLang: input.targetLang! })
+  })
+);
+
+ai.post('/highlights', (c) =>
+  metered(c, {
+    endpoint: 'highlights',
+    fields: {
+      rawText: { required: true, max: MAX_PAGE_CHARS },
+      pageTitle: { max: 300 },
+      targetLang: TARGET_LANG
+    },
+    // Page text can be private (mail, documents), so highlights are never shared.
+    cacheKey: () => null,
+    run: (gemini, input) => runHighlights(gemini, { rawText: input.rawText!, pageTitle: input.pageTitle, targetLang: input.targetLang! })
   })
 );

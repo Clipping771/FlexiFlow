@@ -45,14 +45,15 @@ export interface TaskResult<T> {
   tokensOut: number;
 }
 
-type Validation<T> = { isValid: boolean; data?: T; errors: string[] };
+export type Validation<T> = { isValid: boolean; data?: T; errors: string[] };
 
 /** One call, plus at most one retry carrying the parse or validation errors back to the model. */
-async function runValidated<T>(
+export async function runValidated<T>(
   gemini: GeminiConfig,
   prompt: PromptSpec,
   validate: (raw: unknown) => Validation<T>,
-  correction: (errors: string[]) => string
+  correction: (errors: string[]) => string,
+  timeoutMs?: number
 ): Promise<TaskResult<T>> {
   let tokensIn = 0;
   let tokensOut = 0;
@@ -64,7 +65,7 @@ async function runValidated<T>(
       : lastErrors.length ? correction(lastErrors) : withJsonOnlyReminder(prompt.user);
     let res;
     try {
-      res = await generateGeminiJson({ ...gemini, system: prompt.system, user, maxTokens: prompt.maxTokens });
+      res = await generateGeminiJson({ ...gemini, system: prompt.system, user, maxTokens: prompt.maxTokens, timeoutMs });
     } catch {
       throw new TaskFailedError('model_error', tokensIn, tokensOut);
     }
