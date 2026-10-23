@@ -601,6 +601,16 @@ class ContentScriptManager {
     if (!this.popupView) {
       this.popupView = new PopupView({
         onClose: () => this.hidePopup(),
+        onRetry: () => {
+          if (!this.currentText || !this.currentAnchorRect) return;
+          this.executeAnalysis(
+            this.currentText,
+            this.currentSelectionType,
+            this.currentContextSentence,
+            this.currentNearbyParagraph,
+            this.currentAnchorRect
+          );
+        },
         onSave: async (item: VocabularyItem) => {
           await this.sendMessage('SAVE_VOCAB', { item });
         },

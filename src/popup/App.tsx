@@ -13,6 +13,9 @@ import {
 } from '../types';
 import { PopupView } from '../content/popupView';
 import { POPUP_STYLES } from '../content/styles';
+import { Onboarding } from './components/Onboarding';
+import { LookupTab } from './components/LookupTab';
+import { LibraryTab } from './components/LibraryTab';
 import { DictionaryService, dictionaryResultToStageA } from '../services/dictionary';
 import { AIService } from '../services/ai';
 import { SettingsService } from '../services/storage/settings';
@@ -23,18 +26,10 @@ import {
   Search,
   Sparkles,
   Check,
-  BookmarkPlus,
   PanelRight,
   ExternalLink,
-  Volume2,
   X,
-  Send,
-  MessageSquare,
-  Lightbulb,
   BookOpen,
-  Layers,
-  Copy,
-  ArrowLeft,
   ChevronUp,
   ChevronDown,
   RotateCcw,
@@ -44,11 +39,9 @@ import {
   AlertCircle,
   Info,
   Globe,
-  Flame,
   BookMarked,
-  ArrowRight
+  FileText
 } from 'lucide-react';
-import { playPronunciation } from '../services/audio/voiceService';
 import { MONETIZATION_ENABLED } from '../config/features';
 import './popup.css';
 
@@ -278,6 +271,8 @@ const PopupCardHost: React.FC<PopupCardHostProps> = ({ initialWord }) => {
   );
 };
 
+const ONBOARDING_KEY = 'lexiflow_onboarding_done';
+
 export const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [result, setResult] = useState<LinguisticAnalysisResult | null>(null);
@@ -300,6 +295,29 @@ export const App: React.FC = () => {
   const [textSize, setTextSize] = useState<'small' | 'medium' | 'large' | 'xlarge'>('medium');
 
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+
+  // First-run welcome guide (dismissed once, remembered in extension storage)
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
+    chrome.storage.local.get(ONBOARDING_KEY, (res) => {
+      if (!res?.[ONBOARDING_KEY]) setShowOnboarding(true);
+    });
+  }, []);
+
+  const dismissOnboarding = () => {
+    setShowOnboarding(false);
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({ [ONBOARDING_KEY]: true });
+    }
+  };
+
+  const chooseTextSize = (size: 'small' | 'medium' | 'large' | 'xlarge') => {
+    setTextSize(size);
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({ type: 'UPDATE_SETTINGS', payload: { popupSize: size } });
+    }
+  };
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -947,19 +965,7 @@ export const App: React.FC = () => {
               <span className="app-title">LexiFlow</span>
               {MONETIZATION_ENABLED && <span className="app-badge-pro">PRO</span>}
             </div>
-            {currentDomain ? (
-              <div
-                className={`header-site-capsule ${isCurrentSiteEnabled ? 'active' : 'paused'}`}
-                onClick={toggleCurrentSite}
-                title={`Click to ${isCurrentSiteEnabled ? 'pause' : 'activate'} on ${currentDomain}`}
-              >
-                <span className={`domain-dot ${isCurrentSiteEnabled ? 'active' : ''}`} />
-                <span className="domain-name">{currentDomain}</span>
-                <span className="domain-state-text">{isCurrentSiteEnabled ? 'ON' : 'OFF'}</span>
-              </div>
-            ) : (
-              <div className="app-sub">Contextual Reading & Mastery</div>
-            )}
+            <div className="app-sub">Contextual reading companion</div>
           </div>
         </div>
 
@@ -1023,13 +1029,22 @@ export const App: React.FC = () => {
         {/* ======================================================== */}
         {popupTab === 'reading' && (
           <div className="hub-tab-pane">
+            {showOnboarding && (
+              <Onboarding textSize={textSize} onChooseSize={chooseTextSize} onDone={dismissOnboarding} />
+            )}
+
             {/* Site status capsule banner */}
             <div className="reading-site-banner">
               <div className="site-banner-left">
-                <Globe size={14} className="site-banner-icon" />
+                <span className="site-banner-icon-tile">
+                  <Globe size={15} className="site-banner-icon" />
+                </span>
                 <div className="site-banner-info">
-                  <span className="site-banner-label">Active Site:</span>
-                  <span className="site-banner-domain">{currentDomain || 'Current Web Page'}</span>
+                  <span className="site-banner-domain">{currentDomain || 'Current web page'}</span>
+                  <span className={`site-banner-label ${isCurrentSiteEnabled ? 'on' : 'off'}`}>
+                    <span className={`domain-dot ${isCurrentSiteEnabled ? 'active' : ''}`} />
+                    {isCurrentSiteEnabled ? 'Active on this site' : 'Paused on this site'}
+                  </span>
                 </div>
               </div>
 
@@ -1063,27 +1078,34 @@ export const App: React.FC = () => {
               </div>
             ) : !highlightState || highlightState.count.total === 0 ? (
               <div className="reading-ready-hero">
-                <div className="reading-hero-scope">
-                  <span className="scope-tag">SCOPE</span>
-                  <span className="scope-title" title={highlightState?.articleTitle || ''}>
-                    {highlightState?.articleTitle ? highlightState.articleTitle : 'Core editorial body (noise-filtered)'}
+                <div className="hero-article">
+                  <span className="hero-article-icon">
+                    <FileText size={16} />
                   </span>
+                  <div className="hero-article-text">
+                    <span className="hero-article-label">
+                      {highlightState?.articleTitle ? 'Article on this page' : 'Ready to scan'}
+                    </span>
+                    <span className="hero-article-title" title={highlightState?.articleTitle || ''}>
+                      {highlightState?.articleTitle ? highlightState.articleTitle : 'Main article text (ads & sidebars skipped)'}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="reading-value-grid">
-                  <div className="value-chip">
-                    <Check size={12} className="check-icon" />
-                    <span>Auto-detects high-impact words</span>
-                  </div>
-                  <div className="value-chip">
-                    <Check size={12} className="check-icon" />
-                    <span>Contextual Bengali translations</span>
-                  </div>
-                  <div className="value-chip">
-                    <Check size={12} className="check-icon" />
-                    <span>Bypasses banners & sidebars</span>
-                  </div>
-                </div>
+                <ul className="hero-feature-list">
+                  <li>
+                    <Check size={13} className="check-icon" />
+                    <span>Finds the hard, high-impact words</span>
+                  </li>
+                  <li>
+                    <Check size={13} className="check-icon" />
+                    <span>Bengali meaning in context</span>
+                  </li>
+                  <li>
+                    <Check size={13} className="check-icon" />
+                    <span>Skips banners, ads & sidebars</span>
+                  </li>
+                </ul>
 
                 {highlightFeedback && (
                   <div className={`studio-feedback-banner ${highlightFeedback.type}`}>
@@ -1238,6 +1260,22 @@ export const App: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Learning progress at a glance */}
+            <div className="hub-stats-row">
+              <button type="button" className="hub-stat" onClick={() => setPopupTab('library')}>
+                <span className="hub-stat-num">{savedCount}</span>
+                <span className="hub-stat-label">Words saved</span>
+              </button>
+              <button
+                type="button"
+                className={`hub-stat ${dueCount > 0 ? 'due' : ''}`}
+                onClick={() => setPopupTab('library')}
+              >
+                <span className="hub-stat-num">{dueCount}</span>
+                <span className="hub-stat-label">Due for review</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -1245,236 +1283,35 @@ export const App: React.FC = () => {
         {/* TAB 2: QUICK LOOKUP (Dictionary & Instant Explainer)     */}
         {/* ======================================================== */}
         {popupTab === 'lookup' && (
-          <div className="hub-tab-pane">
-            {/* Modern Search Command Bar */}
-            <div className="lookup-search-bar">
-              <div className="lookup-input-box">
-                <Search size={14} className="lookup-search-icon" />
-                <input
-                  type="text"
-                  className="lookup-input-field"
-                  placeholder="Search word, idiom, or sentence..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && executeSearch(searchTerm)}
-                  autoFocus
-                />
-                {searchTerm && (
-                  <button
-                    type="button"
-                    className="lookup-clear-btn"
-                    onClick={() => {
-                      setSearchTerm('');
-                      setResult(null);
-                    }}
-                    title="Clear"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-              <button
-                type="button"
-                className="btn-lookup-analyze"
-                onClick={() => executeSearch(searchTerm)}
-                disabled={loading || !searchTerm.trim()}
-              >
-                {loading ? '...' : <><Sparkles size={13} /><span>Analyze</span></>}
-              </button>
-            </div>
-
-            {loading && (
-              <div className="lookup-loading-box">
-                <div className="reading-scanning-spinner" />
-                <span>Interpreting with LexiFlow AI...</span>
-              </div>
-            )}
-
-            {/* Result View */}
-            {!loading && result && (
-              <div className="lookup-result-box">
-                <div className="result-top-row">
-                  <span className="result-term-title">
-                    {result.selectionType === 'sentence' || result.selectionType === 'paragraph'
-                      ? renderInteractiveWords(result.selectedText)
-                      : result.selectedText}
-                  </span>
-                  <button
-                    type="button"
-                    className="result-pronounce-btn"
-                    title="Listen to pronunciation"
-                    onClick={() => playPronunciation(result.selectedText)}
-                  >
-                    <Volume2 size={14} />
-                  </button>
-                  <span className="result-type-badge">{result.selectionType.toUpperCase()}</span>
-                </div>
-
-                {result.bengaliTranslation && (
-                  <div className="result-bengali-pill">
-                    <span className="bengali-accent-mark" />
-                    <span>{result.bengaliTranslation}</span>
-                  </div>
-                )}
-
-                <div className="result-definition-text">
-                  {renderInteractiveWords(
-                    (result as WordAnalysisResult).contextualMeaning ||
-                    (result as WordAnalysisResult).simpleEnglishExplanation ||
-                    (result as SentenceAnalysisResult).plainEnglishParaphrase ||
-                    ''
-                  )}
-                </div>
-
-                {isSentenceMode && sentenceResult?.phraseBreakdown && sentenceResult.phraseBreakdown.length > 0 && (
-                  <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #86868b)' }}>
-                      Phrase Breakdown (Click any word):
-                    </div>
-                    {sentenceResult.phraseBreakdown.map((item, idx) => (
-                      <div key={idx} style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px', border: '1px solid var(--border-color, rgba(255,255,255,0.08))' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent, #0071e3)' }}>
-                          {renderInteractiveWords(item.phrase)}
-                        </div>
-                        {item.easyEnglish && (
-                          <div style={{ fontSize: '12px', color: 'var(--text-main)', marginTop: '2px' }}>
-                            {renderInteractiveWords(item.easyEnglish)}
-                          </div>
-                        )}
-                        {item.easyBengali && (
-                          <div style={{ fontSize: '12px', color: 'var(--text-muted, #86868b)', marginTop: '2px' }}>
-                            {item.easyBengali}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="result-action-footer">
-                  <button
-                    type="button"
-                    className={`btn-save-term ${isSaved ? 'saved' : ''}`}
-                    onClick={handleSave}
-                  >
-                    {isSaved ? (
-                      <><Check size={13} /><span>Saved in Library</span></>
-                    ) : (
-                      <><BookmarkPlus size={13} /><span>Save to Library</span></>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Empty state suggestions */}
-            {!loading && !result && (
-              <div className="lookup-empty-hints">
-                <div className="hints-title">Popular suggestions:</div>
-                <div className="hints-chips-row">
-                  {['meticulous', 'break the ice', 'take for granted', 'resilience'].map((w) => (
-                    <button
-                      key={w}
-                      type="button"
-                      className="hint-word-chip"
-                      onClick={() => executeSearch(w)}
-                    >
-                      {w}
-                    </button>
-                  ))}
-                </div>
-                <div className="hints-tip-box">
-                  <Lightbulb size={13} className="tip-icon" />
-                  <span>Enter full sentences to get detailed grammatical breakdowns and natural Bengali translations.</span>
-                </div>
-              </div>
-            )}
-          </div>
+          <LookupTab
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            executeSearch={executeSearch}
+            setResult={setResult}
+            loading={loading}
+            result={result}
+            isSentenceMode={isSentenceMode}
+            sentenceResult={sentenceResult}
+            isSaved={isSaved}
+            handleSave={handleSave}
+            renderInteractiveWords={renderInteractiveWords}
+          />
         )}
 
         {/* ======================================================== */}
         {/* TAB 3: LIBRARY & REVIEW (Spaced Repetition & Saved Words) */}
         {/* ======================================================== */}
         {popupTab === 'library' && (
-          <div className="hub-tab-pane">
-            {/* Metric Cards Row */}
-            <div className="library-stats-grid">
-              <div className="stat-card blue" onClick={openDashboard} role="button" tabIndex={0} title="View all words in Dashboard">
-                <div className="stat-card-icon"><BookOpen size={15} /></div>
-                <div className="stat-card-content">
-                  <span className="stat-number">{savedCount}</span>
-                  <span className="stat-title">Saved Words</span>
-                </div>
-              </div>
-
-              <div className={`stat-card ${dueCount > 0 ? 'orange' : 'neutral'}`} onClick={openDashboard} role="button" tabIndex={0} title="Review words due today">
-                <div className="stat-card-icon"><Flame size={15} /></div>
-                <div className="stat-card-content">
-                  <span className="stat-number">{dueCount}</span>
-                  <span className="stat-title">Due for Review</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Flashcard Due Banner */}
-            {dueCount > 0 ? (
-              <div className="library-due-banner">
-                <div className="due-banner-text">
-                  <div className="due-banner-title">🔥 {dueCount} words due for spaced repetition</div>
-                  <div className="due-banner-sub">Strengthen your memory with FSRS smart flashcards.</div>
-                </div>
-                <button type="button" className="btn-start-review" onClick={openDashboard}>
-                  <span>Review Flashcards</span>
-                  <ArrowRight size={13} />
-                </button>
-              </div>
-            ) : (
-              <div className="library-caught-up-banner">
-                <Check size={14} className="caught-up-icon" />
-                <span>All caught up! No flashcards due today.</span>
-              </div>
-            )}
-
-            {/* Recent Vocabulary Section */}
-            <div className="library-recent-section">
-              <div className="recent-section-header">
-                <span className="recent-heading">Recent Saved Words</span>
-                <button type="button" className="recent-view-all" onClick={openDashboard}>
-                  <span>View All</span>
-                  <ArrowRight size={11} />
-                </button>
-              </div>
-
-              {recentVocab.length > 0 ? (
-                <div className="recent-vocab-list">
-                  {recentVocab.map((item, idx) => (
-                    <div key={idx} className="recent-vocab-row" onClick={() => {
-                      setPopupTab('lookup');
-                      executeSearch(item.word);
-                    }}>
-                      <div className="recent-word-info">
-                        <span className="recent-word-term">{item.word}</span>
-                        {item.bengaliMeaning && <span className="recent-word-bn">{item.bengaliMeaning}</span>}
-                      </div>
-                      <button
-                        type="button"
-                        className="recent-word-audio"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          playPronunciation(item.word);
-                        }}
-                        title="Pronounce"
-                      >
-                        <Volume2 size={13} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="recent-empty-text">No words saved yet. Highlight or search words to build your library.</div>
-              )}
-            </div>
-          </div>
+          <LibraryTab
+            savedCount={savedCount}
+            dueCount={dueCount}
+            recentVocab={recentVocab}
+            onOpenDashboard={openDashboard}
+            onLookupWord={(word) => {
+              setPopupTab('lookup');
+              executeSearch(word);
+            }}
+          />
         )}
       </div>
 

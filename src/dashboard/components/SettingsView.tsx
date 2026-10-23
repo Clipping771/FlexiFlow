@@ -27,9 +27,25 @@ import {
   Monitor,
   Trash2,
   Download,
-  FileText
+  FileText,
+  Type
 } from 'lucide-react';
 import { playPronunciation } from '../../services/audio/voiceService';
+
+// Mirrors the --lf-font-english / --lf-font-bengali tokens of each popup size in content/styles.ts
+const TEXT_SIZE_OPTIONS: Array<{
+  value: NonNullable<UserSettings['popupSize']>;
+  label: string;
+  short: string;
+  glyph: number;
+  english: number;
+  bengali: number;
+}> = [
+  { value: 'small', label: 'Small', short: 'Small', glyph: 11, english: 15, bengali: 17 },
+  { value: 'medium', label: 'Medium', short: 'Medium', glyph: 13, english: 16, bengali: 18.5 },
+  { value: 'large', label: 'Large', short: 'Large', glyph: 15, english: 18, bengali: 21 },
+  { value: 'xlarge', label: 'Extra Large', short: 'XL', glyph: 17, english: 20, bengali: 23.5 }
+];
 
 interface SettingsViewProps {
   settings: UserSettings;
@@ -640,6 +656,72 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Reading Card Text Size (low-vision friendly) */}
+          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--line)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Type size={15} style={{ color: 'var(--blue)' }} />
+                  Text Size / লেখার আকার:
+                </label>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Make the in-page reading card easier to read. Updates open tabs instantly.
+                </div>
+              </div>
+              <div className="segmented-control" role="radiogroup" aria-label="Reading card text size">
+                {TEXT_SIZE_OPTIONS.map((opt) => {
+                  const active = (form.popupSize || 'medium') === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      aria-label={opt.label}
+                      title={opt.label}
+                      className={`segmented-item ${active ? 'active' : ''}`}
+                      onClick={async () => {
+                        const updated = { ...form, popupSize: opt.value };
+                        setForm(updated);
+                        await onSaveSettings(updated);
+                        setStatus(`Text size set to ${opt.label}.`);
+                        setTimeout(() => setStatus(null), 2500);
+                      }}
+                    >
+                      <span style={{ fontSize: `${opt.glyph}px`, fontWeight: 700, lineHeight: 1 }}>A</span>
+                      <span>{opt.short}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {(() => {
+              const preview = TEXT_SIZE_OPTIONS.find((o) => o.value === (form.popupSize || 'medium')) || TEXT_SIZE_OPTIONS[1];
+              return (
+                <div
+                  aria-live="polite"
+                  style={{
+                    marginTop: '12px',
+                    padding: '12px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--line)',
+                    background: 'var(--fill)'
+                  }}
+                >
+                  <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    Preview
+                  </div>
+                  <div style={{ fontSize: `${preview.english}px`, lineHeight: 1.45, color: 'var(--text-main)' }}>
+                    Very careful and thorough examination of something.
+                  </div>
+                  <div style={{ fontSize: `${preview.bengali}px`, lineHeight: 1.45, fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>
+                    পুঙ্খানুপুঙ্খ পরীক্ষা বা গভীর পর্যবেক্ষণ
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Clean Pronunciation Voice Row */}

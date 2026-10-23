@@ -179,7 +179,7 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     expect(el.textContent).toContain('Although inflation increased rapidly, the central bank maintained steady interest rates.');
 
     // B. Phrase-by-Phrase Explanation
-    expect(el.textContent).toContain('Phrase-by-Phrase Explanation');
+    expect(el.textContent).toContain('Phrase by phrase');
     expect(el.textContent).toContain('Although inflation increased rapidly');
     expect(el.textContent).toContain('Even though prices rose very quickly');
     expect(el.textContent).toContain('যদিও দ্রব্যমূল্য দ্রুত বৃদ্ধি পেয়েছিল');
@@ -240,13 +240,13 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     const el = popup.getElement();
 
     expect(el.textContent).toContain('PARAGRAPH');
-    expect(el.textContent).toContain('Paragraph Intelligence');
+    expect(el.textContent).toContain('Paragraph Analysis');
 
     // A. Original Text
     expect(el.textContent).toContain('Artificial intelligence is transforming education worldwide.');
 
     // B. Phrase-by-Phrase Explanation with 3 required fields per phrase
-    expect(el.textContent).toContain('Phrase-by-Phrase Explanation');
+    expect(el.textContent).toContain('Phrase by phrase');
     expect(el.textContent).toContain('Artificial intelligence is transforming education worldwide');
     expect(el.textContent).toContain('AI is changing schools and learning everywhere.');
     expect(el.textContent).toContain('কৃত্রিম বুদ্ধিমত্তা বিশ্বব্যাপী শিক্ষা ব্যবস্থাকে পরিবর্তন করছে।');
@@ -387,6 +387,22 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     freshNextBtn.click();
     const forwardTabs = el.querySelectorAll('.lf-sentence-switcher .lf-tab') as NodeListOf<HTMLButtonElement>;
     expect(forwardTabs[1].classList.contains('active')).toBe(true);
+
+    // Verify Paragraph tabs render and toggle full paragraph overview
+    const paraTabs = el.querySelectorAll('.lf-para-tabs .lf-tab') as NodeListOf<HTMLButtonElement>;
+    expect(paraTabs.length).toBe(2);
+    expect(paraTabs[0].textContent?.trim()).toContain('প্যারাগ্রাফ ১');
+    expect(paraTabs[1].textContent?.trim()).toContain('প্যারাগ্রাফ ২');
+
+    // Switch to paragraph 2
+    paraTabs[1].click();
+    expect(el.querySelector('.lf-para-panel[data-para-panel-idx="1"]')?.getAttribute('style')).toContain('block');
+
+    // Toggle Full Paragraph Overview
+    const toggleBtn = el.querySelector('#lf-para-text-toggle') as HTMLButtonElement;
+    expect(toggleBtn).not.toBeNull();
+    toggleBtn.click();
+    expect(el.textContent).toContain('প্যারাগ্রাফ ২ (সম্পূর্ণ মূল অংশ):');
   });
 
   // 4. Selecting a word within a sentence
@@ -518,7 +534,7 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     const updatedSentenceExpand = el.querySelector('#lf-sentence-expand-toggle');
     expect(updatedSentenceExpand?.getAttribute('aria-expanded')).toBe('true');
     expect(el.textContent).toContain('Difficult Words & Key Terms');
-    expect(el.textContent).toContain('Syntactic Structure');
+    expect(el.textContent).toContain('Sentence structure');
     expect(onClose).not.toHaveBeenCalled();
 
     // Difficult vocab chip clicking inside expanded section
@@ -611,6 +627,55 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     expect(clearBtn).not.toBeNull();
     clearBtn.click();
     expect(el.querySelector('.lf-qa-thread')).toBeNull();
+  });
+
+  it('9b. Ask AI Coach: renders responses with quotes, apostrophes, and HTML entities cleanly without raw &#039; or hex numbers', async () => {
+    const responseWithEntities = {
+      question: "What is the headline's context?",
+      keyTakeaway: "Context is the background that gives meaning to India's diplomacy.",
+      answer: "In this specific headline, the 'context' is about international diplomacy. It refers to the Prime Minister of India's visit to Japan. The core situation is that Tokyo might convince India to rejoin 'BIG-B'. Without this background, we wouldn't know who is traveling.",
+      bengaliSummary: "এখানে context বা প্রসঙ্গ হলো ভারতের প্রধানমন্ত্রীর জাপান সফর। মূল বিষয়টি হলো, জাপান সরকার চায় ভারত যেন পুনরায় 'BIG-B' নামক চুক্তিতে যোগ দেয়।",
+      suggestedFollowUps: [
+        "Why is India's role so important in 'BIG-B'?"
+      ],
+      examples: [
+        {
+          english: "The country's prime minister didn't hesitate to visit Tokyo.",
+          bengali: "দেশের প্রধানমন্ত্রী টোকিও সফরে দ্বিধাবোধ করেননি।"
+        }
+      ]
+    };
+
+    onAskFollowUp.mockResolvedValue(responseWithEntities);
+
+    popup.showStageA(mockWordStageA, "The prime minister's visit to Tokyo came under scrutiny.", '');
+    const el = popup.getElement();
+
+    const toggleBtn = el.querySelector('.lf-qa-toggle-btn') as HTMLElement;
+    expect(toggleBtn).not.toBeNull();
+    toggleBtn.click();
+
+    const input = el.querySelector('.lf-qa-input') as HTMLInputElement;
+    input.value = "What is the headline's context?";
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await Promise.resolve();
+
+    const bodyText = el.querySelector('.lf-qa-body-text')?.textContent || '';
+    // Must NOT contain raw &#039; or &#...; or &amp;
+    expect(bodyText).not.toContain('&#039;');
+    expect(bodyText).not.toContain('&#039');
+    expect(bodyText).not.toContain('&amp;');
+    expect(bodyText).toContain("the 'context' is about international diplomacy");
+    expect(bodyText).toContain("Prime Minister of India's visit to Japan");
+    expect(bodyText).toContain("we wouldn't know");
+
+    const takeawayText = el.querySelector('.lf-qa-takeaway-box')?.textContent || '';
+    expect(takeawayText).not.toContain('&#039;');
+    expect(takeawayText).toContain("India's diplomacy");
+
+    const bengaliText = el.querySelector('.lf-qa-bengali-text')?.textContent || '';
+    expect(bengaliText).not.toContain('&#039;');
+    expect(bengaliText).toContain("'BIG-B'");
   });
 
   it('11. Dragging header freely updates popup position coordinates', () => {
@@ -881,7 +946,7 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     const sentenceTab = freshEl.querySelector('.lf-tab[data-tab="breakdown"]') as HTMLElement;
     expect(sentenceTab).not.toBeNull();
     sentenceTab.click();
-    expect(freshEl.textContent).toContain('Phrase-by-Phrase Explanation');
+    expect(freshEl.textContent).toContain('Phrase by phrase');
 
     // 5. Footer Grammar toggle button
     const sentenceExpandToggle = freshEl.querySelector('#lf-sentence-expand-toggle') as HTMLElement;
@@ -1130,7 +1195,7 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     expect(el.textContent).toContain('Consequence / Result');
 
     // 3. Honest plain offline message
-    expect(el.textContent).toContain('AI Interpretation Unavailable / AI বিশ্লেষণ অনুপলব্ধ');
+    expect(el.textContent).toContain("Couldn't get an AI explanation / AI ব্যাখ্যা পাওয়া যায়নি");
     expect(el.textContent).toContain('Provider connection timed out');
     expect(el.textContent).toContain('Deep phrase breakdown and contextual translation require an active AI provider');
   });

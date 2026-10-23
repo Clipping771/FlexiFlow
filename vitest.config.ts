@@ -9,6 +9,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     testTimeout: 10000,
+    // Let `popupStyles.css?raw` resolve to the real stylesheet so style guard tests can inspect it.
+    css: { include: [/popupStyles\.css/] },
     include: ['src/**/*.test.{ts,tsx}']
   }
 });
