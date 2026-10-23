@@ -1704,3 +1704,85 @@ textarea::placeholder {
   to { opacity: 1; transform: translateY(0); }
 }
 
+
+/* LexiFlow Cloud account card (Settings) */
+.account-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.account-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.account-muted {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.account-plan {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--fill);
+  color: var(--text-muted);
+}
+
+.account-plan-pro {
+  color: var(--purple);
+  border-color: var(--purple);
+}
+
+.account-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.account-usage-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.account-usage-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fill);
+  overflow: hidden;
+}
+
+.account-usage-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--blue);
+  transition: width 0.3s ease;
+}
+
+.account-usage-fill.is-high {
+  background: var(--warning);
+}
+
+.account-error {
+  margin-top: 12px;
+  font-size: 12.5px;
+  color: var(--danger);
+}

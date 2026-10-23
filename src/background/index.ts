@@ -8,6 +8,7 @@ import { VocabularyItem, FSRSRating, SelectionType, WritingGoal, WrongMeaningRep
 import { setupOllamaOriginRules } from './ollamaRules';
 import { setupBadgeListeners, updateAllTabBadges } from './badgeService';
 import { EventLogger, ApprovedEventName } from '../services/logging/eventLogger';
+import { AuthService, CloudAuthError } from '../services/auth/authService';
 
 // Immediately ensure Ollama dynamic rules and Badge synchronization are registered
 setupOllamaOriginRules();
@@ -434,6 +435,23 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             break;
           }
 
+          case 'AUTH_LOGIN': {
+            await AuthService.login();
+            sendResponse({ success: true, data: await AuthService.getAccount() });
+            break;
+          }
+
+          case 'AUTH_LOGOUT': {
+            await AuthService.logout();
+            sendResponse({ success: true });
+            break;
+          }
+
+          case 'GET_ACCOUNT': {
+            sendResponse({ success: true, data: await AuthService.getAccount() });
+            break;
+          }
+
           case 'GET_SETTINGS': {
             const settings = await SettingsService.getSettings();
             sendResponse({ success: true, data: settings });
@@ -594,7 +612,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             sendResponse({ success: false, error: `Unknown message type: ${type}` });
         }
       } catch (err) {
-        sendResponse({ success: false, error: (err as Error).message });
+        sendResponse({
+          success: false,
+          error: (err as Error).message,
+          ...(err instanceof CloudAuthError ? { code: err.code } : {})
+        });
       }
     })();
 

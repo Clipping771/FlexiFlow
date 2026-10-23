@@ -14,7 +14,12 @@ let env: Bindings;
 
 beforeEach(async () => {
   d1 = await createTestD1();
-  env = { DB: d1.db, JWT_SECRET: SECRET, ALLOWED_ORIGINS: `${EXT_ORIGIN}, http://localhost:8787` };
+  env = {
+    DB: d1.db,
+    JWT_SECRET: SECRET,
+    ALLOWED_ORIGINS: `${EXT_ORIGIN}, http://localhost:8787`,
+    GOOGLE_CLIENT_ID: 'test-client.apps.googleusercontent.com'
+  };
 });
 
 afterEach(() => {

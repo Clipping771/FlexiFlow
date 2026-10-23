@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserSettings, CustomLanguageConfig } from '../../types';
 import { fetchProviderModels, AvailableModel } from '../../services/ai/modelFetcher';
+import { AccountSection } from './AccountSection';
 import {
   getAllLanguages,
   getLanguageConfig,
@@ -454,6 +455,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </span>
           </span>
         </div>
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <AccountSection />
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

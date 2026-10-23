@@ -7,6 +7,10 @@ compatibility_date = "2026-10-01"
 # chrome-extension://<EXTENSION_ID>; add http://localhost:* origins only in .dev.vars.
 ALLOWED_ORIGINS = "chrome-extension://REPLACE_WITH_EXTENSION_ID"
 
+# Google OAuth 2.0 "Web application" client id. Its authorized redirect URI must be
+# https://<EXTENSION_ID>.chromiumapp.org/ (what chrome.identity.getRedirectURL() returns).
+GOOGLE_CLIENT_ID = "REPLACE_WITH_CLIENT_ID.apps.googleusercontent.com"
+
 # Secrets (set with `wrangler secret put <NAME>`, or in .dev.vars for local dev):
 #   JWT_SECRET  HMAC key for access tokens, at least 32 random bytes
 

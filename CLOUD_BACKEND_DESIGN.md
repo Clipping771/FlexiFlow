@@ -248,6 +248,8 @@ Base URL: `https://api.lexiflow.app/v1`
 | 413 | `INPUT_TOO_LONG` | ছোট করে নির্বাচন করতে বলবে, `maxChars` দেখাবে |
 | 429 | `RATE_LIMITED` | `Retry-After` অনুযায়ী অপেক্ষা করে আবার চেষ্টা করবে |
 | 503 | `AI_UNAVAILABLE` | "কিছুক্ষণ পর চেষ্টা করুন" দেখাবে, credit refund হয়ে যাবে |
+| 400 | `INVALID_REQUEST` | Body ভুল বা অসম্পূর্ণ। এটা extension-এর bug, ইউজারের কিছু করার নেই |
+| 503 | `SERVICE_UNAVAILABLE` | Google-এর key আনা যায়নি বা সার্ভার সাময়িক বন্ধ। "কিছুক্ষণ পর চেষ্টা করুন" দেখাবে, লগইন অবস্থা মুছবে না |
 
 ---
 

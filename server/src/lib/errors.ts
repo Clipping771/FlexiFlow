@@ -9,6 +9,8 @@ export type ErrorCode =
   | 'INPUT_TOO_LONG'
   | 'RATE_LIMITED'
   | 'AI_UNAVAILABLE'
+  | 'SERVICE_UNAVAILABLE'
+  | 'INVALID_REQUEST'
   | 'NOT_FOUND'
   | 'INTERNAL';
 
