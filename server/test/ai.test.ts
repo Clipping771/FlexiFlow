@@ -200,11 +200,26 @@ describe('POST /v1/ai/stage-a', () => {
 
     expect(res.status).toBe(402);
     const body = await json(res);
-    expect(body.error).toMatchObject({ code: 'QUOTA_EXCEEDED', used: 30, limit: 30, upgradeUrl: 'https://lexiflow.test/pro' });
+    expect(body.error).toMatchObject({ code: 'QUOTA_EXCEEDED', used: 30, limit: 30 });
     expect(body.error.resetAt).toMatch(/T00:00:00\+06:00$/);
+    // Monetization is off unless MONETIZATION_ENABLED is "true", so there is nothing to upgrade to.
+    expect(body.error).not.toHaveProperty('upgradeUrl');
+    expect(body.error.message).not.toMatch(/credit|pro\b/i);
     expect(geminiRequests).toHaveLength(0);
     expect(await creditsUsed()).toBe(30);
     expect((await events()).map((e) => e.status)).toEqual(['rejected']);
+  });
+
+  it('adds the upgrade link to QUOTA_EXCEEDED only when monetization is on', async () => {
+    seedUser();
+    d1.exec(`INSERT INTO usage_daily (user_id, day, credits_used) VALUES ('usr_1', ?1, 30)`, [
+      new Date(Date.now() + 6 * 3600e3).toISOString().slice(0, 10)
+    ]);
+    env.MONETIZATION_ENABLED = 'true';
+
+    const body = await json(await call('/v1/ai/stage-a', stageABody));
+
+    expect(body.error).toMatchObject({ code: 'QUOTA_EXCEEDED', upgradeUrl: 'https://lexiflow.test/pro' });
   });
 
   it('lets only one of two concurrent requests take the last credit', async () => {

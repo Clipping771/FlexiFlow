@@ -10,7 +10,9 @@ export interface Bindings {
   GEMINI_API_KEY: string;
   /** Gemini model id, e.g. "gemini-2.0-flash". */
   GEMINI_MODEL: string;
-  /** Where the "upgrade to Pro" button in QUOTA_EXCEEDED errors points. */
+  /** "true" turns on paid-plan prompts (src/lib/features.ts); anything else keeps the service free-only. */
+  MONETIZATION_ENABLED?: string;
+  /** Where the "upgrade to Pro" button in QUOTA_EXCEEDED errors points, when monetization is on. */
   UPGRADE_URL: string;
   /** Shared response cache, also holding the manual kill switch key. */
   CACHE: KVNamespace;

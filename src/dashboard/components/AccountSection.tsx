@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Cloud, LogIn, LogOut } from 'lucide-react';
 import type { CloudAccount } from '../../services/auth/authService';
+import { MONETIZATION_ENABLED } from '../../config/features';
 
 interface BackgroundResponse<T> {
   success: boolean;
@@ -105,16 +106,18 @@ export const AccountSection: React.FC = () => {
               <div className="account-name">{account.user.name || account.user.email}</div>
               {account.user.name && <div className="account-muted">{account.user.email}</div>}
             </div>
-            <span className={`account-plan account-plan-${account.plan}`}>
-              {account.plan === 'pro' ? 'Pro' : 'Free'}
-            </span>
+            {MONETIZATION_ENABLED && (
+              <span className={`account-plan account-plan-${account.plan}`}>
+                {account.plan === 'pro' ? 'Pro' : 'Free'}
+              </span>
+            )}
           </div>
 
           {usage && (
             <div className="account-usage">
               <div className="account-usage-label">
                 <span>
-                  <strong>{usage.used}</strong> / {usage.limit} credits used today
+                  <strong>{usage.used}</strong> / {usage.limit} {MONETIZATION_ENABLED ? 'credits' : 'AI uses'} today
                 </span>
                 <span className="account-muted">Resets at {resetTime}</span>
               </div>
@@ -124,7 +127,7 @@ export const AccountSection: React.FC = () => {
                 aria-valuemin={0}
                 aria-valuemax={usage.limit}
                 aria-valuenow={usage.used}
-                aria-label="Credits used today"
+                aria-label={MONETIZATION_ENABLED ? 'Credits used today' : 'AI uses today'}
               >
                 <div
                   className={`account-usage-fill ${usedPct >= 90 ? 'is-high' : ''}`}
@@ -143,7 +146,7 @@ export const AccountSection: React.FC = () => {
           {confirmingDelete ? (
             <div className="account-delete-confirm" role="group" aria-label="Confirm account deletion">
               <p>
-                This permanently deletes your LexiFlow Cloud account, plan and usage history on every device.
+                This permanently deletes your LexiFlow Cloud account{MONETIZATION_ENABLED ? ', plan' : ''} and usage history on every device.
                 Vocabulary saved in this browser is not affected.
               </p>
               <div className="account-delete-actions">

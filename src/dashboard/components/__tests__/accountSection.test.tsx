@@ -1,6 +1,13 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+const flags = vi.hoisted(() => ({ monetization: false }));
+vi.mock('../../../config/features', () => ({
+  get MONETIZATION_ENABLED() {
+    return flags.monetization;
+  }
+}));
+
 import { AccountSection } from '../AccountSection';
 
 const account = {
@@ -15,6 +22,7 @@ let responses: Record<string, any>;
 let sendMessage: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  flags.monetization = false;
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -57,9 +65,19 @@ describe('AccountSection', () => {
     await render();
     expect(container.textContent).toContain('Test Reader');
     expect(container.textContent).toContain('reader@example.com');
-    expect(container.textContent).toContain('Free');
-    expect(container.textContent).toContain('12 / 30 credits used today');
+    expect(container.textContent).toContain('12 / 30 AI uses today');
     expect(container.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('12');
+    // No paid-plan wording while monetization is off.
+    expect(container.querySelector('.account-plan')).toBeNull();
+    expect(container.textContent).not.toMatch(/credit|Free|Pro\b/);
+  });
+
+  it('shows the plan badge and credits once monetization is on', async () => {
+    flags.monetization = true;
+    responses.GET_ACCOUNT = { success: true, data: account };
+    await render();
+    expect(container.querySelector('.account-plan')?.textContent).toBe('Free');
+    expect(container.textContent).toContain('12 / 30 credits today');
   });
 
   it('signs in and then shows the account', async () => {
@@ -68,7 +86,7 @@ describe('AccountSection', () => {
     await render();
     await click('Sign in with Google');
     expect(sendMessage).toHaveBeenCalledWith({ type: 'AUTH_LOGIN' }, expect.any(Function));
-    expect(container.textContent).toContain('12 / 30 credits used today');
+    expect(container.textContent).toContain('12 / 30 AI uses today');
   });
 
   it('stays quiet when the user cancels sign-in, but reports real failures', async () => {

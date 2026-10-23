@@ -48,6 +48,12 @@ counts, tokens and latency, never the text.
 
 ## Running costs
 
+- **Paid plans are off.** `MONETIZATION_ENABLED = "false"` in every `wrangler.toml` section keeps upgrade links out
+  of responses, and `MONETIZATION_ENABLED = false` in `src/config/features.ts` hides the PRO badge, Free/Pro labels,
+  credit wording and upgrade prompts in the extension. Turn both on together once payments exist. Daily limits,
+  rate limits and the budget kill switch stay on regardless: they protect AI costs, and users see them as a plain
+  daily limit.
+
 - **Cache.** Stage A/B answers are cached in KV for 30 days under keys that include `PROMPT_VERSION`; Stage A keys
   hold only a hash of the reader's sentence. Bump `PROMPT_VERSION` after changing prompt text to retire old entries.
 - **Budget.** Every model call adds its estimated cost to `spend_daily` (failed attempts included). When Free-plan

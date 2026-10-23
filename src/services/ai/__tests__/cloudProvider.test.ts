@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const flags = vi.hoisted(() => ({ monetization: false }));
+vi.mock('../../../config/features', () => ({
+  get MONETIZATION_ENABLED() {
+    return flags.monetization;
+  }
+}));
+
 const authorizedFetch = vi.fn();
 vi.mock('../../auth/authService', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../auth/authService')>();
@@ -20,6 +27,7 @@ function sentBody(call = 0) {
 
 beforeEach(() => {
   authorizedFetch.mockReset();
+  flags.monetization = false;
 });
 
 describe('CloudProvider', () => {
@@ -42,17 +50,35 @@ describe('CloudProvider', () => {
     expect(sentBody()).toEqual({ lemma: 'bank', partOfSpeech: 'noun', contextualSenseId: 'sense_2', targetLang: 'bn' });
   });
 
-  it('turns QUOTA_EXCEEDED into a readable error with the reset time and upgrade link', async () => {
+  it('turns QUOTA_EXCEEDED into a plain daily-limit message while monetization is off', async () => {
     authorizedFetch.mockResolvedValue(reply(402, {
-      error: { code: 'QUOTA_EXCEEDED', message: 'quota', used: 30, limit: 30, resetAt: '2026-10-24T00:00:00+06:00', upgradeUrl: 'https://x/pro' }
+      error: { code: 'QUOTA_EXCEEDED', message: 'quota', used: 30, limit: 30, resetAt: '2026-10-24T00:00:00+06:00' }
     }));
 
     const err = await new CloudProvider().analyzeStageA('resilient').catch((e) => e);
 
     expect(err).toBeInstanceOf(CloudAIError);
     expect(err.code).toBe('QUOTA_EXCEEDED');
+    expect(err.message).toMatch(/^You've reached today's LexiFlow limit of 30 AI uses\. It resets at .+\.$/);
+    expect(err.message).not.toMatch(/credit|Pro/);
+  });
+
+  it('never upsells while the build flag is off, even if the server sends an upgrade link', async () => {
+    authorizedFetch.mockResolvedValue(reply(402, { error: { code: 'QUOTA_EXCEEDED', limit: 30, upgradeUrl: 'https://x/pro' } }));
+    const err = await new CloudProvider().analyzeStageA('x').catch((e) => e);
+    expect(err.message).not.toContain('Upgrade');
+  });
+
+  it('offers the upgrade once monetization is on and the server sends a link', async () => {
+    flags.monetization = true;
+    authorizedFetch.mockResolvedValue(reply(402, {
+      error: { code: 'QUOTA_EXCEEDED', limit: 30, resetAt: '2026-10-24T00:00:00+06:00', upgradeUrl: 'https://x/pro' }
+    }));
+
+    const err = await new CloudProvider().analyzeStageA('resilient').catch((e) => e);
+
     expect(err.message).toMatch(/^You've used all 30 of today's LexiFlow credits\. They reset at .+\. Upgrade to Pro for more\.$/);
-    expect(err.details).toMatchObject({ resetAt: '2026-10-24T00:00:00+06:00', upgradeUrl: 'https://x/pro' });
+    expect(err.details).toMatchObject({ upgradeUrl: 'https://x/pro' });
   });
 
   it.each([

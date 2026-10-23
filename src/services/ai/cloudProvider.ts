@@ -11,6 +11,7 @@ import {
 } from '../../types';
 import { AuthService, CloudAuthError } from '../auth/authService';
 import { AIProvider } from './types';
+import { MONETIZATION_ENABLED } from '../../config/features';
 
 export type CloudAIErrorCode =
   | 'QUOTA_EXCEEDED'
@@ -50,9 +51,14 @@ function toCloudError(status: number, envelope: ErrorEnvelope): Error {
   switch (code) {
     case 'QUOTA_EXCEEDED': {
       const reset = formatTime(details.resetAt);
+      const resets = reset ? ` It resets at ${reset}.` : '';
+      // Upsell only when paid plans exist on both sides: the build flag and the server's upgrade link.
+      const upsell = MONETIZATION_ENABLED && typeof details.upgradeUrl === 'string';
       return new CloudAIError(
         'QUOTA_EXCEEDED',
-        `You've used all ${details.limit ?? ''} of today's LexiFlow credits.${reset ? ` They reset at ${reset}.` : ''} Upgrade to Pro for more.`.replace('all  of', 'all of'),
+        upsell
+          ? `You've used all ${details.limit} of today's LexiFlow credits.${resets.replace('It resets', 'They reset')} Upgrade to Pro for more.`
+          : `You've reached today's LexiFlow limit of ${details.limit} AI uses.${resets}`,
         details
       );
     }

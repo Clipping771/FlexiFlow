@@ -12,6 +12,7 @@ import {
   refundCredits,
   reserveCredits
 } from '../lib/quota';
+import { monetizationEnabled } from '../lib/features';
 import { hitRateLimit } from '../lib/rateLimit';
 import { addSpend, checkPause, estimateMicroUsd } from '../lib/spend';
 import {
@@ -136,11 +137,12 @@ async function metered<K extends string, T>(c: Context<AppEnv>, spec: TaskSpec<K
   const used = await reserveCredits(db, userId, day, credits, limits.dailyCredits);
   if (used === null) {
     await recordUsageEvent(db, { userId, endpoint, credits, cached: cached !== null, status: 'rejected' }, now);
-    throw new ApiError(402, 'QUOTA_EXCEEDED', "You have used today's LexiFlow credits.", {
+    throw new ApiError(402, 'QUOTA_EXCEEDED', "You have reached today's LexiFlow limit.", {
       used: await currentUsage(db, userId, day),
       limit: limits.dailyCredits,
       resetAt,
-      upgradeUrl: c.env.UPGRADE_URL
+      // Without monetization there is nothing to upgrade to, so the extension shows no upsell.
+      ...(monetizationEnabled(c.env) ? { upgradeUrl: c.env.UPGRADE_URL } : {})
     });
   }
   const usage = { used, limit: limits.dailyCredits, resetAt };

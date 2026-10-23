@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserSettings, CustomLanguageConfig } from '../../types';
 import { fetchProviderModels, AvailableModel } from '../../services/ai/modelFetcher';
 import { AccountSection } from './AccountSection';
+import { MONETIZATION_ENABLED } from '../../config/features';
 import {
   getAllLanguages,
   getLanguageConfig,
@@ -1109,9 +1110,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
           {form.aiProvider === 'lexiflow' && (
             <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Uses your LexiFlow Cloud account above: no API key needed, counted against your daily credits.
-              Word lookups and AI chat cost 1 credit, Sentence X-Ray, Word Difference and Usage Coach 2, and
-              paragraph analysis, writing help and page highlights 3. Article analysis runs on this device and is free.
+              {MONETIZATION_ENABLED
+                ? 'Uses your LexiFlow Cloud account above: no API key needed, counted against your daily credits. Word lookups and AI chat cost 1 credit, Sentence X-Ray, Word Difference and Usage Coach 2, and paragraph analysis, writing help and page highlights 3. Article analysis runs on this device and is free.'
+                : 'Uses your LexiFlow Cloud account above: free, no API key needed. There is a daily limit; longer tasks (Sentence X-Ray, Word Difference, Usage Coach, paragraphs, writing help and page highlights) count more than a word lookup. Article analysis runs on this device and does not count.'}
             </p>
           )}
 

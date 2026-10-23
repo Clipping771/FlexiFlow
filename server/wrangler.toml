@@ -19,6 +19,9 @@ ALLOWED_ORIGINS = "chrome-extension://REPLACE_WITH_DEV_EXTENSION_ID,http://local
 # https://<EXTENSION_ID>.chromiumapp.org/ for every extension ID that signs in (chrome.identity.getRedirectURL()).
 GOOGLE_CLIENT_ID = "REPLACE_WITH_CLIENT_ID.apps.googleusercontent.com"
 GEMINI_MODEL = "gemini-2.0-flash"
+# Paid plans are off until launch: no upgrade links or Pro prompts. Set to "true" with the extension's
+# MONETIZATION_ENABLED (src/config/features.ts) when payments exist.
+MONETIZATION_ENABLED = "false"
 UPGRADE_URL = "https://lexiflow.app/pro"
 # Spend estimates and the Free-plan budget (CLOUD_BACKEND_DESIGN.md §5.4). Prices are USD per
 # million tokens for GEMINI_MODEL; check Google's current pricing when changing the model.
@@ -51,6 +54,9 @@ routes = [{ pattern = "api-staging.lexiflow.app", custom_domain = true }]
 ALLOWED_ORIGINS = "chrome-extension://REPLACE_WITH_STAGING_EXTENSION_ID"
 GOOGLE_CLIENT_ID = "REPLACE_WITH_CLIENT_ID.apps.googleusercontent.com"
 GEMINI_MODEL = "gemini-2.0-flash"
+# Paid plans are off until launch: no upgrade links or Pro prompts. Set to "true" with the extension's
+# MONETIZATION_ENABLED (src/config/features.ts) when payments exist.
+MONETIZATION_ENABLED = "false"
 UPGRADE_URL = "https://lexiflow.app/pro"
 GEMINI_INPUT_USD_PER_MTOK = "0.10"
 GEMINI_OUTPUT_USD_PER_MTOK = "0.40"
@@ -83,6 +89,9 @@ workers_dev = false
 ALLOWED_ORIGINS = "chrome-extension://REPLACE_WITH_STORE_EXTENSION_ID"
 GOOGLE_CLIENT_ID = "REPLACE_WITH_CLIENT_ID.apps.googleusercontent.com"
 GEMINI_MODEL = "gemini-2.0-flash"
+# Paid plans are off until launch: no upgrade links or Pro prompts. Set to "true" with the extension's
+# MONETIZATION_ENABLED (src/config/features.ts) when payments exist.
+MONETIZATION_ENABLED = "false"
 UPGRADE_URL = "https://lexiflow.app/pro"
 GEMINI_INPUT_USD_PER_MTOK = "0.10"
 GEMINI_OUTPUT_USD_PER_MTOK = "0.40"

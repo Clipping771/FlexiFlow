@@ -96,7 +96,7 @@ the store listing.
 > • Page highlights pick out the words in an article worth learning.
 > • Save words and review them with spaced repetition (FSRS) so they stick.
 >
-> Sign in with Google to use LexiFlow Cloud with daily free credits, or bring your own Gemini, OpenAI,
+> Sign in with Google to use LexiFlow Cloud for free (with a daily fair-use limit), or bring your own Gemini, OpenAI,
 > Anthropic or local Ollama model. Your vocabulary stays in your browser.
 >
 > Bengali (বাংলা) explanations are built in, along with more than 30 other languages including Hindi, Urdu,

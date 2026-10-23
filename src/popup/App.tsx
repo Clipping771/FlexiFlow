@@ -49,6 +49,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { playPronunciation } from '../services/audio/voiceService';
+import { MONETIZATION_ENABLED } from '../config/features';
 import './popup.css';
 
 export const resolveEffectiveTheme = (t?: string): 'light' | 'dark' => {
@@ -944,7 +945,7 @@ export const App: React.FC = () => {
           <div className="brand-text-block">
             <div className="app-title-row">
               <span className="app-title">LexiFlow</span>
-              <span className="app-badge-pro">PRO</span>
+              {MONETIZATION_ENABLED && <span className="app-badge-pro">PRO</span>}
             </div>
             {currentDomain ? (
               <div

@@ -19,8 +19,8 @@ LexiFlow is provided by **[TODO: your name or company]** ("we"). Contact: **[TOD
 - Your vocabulary, review history and settings are stored **only in your browser**.
 - LexiFlow sends text over the network **only when you ask it to explain something**, and only to the AI service
   you chose: LexiFlow Cloud, or your own Google Gemini, OpenAI, Anthropic or local Ollama account.
-- If you use **LexiFlow Cloud**, we keep your Google account email and name, your plan, and counts of how many
-  credits you used. We **do not store the text you look up** with your account, and we never sell your data.
+- If you use **LexiFlow Cloud**, we keep your Google account email and name, your account type, and counts of
+  how much you used the AI features. We **do not store the text you look up** with your account, and we never sell your data.
 - You can **delete your LexiFlow Cloud account** at any time in Settings, which erases everything tied to it.
 
 ## 1. Data stored on your device
