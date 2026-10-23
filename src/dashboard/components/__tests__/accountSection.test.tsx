@@ -91,4 +91,32 @@ describe('AccountSection', () => {
     expect(sendMessage).toHaveBeenCalledWith({ type: 'AUTH_LOGOUT' }, expect.any(Function));
     expect(button('Sign in with Google')).toBeTruthy();
   });
+
+  it('deletes the account only after confirmation', async () => {
+    responses.GET_ACCOUNT = { success: true, data: account };
+    responses.AUTH_DELETE_ACCOUNT = { success: true };
+    await render();
+
+    await click('Delete account');
+    expect(sendMessage).not.toHaveBeenCalledWith({ type: 'AUTH_DELETE_ACCOUNT' }, expect.any(Function));
+    expect(container.textContent).toContain('permanently deletes');
+
+    await click('Cancel');
+    expect(container.textContent).not.toContain('permanently deletes');
+
+    await click('Delete account');
+    await click('Delete my account');
+    expect(sendMessage).toHaveBeenCalledWith({ type: 'AUTH_DELETE_ACCOUNT' }, expect.any(Function));
+    expect(button('Sign in with Google')).toBeTruthy();
+  });
+
+  it('keeps the account shown when deletion fails', async () => {
+    responses.GET_ACCOUNT = { success: true, data: account };
+    responses.AUTH_DELETE_ACCOUNT = { success: false, error: 'Could not reach LexiFlow Cloud.' };
+    await render();
+    await click('Delete account');
+    await click('Delete my account');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Could not reach');
+    expect(container.textContent).toContain('Test Reader');
+  });
 });

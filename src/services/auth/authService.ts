@@ -190,6 +190,13 @@ export const AuthService = {
     }
   },
 
+  /** Permanently deletes the LexiFlow Cloud account on the server, then signs out locally. */
+  async deleteAccount(): Promise<void> {
+    const res = await AuthService.authorizedFetch('/v1/me', { method: 'DELETE' });
+    if (!res.ok && res.status !== 401) throw await errorFromResponse(res);
+    await clearSession();
+  },
+
   /** A valid access token, refreshed when close to expiry; null when signed out. */
   async getAccessToken(): Promise<string | null> {
     const access = await readAccessToken();

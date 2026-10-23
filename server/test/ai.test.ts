@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import app from '../src/index';
+import { app } from '../src/index';
 import type { Bindings } from '../src/env';
 import { signAccessToken } from '../src/lib/tokens';
 import { PLAN_LIMITS } from '../src/lib/plans';

@@ -11,7 +11,15 @@ const root = path.resolve(__dirname, '..');
 // Dev builds (`npm run build:dev`) keep readable output with inline sourcemaps;
 // production builds are minified and ship without sourcemaps.
 const isDev = process.argv.includes('--dev');
-const define = { __LEXIFLOW_DEMO__: JSON.stringify(isDev) };
+// Which LexiFlow Cloud to talk to (src/config/cloud.ts): dev builds use local `wrangler dev`,
+// `--cloud=staging` the staging Worker, and everything else production.
+const cloudArg = process.argv.find((a) => a.startsWith('--cloud='))?.slice('--cloud='.length);
+const cloudEnv = cloudArg ?? (isDev ? 'development' : 'production');
+if (!['development', 'staging', 'production'].includes(cloudEnv)) {
+  console.error(`Unknown --cloud=${cloudEnv}; use development, staging or production.`);
+  process.exit(1);
+}
+const define = { __LEXIFLOW_DEMO__: JSON.stringify(isDev), __LEXIFLOW_CLOUD_ENV__: JSON.stringify(cloudEnv) };
 
 async function buildAll() {
   console.log('--- Step 1: Building Popup and Dashboard HTML Pages ---');
@@ -69,10 +77,18 @@ async function buildAll() {
 
   console.log('--- Step 4: Copying Manifest and Assets ---');
   const distDir = path.resolve(root, 'dist');
-  fs.copyFileSync(path.resolve(root, 'manifest.json'), path.resolve(distDir, 'manifest.json'));
+  const manifest = JSON.parse(fs.readFileSync(path.resolve(root, 'manifest.json'), 'utf8'));
+  if (cloudEnv === 'staging') {
+    // Testers can tell the builds apart, and the staging API is reachable.
+    manifest.name = `${manifest.name} (Staging)`;
+    if (!manifest.host_permissions.includes('https://api-staging.lexiflow.app/*')) {
+      manifest.host_permissions.push('https://api-staging.lexiflow.app/*');
+    }
+  }
+  fs.writeFileSync(path.resolve(distDir, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
   fs.cpSync(path.resolve(root, 'assets'), path.resolve(distDir, 'assets'), { recursive: true });
 
-  console.log('✓ LexiFlow Extension Build Complete in dist/');
+  console.log(`✓ LexiFlow Extension Build Complete in dist/ (LexiFlow Cloud: ${cloudEnv})`);
 }
 
 buildAll().catch((err) => {

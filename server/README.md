@@ -67,20 +67,49 @@ counts, tokens and latency, never the text.
 ## Google sign-in setup
 
 1. In Google Cloud Console, create an OAuth 2.0 client of type **Web application**.
-2. Add `https://<EXTENSION_ID>.chromiumapp.org/` as an authorized redirect URI. Keep the extension ID stable
-   with a `key` in `manifest.json`, or the redirect changes on every unpacked install.
-3. Put the client id in `GOOGLE_CLIENT_ID` (`wrangler.toml`, `.dev.vars`) and in
-   `GOOGLE_OAUTH_CLIENT_ID` (`src/config/cloud.ts` in the extension).
+2. Add `https://<EXTENSION_ID>.chromiumapp.org/` as an authorized redirect URI for **every** extension ID that
+   signs in (your unpacked dev build, the staging build, the Web Store build). Keep each ID stable with a `key`
+   in `manifest.json`, or the redirect changes on every unpacked install.
+3. Put the client id in `GOOGLE_CLIENT_ID` in each `wrangler.toml` section (and `.dev.vars`), and in
+   `GOOGLE_OAUTH_CLIENT_ID` in `src/config/cloud.ts` for the matching environment.
+4. Publish the OAuth consent screen with the privacy policy URL (see [WEB_STORE_DISCLOSURE.md](../WEB_STORE_DISCLOSURE.md)).
 
-## First deploy
+## Environments
+
+| | Development | Staging | Production |
+|---|---|---|---|
+| Worker | `wrangler dev` (never deployed) | `lexiflow-api-staging` | `lexiflow-api` |
+| URL | `http://localhost:8787` | `https://api-staging.lexiflow.app` | `https://api.lexiflow.app` |
+| D1 / KV | local only | `lexiflow-staging` / own namespace | `lexiflow-production` / own namespace |
+| Extension build | `npm run build:dev` | `npm run build:staging` ("LexiFlow (Staging)") | `npm run build` (Web Store) |
+| Free daily budget | $5 | $1 | $5 |
+
+Each environment has its own database, cache, secrets and Google redirect URI, so testing on staging never
+touches production data. Every section of `wrangler.toml` lists its own vars and bindings (Wrangler does not
+inherit them). `npm run check:config` dry-runs both deployed environments and fails on a broken config.
+
+### One-time setup (per environment, shown for staging; repeat with `production`)
 
 ```bash
-npx wrangler d1 create lexiflow           # put the printed id in wrangler.toml
-npx wrangler kv namespace create CACHE    # put the printed id in wrangler.toml
-npx wrangler secret put JWT_SECRET
-npx wrangler secret put GEMINI_API_KEY
-npm run db:migrate:remote
-npm run deploy
+npx wrangler d1 create lexiflow-staging                 # put the id in [[env.staging.d1_databases]]
+npx wrangler kv namespace create CACHE --env staging    # put the id in [[env.staging.kv_namespaces]]
+npx wrangler secret put JWT_SECRET --env staging        # a new random value per environment
+npx wrangler secret put GEMINI_API_KEY --env staging
+npx wrangler secret put ALERT_WEBHOOK_URL --env staging # optional
 ```
 
-Set `ALLOWED_ORIGINS` in `wrangler.toml` to `chrome-extension://<EXTENSION_ID>` before deploying.
+Also set `ALLOWED_ORIGINS` and `GOOGLE_CLIENT_ID` in that environment's vars, and add the custom domain's zone
+(`lexiflow.app`) to the Cloudflare account so the `routes` entry can attach.
+
+### Releasing
+
+```bash
+npm run db:migrate:staging        # apply new migrations first; they must work with the running code
+npm run deploy:staging            # runs the tests, then deploys
+# test with the staging extension build, then:
+npm run db:migrate:production
+npm run deploy:production
+```
+
+The daily retention job (`[triggers]`, 02:30 Asia/Dhaka) runs in staging and production. Roll back with
+`npx wrangler rollback --env production`; D1 migrations do not roll back, so keep them additive.

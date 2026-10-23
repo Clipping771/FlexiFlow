@@ -454,6 +454,12 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             break;
           }
 
+          case 'AUTH_DELETE_ACCOUNT': {
+            await AuthService.deleteAccount();
+            sendResponse({ success: true });
+            break;
+          }
+
           case 'GET_ACCOUNT': {
             sendResponse({ success: true, data: await AuthService.getAccount() });
             break;

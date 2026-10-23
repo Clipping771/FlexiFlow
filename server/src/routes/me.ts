@@ -3,6 +3,7 @@ import type { AppEnv } from '../env';
 import { ApiError } from '../lib/errors';
 import { PLAN_LIMITS } from '../lib/plans';
 import { dhakaDay, nextDhakaMidnight } from '../lib/time';
+import { deleteAccount } from '../lib/retention';
 import { loadUser, publicUser } from '../lib/users';
 import { requireAuth } from '../middleware/auth';
 
@@ -33,4 +34,10 @@ me.get('/', async (c) => {
       resetAt: nextDhakaMidnight(now)
     }
   });
+});
+
+/** Deletes the account and everything tied to it, ending every session on every device. */
+me.delete('/', async (c) => {
+  await deleteAccount(c.env.DB, c.get('userId'));
+  return c.body(null, 204);
 });

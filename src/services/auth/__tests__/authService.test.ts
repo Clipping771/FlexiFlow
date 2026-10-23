@@ -226,4 +226,20 @@ describe('AuthService.getAccount and logout', () => {
     await expect(AuthService.logout()).resolves.toBeUndefined();
     expect(await AuthService.isSignedIn()).toBe(false);
   });
+
+  it('deletes the account on the server and then signs out', async () => {
+    signedIn();
+    fetchMock.mockResolvedValue(jsonResponse(204, null));
+    await AuthService.deleteAccount();
+    const [, init] = requestsTo('/v1/me')[0];
+    expect(init.method).toBe('DELETE');
+    expect(await AuthService.isSignedIn()).toBe(false);
+  });
+
+  it('keeps the session when the server cannot delete the account', async () => {
+    signedIn();
+    fetchMock.mockResolvedValue(jsonResponse(503, { error: { code: 'SERVICE_UNAVAILABLE', message: 'down' } }));
+    await expect(AuthService.deleteAccount()).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE' });
+    expect(await AuthService.isSignedIn()).toBe(true);
+  });
 });

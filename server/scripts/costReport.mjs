@@ -1,5 +1,8 @@
 // Pure helpers for scripts/cost-report.mjs, kept separate so they can be unit tested.
 
+/** D1 database names per environment, matching wrangler.toml. */
+export const DATABASES = { local: 'lexiflow', staging: 'lexiflow-staging', production: 'lexiflow-production' };
+
 /** Days are Asia/Dhaka calendar days, matching usage_daily and spend_daily. */
 export function usageQuery(days) {
   if (!Number.isInteger(days) || days < 1 || days > 366) throw new Error('days must be an integer from 1 to 366');
@@ -83,10 +86,21 @@ export function summarize(rows, prices) {
   };
 }
 
-/** Reads the price and budget vars from wrangler.toml so the report uses what the Worker uses. */
-export function readPricing(wranglerToml) {
+/** The vars table of one environment (top level when `env` is omitted), as raw TOML text. */
+function varsSection(wranglerToml, env) {
+  const header = env ? `[env.${env}.vars]` : '[vars]';
+  const start = wranglerToml.indexOf(header);
+  if (start < 0) return '';
+  const rest = wranglerToml.slice(start + header.length);
+  const next = rest.search(/^\[/m);
+  return next < 0 ? rest : rest.slice(0, next);
+}
+
+/** Reads the price and budget vars from wrangler.toml so the report uses what that environment's Worker uses. */
+export function readPricing(wranglerToml, env) {
+  const section = varsSection(wranglerToml, env);
   const value = (name, fallback) => {
-    const m = new RegExp(`^${name}\\s*=\\s*"([^"]*)"`, 'm').exec(wranglerToml);
+    const m = new RegExp(`^${name}\\s*=\\s*"([^"]*)"`, 'm').exec(section);
     const n = m ? Number(m[1]) : NaN;
     return Number.isFinite(n) ? n : fallback;
   };

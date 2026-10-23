@@ -21,12 +21,13 @@ function send<T>(type: string): Promise<BackgroundResponse<T>> {
   });
 }
 
-type Status = 'loading' | 'idle' | 'signing-in' | 'signing-out';
+type Status = 'loading' | 'idle' | 'signing-in' | 'signing-out' | 'deleting';
 
 export const AccountSection: React.FC = () => {
   const [account, setAccount] = useState<CloudAccount | null>(null);
   const [status, setStatus] = useState<Status>('loading');
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const loadAccount = useCallback(async () => {
     const res = await send<CloudAccount | null>('GET_ACCOUNT');
@@ -59,6 +60,19 @@ export const AccountSection: React.FC = () => {
     setStatus('signing-out');
     await send('AUTH_LOGOUT');
     setAccount(null);
+    setStatus('idle');
+  };
+
+  const handleDeleteAccount = async () => {
+    setError(null);
+    setStatus('deleting');
+    const res = await send('AUTH_DELETE_ACCOUNT');
+    if (res.success) {
+      setAccount(null);
+      setConfirmingDelete(false);
+    } else {
+      setError(res.error || 'Could not delete your account. Try again.');
+    }
     setStatus('idle');
   };
 
@@ -125,6 +139,27 @@ export const AccountSection: React.FC = () => {
               <LogOut size={14} /> {status === 'signing-out' ? 'Signing out…' : 'Sign out'}
             </button>
           </div>
+
+          {confirmingDelete ? (
+            <div className="account-delete-confirm" role="group" aria-label="Confirm account deletion">
+              <p>
+                This permanently deletes your LexiFlow Cloud account, plan and usage history on every device.
+                Vocabulary saved in this browser is not affected.
+              </p>
+              <div className="account-delete-actions">
+                <button type="button" className="btn-danger" onClick={handleDeleteAccount} disabled={status !== 'idle'}>
+                  {status === 'deleting' ? 'Deleting…' : 'Delete my account'}
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => setConfirmingDelete(false)} disabled={status !== 'idle'}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="account-delete-link" onClick={() => setConfirmingDelete(true)} disabled={status !== 'idle'}>
+              Delete account…
+            </button>
+          )}
         </div>
       ) : (
         <div className="account-body">

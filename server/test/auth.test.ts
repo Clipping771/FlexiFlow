@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sign } from 'hono/jwt';
-import app from '../src/index';
+import { app } from '../src/index';
 import type { Bindings } from '../src/env';
 import { GOOGLE_JWKS_URL, clearGoogleKeyCache } from '../src/lib/google';
 import { SIGNUPS_PER_IP_PER_DAY } from '../src/routes/auth';

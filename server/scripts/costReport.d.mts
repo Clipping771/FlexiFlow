@@ -56,4 +56,5 @@ export function usageQuery(days: number): string;
 export function spendQuery(days: number): string;
 export function tokenCostUsd(tokensIn: number, tokensOut: number, prices: Pick<Pricing, 'inputPerMTok' | 'outputPerMTok'>): number;
 export function summarize(rows: UsageRow[], prices: Pick<Pricing, 'inputPerMTok' | 'outputPerMTok'>): Summary;
-export function readPricing(wranglerToml: string): Pricing;
+export const DATABASES: { local: string; staging: string; production: string };
+export function readPricing(wranglerToml: string, env?: 'staging' | 'production'): Pricing;

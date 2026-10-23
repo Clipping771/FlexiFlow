@@ -50,11 +50,28 @@ describe('cost report', () => {
   });
 
   it('reads prices from wrangler.toml and falls back to defaults', () => {
-    expect(readPricing('GEMINI_INPUT_USD_PER_MTOK = "0.25"\nFREE_DAILY_BUDGET_USD = "12"')).toEqual({
+    expect(readPricing('[vars]\nGEMINI_INPUT_USD_PER_MTOK = "0.25"\nFREE_DAILY_BUDGET_USD = "12"')).toEqual({
       inputPerMTok: 0.25,
       outputPerMTok: 0.4,
       freeDailyBudgetUsd: 12
     });
+  });
+
+  it('reads the prices of the requested environment only', () => {
+    const toml = [
+      '[vars]',
+      'FREE_DAILY_BUDGET_USD = "5"',
+      '[env.staging.vars]',
+      'FREE_DAILY_BUDGET_USD = "1"',
+      'GEMINI_INPUT_USD_PER_MTOK = "0.20"',
+      '[[env.staging.kv_namespaces]]',
+      'binding = "CACHE"',
+      '[env.production.vars]',
+      'FREE_DAILY_BUDGET_USD = "50"'
+    ].join('\n');
+    expect(readPricing(toml)).toMatchObject({ freeDailyBudgetUsd: 5, inputPerMTok: 0.1 });
+    expect(readPricing(toml, 'staging')).toMatchObject({ freeDailyBudgetUsd: 1, inputPerMTok: 0.2 });
+    expect(readPricing(toml, 'production')).toMatchObject({ freeDailyBudgetUsd: 50, inputPerMTok: 0.1 });
   });
 
   it('rejects a non-integer day count instead of interpolating it', () => {

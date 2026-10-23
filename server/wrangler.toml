@@ -1,39 +1,104 @@
-name = "lexiflow-api"
+# LexiFlow Cloud API. Three environments (see README "Environments"):
+#   top level          local development only (`npm run dev`); never deployed
+#   [env.staging]      https://api-staging.lexiflow.app  (`npm run deploy:staging`)
+#   [env.production]   https://api.lexiflow.app          (`npm run deploy:production`)
+# Wrangler does not inherit vars, bindings or triggers into environments, so each section lists its own.
+# Secrets are per environment too: `wrangler secret put <NAME> --env staging|production`.
+#   JWT_SECRET         HMAC key for access tokens, at least 32 random bytes (different per environment)
+#   GEMINI_API_KEY     Google AI Studio key used for every cloud AI call
+#   ALERT_WEBHOOK_URL  optional Slack/Discord webhook for budget alerts
+
+name = "lexiflow-api-dev"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
 
 [vars]
-# Comma-separated list of origins allowed by CORS. Production should list only
-# chrome-extension://<EXTENSION_ID>; add http://localhost:* origins only in .dev.vars.
-ALLOWED_ORIGINS = "chrome-extension://REPLACE_WITH_EXTENSION_ID"
-
-# Google OAuth 2.0 "Web application" client id. Its authorized redirect URI must be
-# https://<EXTENSION_ID>.chromiumapp.org/ (what chrome.identity.getRedirectURL() returns).
+# Local values; `.dev.vars` (gitignored) holds the secrets and can override these.
+ALLOWED_ORIGINS = "chrome-extension://REPLACE_WITH_DEV_EXTENSION_ID,http://localhost:8787"
+# Google OAuth 2.0 "Web application" client id. Its authorized redirect URIs must include
+# https://<EXTENSION_ID>.chromiumapp.org/ for every extension ID that signs in (chrome.identity.getRedirectURL()).
 GOOGLE_CLIENT_ID = "REPLACE_WITH_CLIENT_ID.apps.googleusercontent.com"
-
 GEMINI_MODEL = "gemini-2.0-flash"
 UPGRADE_URL = "https://lexiflow.app/pro"
-
 # Spend estimates and the Free-plan budget (CLOUD_BACKEND_DESIGN.md §5.4). Prices are USD per
 # million tokens for GEMINI_MODEL; check Google's current pricing when changing the model.
 GEMINI_INPUT_USD_PER_MTOK = "0.10"
 GEMINI_OUTPUT_USD_PER_MTOK = "0.40"
 FREE_DAILY_BUDGET_USD = "5"
 
-# Secrets (set with `wrangler secret put <NAME>`, or in .dev.vars for local dev):
-#   JWT_SECRET      HMAC key for access tokens, at least 32 random bytes
-#   GEMINI_API_KEY  Google AI Studio key used for every cloud AI call
-#   ALERT_WEBHOOK_URL  optional Slack/Discord webhook for budget alerts
-
 # Shared response cache. The key "control:kill_switch" in it is the manual kill switch.
 [[kv_namespaces]]
 binding = "CACHE"
-# Replace with the id printed by `wrangler kv namespace create CACHE`.
 id = "00000000000000000000000000000000"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "lexiflow"
-# Replace with the id printed by `wrangler d1 create lexiflow`.
 database_id = "00000000-0000-0000-0000-000000000000"
 migrations_dir = "migrations"
+
+# Daily data retention (src/lib/retention.ts) at 02:30 Asia/Dhaka.
+[triggers]
+crons = ["30 20 * * *"]
+
+# ---------------------------------------------------------------------------------------------
+[env.staging]
+name = "lexiflow-api-staging"
+routes = [{ pattern = "api-staging.lexiflow.app", custom_domain = true }]
+
+[env.staging.vars]
+# The staging build is loaded unpacked by testers; list its extension ID (fixed by the `key` in its manifest).
+ALLOWED_ORIGINS = "chrome-extension://REPLACE_WITH_STAGING_EXTENSION_ID"
+GOOGLE_CLIENT_ID = "REPLACE_WITH_CLIENT_ID.apps.googleusercontent.com"
+GEMINI_MODEL = "gemini-2.0-flash"
+UPGRADE_URL = "https://lexiflow.app/pro"
+GEMINI_INPUT_USD_PER_MTOK = "0.10"
+GEMINI_OUTPUT_USD_PER_MTOK = "0.40"
+# Low on purpose: staging is for testers, not traffic.
+FREE_DAILY_BUDGET_USD = "1"
+
+[[env.staging.kv_namespaces]]
+binding = "CACHE"
+# `wrangler kv namespace create CACHE --env staging`
+id = "REPLACE_WITH_STAGING_KV_ID"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "lexiflow-staging"
+# `wrangler d1 create lexiflow-staging`
+database_id = "REPLACE_WITH_STAGING_D1_ID"
+migrations_dir = "migrations"
+
+[env.staging.triggers]
+crons = ["30 20 * * *"]
+
+# ---------------------------------------------------------------------------------------------
+[env.production]
+name = "lexiflow-api"
+routes = [{ pattern = "api.lexiflow.app", custom_domain = true }]
+workers_dev = false
+
+[env.production.vars]
+# Only the Chrome Web Store extension ID.
+ALLOWED_ORIGINS = "chrome-extension://REPLACE_WITH_STORE_EXTENSION_ID"
+GOOGLE_CLIENT_ID = "REPLACE_WITH_CLIENT_ID.apps.googleusercontent.com"
+GEMINI_MODEL = "gemini-2.0-flash"
+UPGRADE_URL = "https://lexiflow.app/pro"
+GEMINI_INPUT_USD_PER_MTOK = "0.10"
+GEMINI_OUTPUT_USD_PER_MTOK = "0.40"
+FREE_DAILY_BUDGET_USD = "5"
+
+[[env.production.kv_namespaces]]
+binding = "CACHE"
+# `wrangler kv namespace create CACHE --env production`
+id = "REPLACE_WITH_PRODUCTION_KV_ID"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "lexiflow-production"
+# `wrangler d1 create lexiflow-production`
+database_id = "REPLACE_WITH_PRODUCTION_D1_ID"
+migrations_dir = "migrations"
+
+[env.production.triggers]
+crons = ["30 20 * * *"]

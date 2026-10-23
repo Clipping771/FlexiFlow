@@ -339,7 +339,7 @@ CREATE TABLE usage_events (            -- অ্যানালিটিক্�
 | **M3: Auth** | `/auth/google`, `/auth/refresh`, `/auth/logout`, extension-এ AuthService ও লগইন UI | Extension থেকে লগইন করে `/me` দেখা যায় |
 | **M4: AI endpoint + quota** | `stage-a` আর `stage-b` প্রথমে, তারপর বাকিগুলো। reserve/refund, rate limit | ৩০ credit শেষ হলে 402 আসে, popup-এ সঠিক কার্ড দেখায় |
 | **M5: Cache + খরচ সুরক্ষা** | KV cache, kill switch, `usage_events` | একই শব্দ দ্বিতীয়বার খুঁজলে `cached: true` আসে |
-| **M6: প্রকাশের প্রস্তুতি** | PRIVACY.md, Web Store disclosure, staging ও prod environment | Staging-এ পুরো flow চলে |
+| **M6: প্রকাশের প্রস্তুতি** | PRIVACY.md, Web Store disclosure ([WEB_STORE_DISCLOSURE.md](WEB_STORE_DISCLOSURE.md)), staging ও prod environment, অ্যাকাউন্ট মোছা (`DELETE /v1/me`), দৈনিক retention job | Staging-এ পুরো flow চলে |
 
 ### টেস্ট পরিকল্পনা
 - **Worker unit test:** quota reserve-এর race (একসাথে ১০টা request, লিমিট ৩), refund, JWT মেয়াদ শেষ, refresh token reuse ধরা।

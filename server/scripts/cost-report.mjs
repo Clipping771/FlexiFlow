@@ -1,17 +1,23 @@
 #!/usr/bin/env node
 // Cost report from usage_events and spend_daily (CLOUD_BACKEND_DESIGN.md §8, M5).
-//   npm run report:costs                 local D1, last 7 days
-//   npm run report:costs -- --remote --days 30
+//   npm run report:costs                                  local D1, last 7 days
+//   npm run report:costs -- --env production --days 30   a deployed environment (staging | production)
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readPricing, spendQuery, summarize, usageQuery } from './costReport.mjs';
+import { DATABASES, readPricing, spendQuery, summarize, usageQuery } from './costReport.mjs';
 
 const serverDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
-const remote = args.includes('--remote');
+const envArg = args.indexOf('--env');
+const env = envArg >= 0 ? args[envArg + 1] : undefined;
+if (env !== undefined && env !== 'staging' && env !== 'production') {
+  console.error('--env must be "staging" or "production"');
+  process.exit(1);
+}
+const database = env ? DATABASES[env] : DATABASES.local;
 const daysArg = args.indexOf('--days');
 const days = daysArg >= 0 ? Number(args[daysArg + 1]) : 7;
 
@@ -25,7 +31,7 @@ function d1(sql) {
   try {
     const out = execFileSync(
       process.execPath,
-      [wranglerBin, 'd1', 'execute', 'lexiflow', remote ? '--remote' : '--local', '--json', '--file', file],
+      [wranglerBin, 'd1', 'execute', database, ...(env ? ['--remote', '--env', env] : ['--local']), '--json', '--file', file],
       { cwd: serverDir, encoding: 'utf8', env: { ...process.env, CI: '1' } }
     );
     const parsed = JSON.parse(out.slice(out.indexOf('[')));
@@ -38,11 +44,11 @@ function d1(sql) {
 const usd = (n) => `$${n.toFixed(n !== 0 && Math.abs(n) < 0.01 ? 6 : 2)}`;
 const pct = (n) => `${Math.round(n * 100)}%`;
 
-const pricing = readPricing(fs.readFileSync(path.join(serverDir, 'wrangler.toml'), 'utf8'));
+const pricing = readPricing(fs.readFileSync(path.join(serverDir, 'wrangler.toml'), 'utf8'), env);
 const { lines, totals } = summarize(d1(usageQuery(days)), pricing);
 const spend = d1(spendQuery(days));
 
-console.log(`LexiFlow Cloud cost report: ${remote ? 'remote' : 'local'} D1, last ${days} day(s)`);
+console.log(`LexiFlow Cloud cost report: ${env ?? 'local'} (${database}), last ${days} day(s)`);
 console.log(`Prices: $${pricing.inputPerMTok}/M input, $${pricing.outputPerMTok}/M output tokens (wrangler.toml)\n`);
 
 if (lines.length === 0) {

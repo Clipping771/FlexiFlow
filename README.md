@@ -44,6 +44,8 @@ LexiFlow AI is an intelligent reading companion for Google Chrome that helps use
 `npm run build` produces a minified production bundle without sourcemaps.
 For local development use `npm run build:dev`: readable output with inline sourcemaps, plus the offline mock fallback that lets `demo/reading_test.html` work outside the extension (`node scripts/serve.cjs`).
 
+Each build talks to its own LexiFlow Cloud environment: `npm run build` to production, `npm run build:staging` to staging (shown as "LexiFlow (Staging)"), and `npm run build:dev` to a local `wrangler dev`. See [server/README.md](server/README.md#environments).
+
 ---
 
 ## Testing & Verification

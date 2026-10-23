@@ -1,13 +1,14 @@
 import { Hono } from 'hono';
-import type { AppEnv } from './env';
+import type { AppEnv, Bindings } from './env';
 import { ApiError } from './lib/errors';
+import { runRetention } from './lib/retention';
 import { corsForExtension } from './middleware/cors';
 import { ai } from './routes/ai';
 import { auth } from './routes/auth';
 import { health } from './routes/health';
 import { me } from './routes/me';
 
-const app = new Hono<AppEnv>();
+export const app = new Hono<AppEnv>();
 
 app.use('*', corsForExtension);
 
@@ -27,4 +28,12 @@ app.onError((err, c) => {
   return c.json(new ApiError(500, 'INTERNAL', 'Something went wrong.').toBody(), 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // Daily cron (wrangler.toml [triggers]): data retention.
+  async scheduled(_controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
+    ctx.waitUntil(
+      runRetention(env.DB).then((r) => console.log(`[lexiflow-api] retention: ${JSON.stringify(r)}`))
+    );
+  }
+} satisfies ExportedHandler<Bindings>;
