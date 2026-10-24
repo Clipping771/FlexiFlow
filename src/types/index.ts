@@ -608,6 +608,8 @@ export interface HighlightExtractionResult {
   totalAnalyzedWords?: number;
   sourceMode?: 'ai_reasoning' | 'curated_offline_fallback' | 'evaluation_fixture';
   articleSummary?: string;
+  /** Why the offline word list was used instead of AI (only set when sourceMode is curated_offline_fallback). */
+  fallbackReason?: 'no_ai_configured' | 'ai_unsupported' | 'ai_failed' | 'ai_empty';
 }
 
 export interface UserSettings {

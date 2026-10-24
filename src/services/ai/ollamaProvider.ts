@@ -53,8 +53,11 @@ export class OllamaProvider implements AIProvider {
     return true;
   }
 
-  private async callOllama(prompt: string): Promise<string> {
+  private async callOllama(prompt: string, numCtx?: number): Promise<string> {
     const formattedPrompt = `${prompt}\nRespond with JSON only adhering strictly to schema.`;
+    // Ollama silently drops the start of a prompt longer than its context window (often only 2-4K tokens),
+    // which for long prompts loses the instructions. Long-input calls pass an explicit window.
+    const options = numCtx ? { options: { num_ctx: numCtx } } : {};
 
     // Try primary endpoint, with automatic fallback between localhost and 127.0.0.1
     const candidateEndpoints = [this.endpoint];
@@ -78,7 +81,8 @@ export class OllamaProvider implements AIProvider {
             model: this.model,
             messages: [{ role: 'user', content: formattedPrompt }],
             format: 'json',
-            stream: false
+            stream: false,
+            ...options
           })
         });
 
@@ -98,7 +102,8 @@ export class OllamaProvider implements AIProvider {
                   model: this.model,
                   messages: [{ role: 'user', content: formattedPrompt }],
                   format: 'json',
-                  stream: false
+                  stream: false,
+                  ...options
                 })
               });
             }
@@ -120,7 +125,8 @@ export class OllamaProvider implements AIProvider {
             model: this.model,
             prompt: formattedPrompt,
             format: 'json',
-            stream: false
+            stream: false,
+            ...options
           })
         });
 
@@ -334,8 +340,9 @@ export class OllamaProvider implements AIProvider {
   async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
     console.debug(`[LexiFlow Ollama] Extracting highlights using model: "${this.model}" at ${this.endpoint}`);
 
-    const prompt = toSinglePrompt(buildHighlightsPrompt({ rawText, pageTitle }, this.targetLang, 'compact'));
-    const raw = await this.callOllama(prompt);
+    const spec = buildHighlightsPrompt({ rawText, pageTitle }, this.targetLang, 'compact');
+    const prompt = toSinglePrompt(spec);
+    const raw = await this.callOllama(prompt, ollamaContextFor(prompt, spec.maxTokens));
     let parsed: any;
     try {
       parsed = safeParseJSON(raw);
@@ -353,4 +360,16 @@ export class OllamaProvider implements AIProvider {
       articleSummary: parsed?.articleSummary
     });
   }
+}
+
+/**
+ * Context window big enough for the prompt plus the expected output, rounded up to a power of two
+ * (so repeated calls reuse the same loaded model instead of reloading it for every size).
+ * ~3.5 characters per token is a conservative estimate for English text.
+ */
+export function ollamaContextFor(prompt: string, outputTokens: number): number {
+  const needed = Math.ceil(prompt.length / 3.5) + outputTokens + 256;
+  let ctx = 4096;
+  while (ctx < needed && ctx < 32768) ctx *= 2;
+  return ctx;
 }

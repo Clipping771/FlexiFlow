@@ -10,6 +10,7 @@ import { TriggerView } from './triggerView';
 import { DOMHighlighter } from './highlighter';
 import { HighlightToolbar } from './highlightToolbar';
 import { MainArticleExtractor } from './articleExtractor';
+import { HIGHLIGHT_MAX_ARTICLE_CHARS } from '../services/ai/highlightIntelligence';
 import {
   SelectionType,
   LinguisticAnalysisResult,
@@ -171,7 +172,7 @@ class ContentScriptManager {
 
     // 1. Isolate the main article body (entire piece, full text)
     const article = MainArticleExtractor.findMainArticle();
-    let cleanExcerpt = (article?.cleanText || '').slice(0, 15000);
+    let cleanExcerpt = (article?.cleanText || '').slice(0, HIGHLIGHT_MAX_ARTICLE_CHARS);
     const title = article?.title || document.title;
     let targetContainer: HTMLElement | undefined = article?.container;
 
@@ -187,7 +188,7 @@ class ContentScriptManager {
         });
 
       if (substantiveParas.length > 0) {
-        cleanExcerpt = substantiveParas.map((p) => p.textContent?.trim()).join('\n\n').slice(0, 15000);
+        cleanExcerpt = substantiveParas.map((p) => p.textContent?.trim()).join('\n\n').slice(0, HIGHLIGHT_MAX_ARTICLE_CHARS);
         targetContainer = document.body;
       }
     }
@@ -449,7 +450,8 @@ class ContentScriptManager {
               data: {
                 count,
                 items: discovered,
-                sourceMode: res?.sourceMode
+                sourceMode: res?.sourceMode,
+                fallbackReason: res?.fallbackReason
               },
               error: !res
                 ? 'No editorial article body found on this webpage (requires at least 30 characters).'
@@ -491,7 +493,9 @@ class ContentScriptManager {
         if (message.type === 'SCROLL_TO_HIGHLIGHT_ITEM') {
           const text = (message.payload?.text || '').toLowerCase().trim();
           const visible = this.highlighter?.getVisibleMarks() || [];
-          const match = visible.find((m) => (m.textContent || '').toLowerCase().trim() === text);
+          const match = visible.find(
+            (m) => (m.getAttribute('data-lexiflow-text') || m.textContent || '').toLowerCase().trim() === text
+          );
           if (match) {
             if (typeof match.scrollIntoView === 'function') {
               match.scrollIntoView({ behavior: 'smooth', block: 'center' });

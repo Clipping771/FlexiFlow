@@ -5,7 +5,8 @@ import {
   WritingAssistResult,
   FollowUpResponse,
   StageAExplanation,
-  StageBDetailedVocabulary
+  StageBDetailedVocabulary,
+  HighlightExtractionResult
 } from '../../types';
 import {
   WordAnalysisSchema,
@@ -13,7 +14,8 @@ import {
   SentenceAnalysisSchema,
   ParagraphAnalysisSchema,
   WritingAssistSchema,
-  FollowUpResponseSchema
+  FollowUpResponseSchema,
+  HighlightExtractionResultSchema
 } from './schemas';
 import { AIProvider } from './types';
 import { safeParseJSON } from './safeJson';
@@ -25,6 +27,7 @@ import {
   buildAnalyzePrompt,
   buildWritingAssistPrompt,
   buildFollowUpPrompt,
+  buildHighlightsPrompt,
   withJsonOnlyReminder
 } from './prompts';
 import { validateStageA, validateStageB } from './validation';
@@ -251,5 +254,14 @@ export class OpenAIProvider implements AIProvider {
     const prompt = buildFollowUpPrompt({ text, context, question }, this.targetLang, 'compact');
     const raw = await this.callOpenAI(prompt.system, prompt.user);
     return FollowUpResponseSchema.parse(safeParseJSON(raw));
+  }
+
+  async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
+    const prompt = buildHighlightsPrompt({ rawText, pageTitle }, this.targetLang, 'full');
+    // A whole article takes far longer than a single-word lookup
+    const raw = await this.callOpenAI(prompt.system, prompt.user, 60000);
+    const validated = HighlightExtractionResultSchema.parse(safeParseJSON(raw));
+    validated.sourceMode = 'ai_reasoning';
+    return validated;
   }
 }

@@ -11,7 +11,12 @@ import { TwoStageCacheService } from './cache';
 import { CacheManager } from '../cache';
 import { hashString } from '../cache/normalization';
 import { AIProvider } from './types';
-import { HighlightIntelligenceService } from './highlightIntelligence';
+import {
+  HighlightIntelligenceService,
+  splitArticleIntoChunks,
+  HIGHLIGHT_CHUNK_CHARS,
+  HIGHLIGHT_MAX_CHUNKS
+} from './highlightIntelligence';
 
 export class AIService {
   private static cache = new Map<string, unknown>();
@@ -201,28 +206,50 @@ export class AIService {
     const isOllama = providerName === 'ollama';
     const hasApiKey = Boolean(userSettings.apiKey?.trim());
     const isLiveAI = providerName === 'lexiflow' || ((isOllama || hasApiKey) && providerName !== 'mock');
-    const key = `extractHighlights:${hashString(rawText.slice(0, 15000))}::${targetLang}::${providerName}::${isLiveAI ? 'ai' : 'offline'}`;
+    const key = `extractHighlights:${hashString(rawText)}::${targetLang}::${providerName}::${isLiveAI ? 'ai' : 'offline'}`;
 
     return CacheManager.getInstance().executeDeduplicated(key, async () => {
       const provider = await this.getProvider(userSettings);
+      let fallbackReason: HighlightExtractionResult['fallbackReason'] = isLiveAI ? 'ai_unsupported' : 'no_ai_configured';
 
       console.debug(`[LexiFlow AIService] extractHighlights starting with provider: "${providerName}", isLiveAI: ${isLiveAI}`);
 
       // 1. If an actual AI provider is configured and available (cloud with API key OR local Ollama)
       if (isLiveAI && provider.extractHighlights) {
-        try {
-          const aiResult = await provider.extractHighlights(rawText, pageTitle);
-          if (aiResult && Array.isArray(aiResult.items) && aiResult.items.length > 0) {
-            const processed = HighlightIntelligenceService.processCandidates(aiResult, rawText);
-            processed.sourceMode = 'ai_reasoning';
-            console.debug(`[LexiFlow AIService] AI extraction succeeded with ${processed.items.length} items (provider: ${providerName})`);
-            return processed;
-          } else {
-            console.warn(`[LexiFlow AIService] AI provider ${providerName} returned 0 items.`);
+        // Long articles go to the model in paragraph-aligned chunks so the end of the piece is read too
+        const chunks = splitArticleIntoChunks(rawText, HIGHLIGHT_CHUNK_CHARS, HIGHLIGHT_MAX_CHUNKS);
+        const candidates: HighlightExtractionResult['items'] = [];
+        let articleSummary: string | undefined;
+        let failures = 0;
+
+        for (const chunk of chunks) {
+          try {
+            const aiResult = await provider.extractHighlights(chunk, pageTitle);
+            if (aiResult && Array.isArray(aiResult.items)) {
+              candidates.push(...aiResult.items);
+              articleSummary = articleSummary || aiResult.articleSummary;
+            }
+          } catch (err) {
+            failures++;
+            console.warn(`[LexiFlow AIService] ${providerName} extractHighlights failed on a chunk:`, err);
           }
-        } catch (err) {
-          console.warn(`[LexiFlow AIService] ${providerName} extractHighlights failed, using curated offline fallback:`, err);
         }
+
+        if (candidates.length > 0) {
+          // Ids from separate chunks collide ("hl_1" in each), so renumber before merging
+          const items = candidates.map((item, idx) => ({ ...item, id: `hl_${idx + 1}` }));
+          const processed = HighlightIntelligenceService.processCandidates(
+            { items, pageTitle, articleSummary, sourceMode: 'ai_reasoning', totalAnalyzedWords: 0 },
+            rawText,
+            { maxItems: Math.min(40, 20 + 10 * (chunks.length - 1)) }
+          );
+          processed.sourceMode = 'ai_reasoning';
+          console.debug(`[LexiFlow AIService] AI extraction succeeded with ${processed.items.length} items from ${chunks.length} chunk(s) (provider: ${providerName})`);
+          return processed;
+        }
+
+        fallbackReason = failures > 0 ? 'ai_failed' : 'ai_empty';
+        console.warn(`[LexiFlow AIService] AI provider ${providerName} produced no usable items (${failures} failed chunk(s)).`);
       }
 
       // 2. Honest curated offline fallback when AI provider is unconfigured, mock, or failed
@@ -231,6 +258,7 @@ export class AIService {
       const rawMock = await mock.extractHighlights(rawText, pageTitle);
       const processedMock = HighlightIntelligenceService.processCandidates(rawMock, rawText);
       processedMock.sourceMode = 'curated_offline_fallback';
+      processedMock.fallbackReason = fallbackReason;
       return processedMock;
     });
   }

@@ -797,10 +797,24 @@ export const App: React.FC = () => {
       }
       if (res?.success && res.data) {
         const count = res.data.count?.total || res.data.items?.length || 0;
-        setHighlightFeedback({
-          message: `Highlighted ${count} key vocabulary items across the article!`,
-          type: 'success'
-        });
+        if (res.data.sourceMode === 'curated_offline_fallback') {
+          // Be honest that these came from the small built-in list, and why
+          const why: Record<string, string> = {
+            no_ai_configured: 'No AI provider is set up',
+            ai_unsupported: 'This AI provider cannot scan articles',
+            ai_failed: 'The AI request failed',
+            ai_empty: 'The AI found no suitable words'
+          };
+          setHighlightFeedback({
+            message: `${why[res.data.fallbackReason] || 'AI was unavailable'}, so ${count} item(s) came from the offline idiom list. Set up AI in Settings for a full scan.`,
+            type: 'info'
+          });
+        } else {
+          setHighlightFeedback({
+            message: `Highlighted ${count} key vocabulary items across the article!`,
+            type: 'success'
+          });
+        }
         setHighlightState((prev) =>
           prev
             ? {
@@ -1008,6 +1022,7 @@ export const App: React.FC = () => {
         {/* ======================================================== */}
         {popupTab === 'reading' && (
           <ReadingTab
+            meaningLanguageLabel={targetLang === 'en' ? 'Simple English' : langConfig.targetLabel}
             savedCount={savedCount}
             dueCount={dueCount}
             setPopupTab={setPopupTab}

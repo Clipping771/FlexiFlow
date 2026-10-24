@@ -10,7 +10,11 @@ export interface HighlightClickEvent {
 export class DOMHighlighter {
   private items: HighlightVocabularyItem[] = [];
   private itemMap: Map<string, HighlightVocabularyItem> = new Map();
+  /** First mark of each highlighted occurrence (used for counting and navigation). */
   private highlightMarks: HTMLElement[] = [];
+  /** Every mark element, including the extra pieces of a phrase that spans several text nodes. */
+  private allMarks: HTMLElement[] = [];
+  private occurrenceCounter: number = 0;
   private currentIndex: number = -1;
   private currentColor: HighlightColor = 'yellow';
   private currentFilters: HighlightFilters = { words: true, phrases: true, idioms: true };
@@ -179,62 +183,22 @@ export class DOMHighlighter {
   }
 
   private highlightItemInContainers(item: HighlightVocabularyItem, containers: HTMLElement[]): void {
-    const searchText = item.text.trim();
-    if (!searchText) return;
+    const pattern = buildTermPattern(item.text);
+    if (!pattern) return;
 
-    // Word boundary regex
-    const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const isWord = item.type === 'word';
-    const pattern = isWord
-      ? new RegExp(`\\b${escaped}\\b`, 'i')
-      : new RegExp(`${escaped}`, 'i');
+    const blocks = this.collectTextBlocks(containers);
+    const matchesToApply: Array<{ block: TextBlock; start: number; end: number }> = [];
+    const context = normalizeForCompare(item.contextSentence || (item as any).context || '');
 
-    const seenNodes = new Set<Text>();
-    const textNodes: Text[] = [];
-
-    for (const container of containers) {
-      if (this.isUnsuitableElement(container)) continue;
-
-      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
-        acceptNode: (node) => {
-          if (!node.nodeValue || !node.nodeValue.trim()) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          if (this.isUnsuitableElement(node.parentElement)) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          if (node.parentElement?.classList.contains('lexiflow-highlight')) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          return NodeFilter.FILTER_ACCEPT;
-        }
-      });
-
-      let current: Node | null;
-      while ((current = walker.nextNode())) {
-        const tn = current as Text;
-        if (!seenNodes.has(tn)) {
-          seenNodes.add(tn);
-          textNodes.push(tn);
-        }
-      }
-    }
-
-    const matchesToApply: Array<{ node: Text; match: RegExpExecArray }> = [];
-    const context = (item.contextSentence || (item as any).context || '').trim();
-
-    // 1. Primary preference: If a specific context sentence is provided, target specifically inside that sentence
-    if (context && context.length > 10) {
-      const sPrefix = context.slice(0, 30).toLowerCase();
-      for (const tn of textNodes) {
-        if (!tn.parentElement) continue;
-        const parentText = (tn.parentElement.textContent || '').toLowerCase();
-        if (parentText.includes(sPrefix) || sPrefix.includes(parentText.slice(0, 20))) {
-          const m = pattern.exec(tn.nodeValue || '');
-          if (m && m.index !== undefined) {
-            matchesToApply.push({ node: tn, match: m });
-            break; // Target single intended pedagogical occurrence in context sentence
-          }
+    // 1. Primary preference: the occurrence inside the item's own context sentence
+    if (context.length > 10) {
+      const sPrefix = context.slice(0, 40);
+      for (const block of blocks) {
+        if (!normalizeForCompare(block.text).includes(sPrefix)) continue;
+        const m = findFreeMatch(pattern, block);
+        if (m) {
+          matchesToApply.push({ block, ...m });
+          break; // Target single intended pedagogical occurrence in context sentence
         }
       }
     }
@@ -242,54 +206,114 @@ export class DOMHighlighter {
     // 2. Fallback: If no context sentence was specified or matched, highlight across distinct block elements
     // (At most 1 highlight per block element like paragraph/heading, capped at 3 to prevent spamming)
     if (matchesToApply.length === 0) {
-      const seenBlocks = new Set<Element>();
-      for (const tn of textNodes) {
-        if (!tn.parentElement) continue;
-        const block = tn.parentElement.closest('p, li, blockquote, div, section, article') || tn.parentElement;
-        if (seenBlocks.has(block)) continue;
-
-        const m = pattern.exec(tn.nodeValue || '');
-        if (m && m.index !== undefined) {
-          seenBlocks.add(block);
-          matchesToApply.push({ node: tn, match: m });
+      for (const block of blocks) {
+        const m = findFreeMatch(pattern, block);
+        if (m) {
+          matchesToApply.push({ block, ...m });
           if (matchesToApply.length >= 3) break;
         }
       }
     }
 
-    for (const { node, match } of matchesToApply) {
-      if (!node.parentNode || !node.nodeValue) continue;
-      const matchIdx = match.index;
-      const matchLen = match[0].length;
+    const itemCat = (item as any).category || item.type || 'word';
+    const itemId = item.id || `hl_${Math.random().toString(36).slice(2, 8)}`;
 
-      // Split text node: before, match, after
-      const matchedNode = node.splitText(matchIdx);
-      matchedNode.splitText(matchLen);
+    for (const { block, start, end } of matchesToApply) {
+      const occurrence = `occ_${++this.occurrenceCounter}`;
+      const parts: HTMLElement[] = [];
 
-      const itemCat = (item as any).category || item.type || 'word';
-      const mark = document.createElement('mark');
-      mark.className = `lexiflow-highlight lexiflow-color-${this.currentColor} lexiflow-type-${itemCat}`;
-      mark.setAttribute('data-lexiflow-id', item.id || `hl_${Math.random().toString(36).slice(2, 8)}`);
-      mark.setAttribute('data-lexiflow-text', item.text);
-      mark.setAttribute('data-lexiflow-type', itemCat);
-      mark.setAttribute('data-category', itemCat);
-      mark.textContent = matchedNode.nodeValue;
+      // A phrase can span several text nodes (e.g. "pave the <a>way</a>"); wrap each overlapping piece
+      for (const seg of block.segments) {
+        const segEnd = seg.start + seg.length;
+        if (segEnd <= start || seg.start >= end) continue;
+        const localStart = Math.max(0, start - seg.start);
+        const localEnd = Math.min(seg.length, end - seg.start);
+        const piece = (seg.node.nodeValue || '').slice(localStart, localEnd);
+        if (!piece.trim() || !seg.node.parentNode) continue;
 
-      mark.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const target = e.currentTarget as HTMLElement;
-        const rect = target.getBoundingClientRect();
-        this.setActiveMark(target);
-        const eventObj = Object.assign({ item, targetElement: target, rect, category: itemCat }, item);
-        this.onHighlightClick?.(eventObj, rect);
-      });
+        let target = seg.node;
+        if (localStart > 0) target = target.splitText(localStart);
+        if (localEnd - localStart < target.length) target.splitText(localEnd - localStart);
 
-      if (matchedNode.parentNode) {
-        matchedNode.parentNode.replaceChild(mark, matchedNode);
-        this.highlightMarks.push(mark);
+        const mark = document.createElement('mark');
+        mark.className = `lexiflow-highlight lexiflow-color-${this.currentColor} lexiflow-type-${itemCat}`;
+        mark.setAttribute('data-lexiflow-id', itemId);
+        mark.setAttribute('data-lexiflow-text', item.text);
+        mark.setAttribute('data-lexiflow-type', itemCat);
+        mark.setAttribute('data-lexiflow-occurrence', occurrence);
+        mark.setAttribute('data-category', itemCat);
+        if (parts.length > 0) mark.setAttribute('data-lexiflow-continuation', 'true');
+        mark.textContent = target.nodeValue;
+
+        mark.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const clicked = e.currentTarget as HTMLElement;
+          const rect = clicked.getBoundingClientRect();
+          this.setActiveMark(parts[0] || clicked);
+          const eventObj = Object.assign({ item, targetElement: clicked, rect, category: itemCat }, item);
+          this.onHighlightClick?.(eventObj, rect);
+        });
+
+        target.parentNode!.replaceChild(mark, target);
+        parts.push(mark);
+      }
+
+      if (parts.length > 0) {
+        this.highlightMarks.push(parts[0]);
+        this.allMarks.push(...parts);
       }
     }
+  }
+
+  /**
+   * Groups the readable text nodes under each block element (paragraph, list item, heading…) and joins
+   * them, so a phrase broken up by inline tags or source line breaks can still be found as one string.
+   */
+  private collectTextBlocks(containers: HTMLElement[]): TextBlock[] {
+    const seenNodes = new Set<Text>();
+    const blockMap = new Map<Element, TextBlock>();
+    const blocks: TextBlock[] = [];
+
+    for (const container of containers) {
+      if (this.isUnsuitableElement(container)) continue;
+
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+        acceptNode: (node) => {
+          if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
+          if (this.isUnsuitableElement(node.parentElement)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      });
+
+      let current: Node | null;
+      while ((current = walker.nextNode())) {
+        const tn = current as Text;
+        if (seenNodes.has(tn) || !tn.parentElement) continue;
+        seenNodes.add(tn);
+
+        const blockEl = tn.parentElement.closest(BLOCK_SELECTOR) || tn.parentElement;
+        let block = blockMap.get(blockEl);
+        if (!block) {
+          block = { text: '', segments: [] };
+          blockMap.set(blockEl, block);
+          blocks.push(block);
+        }
+        const value = tn.nodeValue || '';
+        block.segments.push({
+          node: tn,
+          start: block.text.length,
+          length: value.length,
+          // Text already inside a highlight stays in the joined string (so its neighbours are not
+          // glued together) but no new match may overlap it
+          locked: Boolean(tn.parentElement.closest('.lexiflow-highlight'))
+        });
+        block.text += value;
+      }
+    }
+
+    // Blocks made only of whitespace (layout nodes between elements) carry nothing to match
+    return blocks.filter((b) => b.text.trim().length > 0);
   }
 
   applyHighlights(
@@ -367,7 +391,7 @@ export class DOMHighlighter {
   setColor(color: HighlightColor): void {
     const oldColor = this.currentColor;
     this.currentColor = color;
-    for (const mark of this.highlightMarks) {
+    for (const mark of this.allMarks) {
       mark.classList.remove(`lexiflow-color-${oldColor}`);
       mark.classList.add(`lexiflow-color-${color}`);
     }
@@ -379,7 +403,7 @@ export class DOMHighlighter {
   }
 
   private applyFilters(filters: HighlightFilters): void {
-    for (const mark of this.highlightMarks) {
+    for (const mark of this.allMarks) {
       const type = (mark.getAttribute('data-category') || mark.getAttribute('data-lexiflow-type')) as HighlightType;
       const isVisible =
         (type === 'word' && filters.words) ||
@@ -435,14 +459,18 @@ export class DOMHighlighter {
   }
 
   private setActiveMark(target: HTMLElement): void {
-    for (const m of this.highlightMarks) {
+    for (const m of this.allMarks) {
       m.classList.remove('lexiflow-highlight-active');
     }
-    target.classList.add('lexiflow-highlight-active');
+    const occurrence = target.getAttribute('data-lexiflow-occurrence');
+    const group = occurrence
+      ? this.allMarks.filter((m) => m.getAttribute('data-lexiflow-occurrence') === occurrence)
+      : [target];
+    for (const m of group) m.classList.add('lexiflow-highlight-active');
   }
 
   clearHighlights(): void {
-    for (const mark of this.highlightMarks) {
+    for (const mark of this.allMarks) {
       mark.classList.remove('lexiflow-highlight-active');
       const parent = mark.parentNode;
       if (parent) {
@@ -452,6 +480,7 @@ export class DOMHighlighter {
       }
     }
     this.highlightMarks = [];
+    this.allMarks = [];
     this.items = [];
     this.itemMap.clear();
     this.currentIndex = -1;
@@ -482,4 +511,85 @@ export class DOMHighlighter {
   getDiscoveredItems(): HighlightVocabularyItem[] {
     return this.items;
   }
+}
+
+const BLOCK_SELECTOR = 'p, li, blockquote, h1, h2, h3, h4, h5, h6, td, th, dd, dt, figcaption, pre, div, section, article';
+
+interface TextSegment {
+  node: Text;
+  start: number;
+  /** Length when collected; the node itself may be split later by an earlier match in the same pass. */
+  length: number;
+  locked: boolean;
+}
+
+interface TextBlock {
+  text: string;
+  segments: TextSegment[];
+}
+
+const APOSTROPHES = "'‘’ʼ";
+const QUOTES = '"“”';
+const DASHES = '-‐‑–—';
+
+/**
+ * Builds a case-insensitive pattern for a highlight term that tolerates the ways page text differs from
+ * the AI's copy: any run of whitespace (newlines, non-breaking spaces) between words, curly vs straight
+ * apostrophes and quotes, and hyphen/dash variants. It never matches inside a longer word.
+ */
+export function buildTermPattern(term: string): RegExp | null {
+  const clean = (term || '').trim();
+  if (!clean) return null;
+
+  const SPACE = '[\\s\\u00A0]+';
+  let body = '';
+  for (const ch of clean) {
+    if (/\s/.test(ch)) {
+      if (!body.endsWith(SPACE)) body += SPACE;
+    } else if (APOSTROPHES.includes(ch)) {
+      body += `[${APOSTROPHES}]`;
+    } else if (QUOTES.includes(ch)) {
+      body += `[${QUOTES}]`;
+    } else if (DASHES.includes(ch)) {
+      body += `[\\${DASHES}]`;
+    } else {
+      body += ch.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+    }
+  }
+
+  try {
+    return new RegExp(`(?<![\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])`, 'giu');
+  } catch {
+    return null;
+  }
+}
+
+/** Lower-cases and flattens whitespace, quotes and dashes so sentences can be compared loosely. */
+export function normalizeForCompare(text: string): string {
+  return (text || '')
+    .toLowerCase()
+    .replace(new RegExp(`[${APOSTROPHES}]`, 'g'), "'")
+    .replace(new RegExp(`[${QUOTES}]`, 'g'), '"')
+    .replace(new RegExp(`[\\${DASHES}]`, 'g'), '-')
+    .replace(/[\s ]+/g, ' ')
+    .trim();
+}
+
+/** First match in the block that does not overlap text already inside a highlight. */
+function findFreeMatch(pattern: RegExp, block: TextBlock): { start: number; end: number } | null {
+  pattern.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(block.text))) {
+    if (m[0].length === 0) {
+      pattern.lastIndex++;
+      continue;
+    }
+    const start = m.index;
+    const end = start + m[0].length;
+    const overlapsLocked = block.segments.some(
+      (seg) => seg.locked && seg.start < end && seg.start + seg.length > start
+    );
+    if (!overlapsLocked) return { start, end };
+  }
+  return null;
 }

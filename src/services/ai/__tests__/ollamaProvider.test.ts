@@ -186,3 +186,13 @@ describe('OllamaProvider error handling & safeParseJSON integration', () => {
   });
 });
 
+
+describe('ollamaContextFor', () => {
+  it('sizes the context window to fit prompt and output, in powers of two within limits', async () => {
+    const { ollamaContextFor } = await import('../ollamaProvider');
+    expect(ollamaContextFor('short prompt', 500)).toBe(4096);
+    // ~12K-character article plus a 3.5K-token answer needs more than the 4K default
+    expect(ollamaContextFor('x'.repeat(14000), 3500)).toBe(8192);
+    expect(ollamaContextFor('x'.repeat(1_000_000), 3500)).toBe(32768);
+  });
+});

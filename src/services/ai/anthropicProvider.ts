@@ -5,7 +5,8 @@ import {
   WritingAssistResult,
   FollowUpResponse,
   StageAExplanation,
-  StageBDetailedVocabulary
+  StageBDetailedVocabulary,
+  HighlightExtractionResult
 } from '../../types';
 import {
   WordAnalysisSchema,
@@ -13,7 +14,8 @@ import {
   SentenceAnalysisSchema,
   ParagraphAnalysisSchema,
   WritingAssistSchema,
-  FollowUpResponseSchema
+  FollowUpResponseSchema,
+  HighlightExtractionResultSchema
 } from './schemas';
 import { AIProvider } from './types';
 import { safeParseJSON } from './safeJson';
@@ -25,6 +27,7 @@ import {
   buildAnalyzePrompt,
   buildWritingAssistPrompt,
   buildFollowUpPrompt,
+  buildHighlightsPrompt,
   withJsonOnlyReminder
 } from './prompts';
 import { validateStageA, validateStageB } from './validation';
@@ -49,7 +52,7 @@ export class AnthropicProvider implements AIProvider {
     return Boolean(this.apiKey && this.apiKey.trim().length > 0);
   }
 
-  private async callAnthropic(systemPrompt: string, userPrompt: string, timeoutMs: number = 12000): Promise<string> {
+  private async callAnthropic(systemPrompt: string, userPrompt: string, timeoutMs: number = 12000, maxTokens: number = 1800): Promise<string> {
     if (!this.isAvailable()) {
       throw new Error('Anthropic API key is not configured.');
     }
@@ -70,7 +73,7 @@ export class AnthropicProvider implements AIProvider {
         },
         body: JSON.stringify({
           model: this.model,
-          max_tokens: 1800,
+          max_tokens: maxTokens,
           system: `${systemPrompt}\nOutput strictly valid raw JSON only. Do not add markdown backticks.`,
           messages: [{ role: 'user', content: userPrompt }]
         }),
@@ -246,5 +249,14 @@ export class AnthropicProvider implements AIProvider {
     const prompt = buildFollowUpPrompt({ text, context, question }, this.targetLang, 'compact');
     const raw = await this.callAnthropic(prompt.system, prompt.user);
     return FollowUpResponseSchema.parse(safeParseJSON(raw));
+  }
+
+  async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
+    const prompt = buildHighlightsPrompt({ rawText, pageTitle }, this.targetLang, 'full');
+    // A whole article takes far longer than a single-word lookup
+    const raw = await this.callAnthropic(prompt.system, prompt.user, 60000, prompt.maxTokens);
+    const validated = HighlightExtractionResultSchema.parse(safeParseJSON(raw));
+    validated.sourceMode = 'ai_reasoning';
+    return validated;
   }
 }

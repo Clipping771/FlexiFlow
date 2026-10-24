@@ -45,6 +45,8 @@ interface ReadingTabProps {
   handleToggleFilter: (filterKey: 'words' | 'phrases' | 'idioms') => void;
   handleClearHighlights: () => void;
   handleScrollToItem: (itemText: string) => void;
+  /** Name of the reader's target language, e.g. "Bengali" or "Hebrew" ("en" reads "Simple English"). */
+  meaningLanguageLabel: string;
 }
 
 /** Reading AI tab: site switch, article scan and highlight controls, and progress at a glance. */
@@ -69,7 +71,8 @@ export const ReadingTab: React.FC<ReadingTabProps> = ({
   handleChangeHighlightColor,
   handleToggleFilter,
   handleClearHighlights,
-  handleScrollToItem
+  handleScrollToItem,
+  meaningLanguageLabel
 }) => (
   <div className="hub-tab-pane">
     {showOnboarding && (
@@ -142,7 +145,7 @@ export const ReadingTab: React.FC<ReadingTabProps> = ({
           </li>
           <li>
             <Check size={13} className="check-icon" />
-            <span>Bengali meaning in context</span>
+            <span>{meaningLanguageLabel} meaning in context</span>
           </li>
           <li>
             <Check size={13} className="check-icon" />

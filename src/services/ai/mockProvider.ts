@@ -1120,7 +1120,8 @@ export class MockAIProvider implements AIProvider {
           type: cand.type,
           contextSentence: matchedSentence.trim(),
           easyEnglish: cand.easyEnglish,
-          easyBengali: cand.easyBengali,
+          // The curated list is Bengali-only; other target languages get the English meaning alone
+          easyBengali: this.targetLang === 'bn' ? cand.easyBengali : '',
           reason: cand.reason,
           difficulty: cand.difficulty,
           grammaticalNote: cand.grammaticalNote || (cand.type === 'word' ? 'Content vocabulary grounded in article context.' : 'Idiomatic multi-word expression.'),
