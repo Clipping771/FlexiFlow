@@ -644,6 +644,24 @@
   color: var(--lf-ink);
 }
 
+/* Speaker button while audio is playing: click again to stop */
+.lexiflow-popup .lf-speaking,
+.lexiflow-popup .lf-speaking:hover {
+  color: #2563eb !important;
+  background: rgba(37, 99, 235, 0.14) !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35);
+  animation: lf-speaking-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes lf-speaking-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35); }
+  50% { box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lexiflow-popup .lf-speaking { animation: none; }
+}
+
 .lf-btn-icon.active {
   color: var(--lf-danger-ink);
   background: rgba(255, 59, 48, 0.12);

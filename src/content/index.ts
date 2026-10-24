@@ -875,6 +875,7 @@ class ContentScriptManager {
       this.lastAnalyzedText = this.currentText;
     }
     if (this.popupView) {
+      this.popupView.stopAudio();
       this.popupView.unpin();
       this.popupView.resetDrag();
       const el = this.popupView.getElement();

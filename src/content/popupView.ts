@@ -21,7 +21,7 @@ import {
 import { getLanguageConfig, getAllLanguages } from '../config/languages';
 import { clampPositionToViewport } from './positioning';
 import { splitIntoParagraphs, splitIntoSentences } from './selection';
-import { playPronunciation } from '../services/audio/voiceService';
+import { playPronunciation, stopPronunciation } from '../services/audio/voiceService';
 import { getValidatedWhyThisMatters, findDiscourseConnectors, MatchedConnector } from '../services/connectors/matcher';
 import { generateCloze } from '../services/cloze/generator';
 import { getSentenceOverviewTeaching, buildBeginnerBreakdownSections } from '../services/grammar/grammarL10n';
@@ -177,9 +177,13 @@ export class PopupView {
   /** Shows which step the AI is on while a lookup runs, so a slow response does not look frozen. */
   private startLoadingSteps(type: SelectionType): void {
     if (this.loadingStepTimer) clearInterval(this.loadingStepTimer);
+    const lang = getLanguageConfig(this.targetLanguage);
+    const lastStep = this.targetLanguage === 'en'
+      ? 'Writing the simple English explanation…'
+      : `Writing the ${lang?.targetLabel || 'translated'} explanation…`;
     const steps = type === 'word' || type === 'phrase'
-      ? ['Reading the sentence around it…', 'Finding the meaning in this context…', 'Writing the Bengali explanation…']
-      : ['Reading the text…', 'Breaking it into phrases…', 'Writing the Bengali explanation…'];
+      ? ['Reading the sentence around it…', 'Finding the meaning in this context…', lastStep]
+      : ['Reading the text…', 'Breaking it into phrases…', lastStep];
     const host = this.element.querySelector('.lf-skeleton-content') || this.element.querySelector('.lf-content');
     if (!host) return;
     const line = document.createElement('div');
@@ -2735,7 +2739,7 @@ export class PopupView {
         e.stopPropagation();
         const textToSpeak = btn.getAttribute('data-speak') || '';
         if (textToSpeak) {
-          this.speakText(textToSpeak);
+          this.speakText(textToSpeak, undefined, btn as HTMLElement);
         }
       });
     });
@@ -2918,7 +2922,7 @@ export class PopupView {
         e.preventDefault();
         e.stopPropagation();
         if (this.currentStageA) {
-          this.speakText(this.currentStageA.selectedText, this.currentStageA.lemma);
+          this.speakText(this.currentStageA.selectedText, this.currentStageA.lemma, btn as HTMLElement);
         }
       });
     });
@@ -3112,7 +3116,7 @@ export class PopupView {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        this.speakText(s.selectedText);
+        this.speakText(s.selectedText, undefined, btn as HTMLElement);
       });
     });
 
@@ -3334,7 +3338,7 @@ export class PopupView {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        this.speakText(p.selectedText);
+        this.speakText(p.selectedText, undefined, btn as HTMLElement);
       });
     });
 
@@ -3344,7 +3348,7 @@ export class PopupView {
         e.stopPropagation();
         const textToSpeak = btn.getAttribute('data-speak') || '';
         if (textToSpeak) {
-          this.speakText(textToSpeak);
+          this.speakText(textToSpeak, undefined, btn as HTMLElement);
         }
       });
     });
@@ -3517,9 +3521,57 @@ export class PopupView {
     }
   }
 
-  private speakText(text: string, lemma?: string): void {
-    playPronunciation(text, { lemma }).catch((err) => {
-      console.warn('[LexiFlow Audio] Failed to play natural pronunciation:', err);
-    });
+  private speakingText: string | null = null;
+  private speakingBtn: HTMLElement | null = null;
+
+  /** Plays the text, or stops it when the same text is already playing (the speaker icon doubles as a stop button). */
+  private speakText(text: string, lemma?: string, btn?: HTMLElement): void {
+    const wasSameText = this.speakingText === text;
+    if (this.speakingText !== null) this.stopAudio();
+    if (wasSameText) return;
+
+    this.speakingText = text;
+    this.setSpeakingButton(btn || null);
+    playPronunciation(text, { lemma })
+      .catch((err) => {
+        console.warn('[LexiFlow Audio] Failed to play natural pronunciation:', err);
+      })
+      .finally(() => {
+        if (this.speakingText === text) {
+          this.speakingText = null;
+          this.setSpeakingButton(null);
+        }
+      });
+  }
+
+  /** Stops any pronunciation this card started and resets the speaker icon. */
+  stopAudio(): void {
+    this.speakingText = null;
+    this.setSpeakingButton(null);
+    stopPronunciation();
+  }
+
+  private setSpeakingButton(btn: HTMLElement | null): void {
+    const prev = this.speakingBtn;
+    if (prev) {
+      prev.classList.remove('lf-speaking');
+      prev.removeAttribute('aria-pressed');
+      const icon = prev.querySelector('svg.lf-svg-icon');
+      if (icon) icon.outerHTML = lfIcon('volume');
+      const original = prev.getAttribute('data-lf-title');
+      if (original !== null) {
+        prev.setAttribute('title', original);
+        prev.removeAttribute('data-lf-title');
+      }
+    }
+    this.speakingBtn = btn;
+    if (btn) {
+      btn.classList.add('lf-speaking');
+      btn.setAttribute('aria-pressed', 'true');
+      const icon = btn.querySelector('svg.lf-svg-icon');
+      if (icon) icon.outerHTML = lfIcon('stop');
+      btn.setAttribute('data-lf-title', btn.getAttribute('title') || '');
+      btn.setAttribute('title', 'Stop audio');
+    }
   }
 }
