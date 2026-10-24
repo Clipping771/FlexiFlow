@@ -11,6 +11,7 @@ import { DOMHighlighter } from './highlighter';
 import { HighlightToolbar } from './highlightToolbar';
 import { MainArticleExtractor } from './articleExtractor';
 import { HIGHLIGHT_MAX_ARTICLE_CHARS } from '../services/ai/highlightIntelligence';
+import { SUMMARY_MAX_ARTICLE_CHARS } from '../services/ai/prompts/summary';
 import {
   SelectionType,
   LinguisticAnalysisResult,
@@ -171,27 +172,7 @@ class ContentScriptManager {
     this.highlightToolbar?.setLoading(true);
 
     // 1. Isolate the main article body (entire piece, full text)
-    const article = MainArticleExtractor.findMainArticle();
-    let cleanExcerpt = (article?.cleanText || '').slice(0, HIGHLIGHT_MAX_ARTICLE_CHARS);
-    const title = article?.title || document.title;
-    let targetContainer: HTMLElement | undefined = article?.container;
-
-    // Fallback: If no specialized article container detected, collect substantive paragraphs from body
-    if (!cleanExcerpt || cleanExcerpt.trim().length < 30) {
-      const substantiveParas = Array.from(document.querySelectorAll('p'))
-        .filter((p) => {
-          const txt = (p.textContent || '').trim();
-          if (txt.length < 25) return false;
-          // Ignore inside headers, footers, navs
-          if (p.closest('header, footer, nav, aside, [role="navigation"], #lexiflow-host')) return false;
-          return true;
-        });
-
-      if (substantiveParas.length > 0) {
-        cleanExcerpt = substantiveParas.map((p) => p.textContent?.trim()).join('\n\n').slice(0, HIGHLIGHT_MAX_ARTICLE_CHARS);
-        targetContainer = document.body;
-      }
-    }
+    const { text: cleanExcerpt, title, container: targetContainer } = this.collectArticleText(HIGHLIGHT_MAX_ARTICLE_CHARS);
 
     if (!cleanExcerpt || cleanExcerpt.trim().length < 30) {
       console.warn('[LexiFlow] Page highlighting skipped: No substantive article text found (<30 characters).');
@@ -219,6 +200,32 @@ class ContentScriptManager {
     } finally {
       this.highlightToolbar?.setLoading(false);
     }
+  }
+
+  /**
+   * The page's main article text: the detected article body, or else the substantive paragraphs
+   * outside headers, footers and navigation.
+   */
+  private collectArticleText(maxChars: number): { text: string; title: string; container?: HTMLElement } {
+    const article = MainArticleExtractor.findMainArticle();
+    const title = article?.title || document.title;
+    const text = (article?.cleanText || '').slice(0, maxChars);
+    if (text.trim().length >= 30) return { text, title, container: article?.container };
+
+    // Fallback: If no specialized article container detected, collect substantive paragraphs from body
+    const substantiveParas = Array.from(document.querySelectorAll('p')).filter((p) => {
+      const txt = (p.textContent || '').trim();
+      if (txt.length < 25) return false;
+      // Ignore inside headers, footers, navs
+      if (p.closest('header, footer, nav, aside, [role="navigation"], #lexiflow-host')) return false;
+      return true;
+    });
+    if (substantiveParas.length === 0) return { text, title, container: article?.container };
+    return {
+      text: substantiveParas.map((p) => p.textContent?.trim()).join('\n\n').slice(0, maxChars),
+      title,
+      container: document.body
+    };
   }
 
   private updateHighlightToolbar(): void {
@@ -440,6 +447,13 @@ class ContentScriptManager {
             }
           });
           return true;
+        }
+
+        if (message.type === 'EXTRACT_ARTICLE_TEXT') {
+          // For summary practice: the reader's summary is marked against this text
+          const { text, title } = this.collectArticleText(SUMMARY_MAX_ARTICLE_CHARS);
+          sendResponse?.({ success: text.trim().length >= 30, data: { url: window.location.href, title, text } });
+          return;
         }
 
         if (message.type === 'TRIGGER_HIGHLIGHT_ARTICLE') {

@@ -11,6 +11,9 @@ import {
 } from '../../types';
 import { AuthService, CloudAuthError } from '../auth/authService';
 import { AIProvider } from './types';
+import { SummaryEvaluation } from '../../types';
+import { SummaryEvaluationInput } from './prompts';
+import { parseSummaryEvaluation } from './summarySchema';
 import { MONETIZATION_ENABLED } from '../../config/features';
 
 export type CloudAIErrorCode =
@@ -156,6 +159,12 @@ export class CloudProvider implements AIProvider {
 
   askFollowUp(text: string, context: string, question: string): Promise<FollowUpResponse> {
     return this.post('/v1/ai/follow-up', { text, context, question });
+  }
+
+  async evaluateSummary(input: SummaryEvaluationInput): Promise<SummaryEvaluation> {
+    // The server validates too; parsing again keeps the score rules identical on every provider
+    const raw = await this.post<unknown>('/v1/ai/evaluate-summary', { ...input });
+    return parseSummaryEvaluation(raw);
   }
 
   extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {

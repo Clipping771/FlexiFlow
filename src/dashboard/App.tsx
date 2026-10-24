@@ -15,6 +15,7 @@ import { FSRSEngine } from '../services/fsrs/engine';
 import { Menu, X, BookOpen, RotateCw, Settings as SettingsIcon, PanelRight } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ReadingListView } from './components/ReadingListView';
+import { SummaryPracticeView } from './components/SummaryPracticeView';
 import './dashboard.css';
 
 const TAB_TITLES: Record<DashboardTab, string> = {
@@ -23,6 +24,7 @@ const TAB_TITLES: Record<DashboardTab, string> = {
   targeted_practice: 'Targeted Practice',
   review: 'Spaced Review',
   reading_list: 'Reading List',
+  summary_practice: 'Summary Practice',
   word_difference: 'Word Difference',
   usage_coach: 'Usage Coach',
   analytics: 'Learning Analytics',
@@ -40,9 +42,13 @@ const PROVIDER_NAMES: Record<string, string> = {
 };
 
 export const App: React.FC = () => {
-  // dashboard.html#reading_list (from the popup) opens straight on that tab
+  // dashboard.html#reading_list / #summary (from the popup) open straight on that tab
   const [activeTab, setActiveTab] = useState<DashboardTab>(() =>
-    window.location.hash === '#reading_list' ? 'reading_list' : 'vocabulary'
+    window.location.hash === '#reading_list'
+      ? 'reading_list'
+      : window.location.hash === '#summary'
+        ? 'summary_practice'
+        : 'vocabulary'
   );
   const [items, setItems] = useState<VocabularyItem[]>([]);
   const [dueItems, setDueItems] = useState<VocabularyItem[]>([]);
@@ -707,7 +713,11 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'reading_list' && <ReadingListView vocabItems={items} />}
+            {activeTab === 'reading_list' && (
+              <ReadingListView vocabItems={items} onWriteSummary={() => setActiveTab('summary_practice')} />
+            )}
+
+            {activeTab === 'summary_practice' && <SummaryPracticeView />}
 
             {activeTab === 'word_difference' && <WordDifferenceView />}
 

@@ -30,6 +30,7 @@ npm run dev                         # http://localhost:8787
 | POST | `/v1/ai/analyze` | Bearer JWT | `{ text, selectionType, contextSentence?, paragraphContext?, targetLang }`. Word/phrase 1 credit (cached), sentence (Sentence X-Ray) 2, paragraph 3 |
 | POST | `/v1/ai/compare-words` | Bearer JWT | `{ wordA, wordB, targetLang }` → `{ wordA, wordB }` analyses. 2 credits; each word uses the analyze cache |
 | POST | `/v1/ai/evaluate-usage` | Bearer JWT | `{ targetWord, sentence, targetLang }` → Usage Coach verdict and 0-100 collocation score. 2 credits |
+| POST | `/v1/ai/evaluate-summary` | Bearer JWT | `{ articleText (≤15,000), articleTitle?, summary (≤3,000), targetLang }` → summary marked out of 10 on four criteria, with review. 3 credits, never cached |
 | POST | `/v1/ai/assist-writing` | Bearer JWT | `{ text, goal, targetLang }`. 3 credits |
 | POST | `/v1/ai/follow-up` | Bearer JWT | `{ text, context?, question, targetLang }`. 1 credit |
 | POST | `/v1/ai/highlights` | Bearer JWT | `{ rawText, pageTitle?, targetLang }`. 3 credits; page text is never cached |

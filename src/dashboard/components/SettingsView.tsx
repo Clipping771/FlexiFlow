@@ -1193,8 +1193,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {form.aiProvider === 'lexiflow' && (
             <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
               {MONETIZATION_ENABLED
-                ? 'Uses your LexiFlow Cloud account above: no API key needed, counted against your daily credits. Word lookups and AI chat cost 1 credit, sentence analysis, Word Difference and Usage Coach 2, and paragraph analysis, writing help and page highlights 3.'
-                : 'Uses your LexiFlow Cloud account above: free, no API key needed. There is a daily limit; longer tasks (sentences, Word Difference, Usage Coach, paragraphs, writing help and page highlights) count more than a word lookup.'}
+                ? 'Uses your LexiFlow Cloud account above: no API key needed, counted against your daily credits. Word lookups and AI chat cost 1 credit, sentence analysis, Word Difference and Usage Coach 2, and paragraph analysis, writing help, page highlights and summary marking 3.'
+                : 'Uses your LexiFlow Cloud account above: free, no API key needed. There is a daily limit; longer tasks (sentences, Word Difference, Usage Coach, paragraphs, writing help, page highlights and summary marking) count more than a word lookup.'}
             </p>
           )}
 

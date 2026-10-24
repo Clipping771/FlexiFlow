@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, BookmarkCheck, BookmarkPlus, BookOpen, Check, ChevronDown, ChevronUp, FileText, Globe, Info, ListChecks, RotateCcw, Sparkles, X } from 'lucide-react';
+import { AlertCircle, PenLine, BookmarkCheck, BookmarkPlus, BookOpen, Check, ChevronDown, ChevronUp, FileText, Globe, Info, ListChecks, RotateCcw, Sparkles, X } from 'lucide-react';
 import { Onboarding, PopupTextSize } from './Onboarding';
 
 /** What the content script reports about highlights on the active page. */
@@ -35,6 +35,7 @@ interface ReadingTabProps {
   readLater: { saved: boolean; unreadCount: number } | null;
   onToggleReadLater: () => void;
   onOpenReadingList: () => void;
+  onWriteSummary: () => void;
   textSize: PopupTextSize;
   showOnboarding: boolean;
   dismissOnboarding: () => void;
@@ -85,6 +86,7 @@ export const ReadingTab: React.FC<ReadingTabProps> = ({
   readLater,
   onToggleReadLater,
   onOpenReadingList,
+  onWriteSummary,
   textSize,
   showOnboarding,
   dismissOnboarding,
@@ -146,6 +148,10 @@ export const ReadingTab: React.FC<ReadingTabProps> = ({
         >
           {readLater.saved ? <BookmarkCheck size={14} /> : <BookmarkPlus size={14} />}
           <span>{readLater.saved ? 'Saved for later' : 'Save for later'}</span>
+        </button>
+        <button type="button" className="read-later-link" onClick={onWriteSummary} title="Summarize this article and get it marked">
+          <PenLine size={13} />
+          <span>Write a summary</span>
         </button>
         <button type="button" className="read-later-link" onClick={onOpenReadingList}>
           <ListChecks size={13} />

@@ -17,6 +17,7 @@ LexiFlow AI is an intelligent reading companion for Google Chrome that helps use
 - **Spaced Repetition (FSRS)**: Free Spaced Repetition Scheduler tracks memory stability and schedules timely flashcard reviews.
 - **Local-First & Privacy Conscious**: IndexedDB stores vocabulary locally. API keys stay on your machine.
 - **Active Usage Coach**: Test your own sentences using saved words and get instant grammatical and naturalness feedback.
+- **Reading List & Summary Practice**: Save articles for later, then summarize what you read (in English or your own language) and get it marked out of 10 on main idea, key points, accuracy and expression, with a written review.
 
 ---
 

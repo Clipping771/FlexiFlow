@@ -7,7 +7,8 @@ export const CREDIT_COSTS = {
   'evaluate-usage': 2,
   'assist-writing': 3,
   'follow-up': 1,
-  highlights: 3
+  highlights: 3,
+  'evaluate-summary': 3
 } as const;
 
 /** /analyze costs more for longer selections: Sentence X-Ray and paragraphs produce far larger outputs. */

@@ -19,6 +19,9 @@ import {
 } from './schemas';
 import { AIProvider } from './types';
 import { safeParseJSON } from './safeJson';
+import { SummaryEvaluation } from '../../types';
+import { buildSummaryEvaluationPrompt, SummaryEvaluationInput } from './prompts';
+import { parseSummaryEvaluation } from './summarySchema';
 import {
   buildStageAPrompt,
   buildStageACorrection,
@@ -335,6 +338,13 @@ export class OllamaProvider implements AIProvider {
     const prompt = toSinglePrompt(buildFollowUpPrompt({ text, context, question }, this.targetLang, 'compact'));
     const raw = await this.callOllama(prompt);
     return FollowUpResponseSchema.parse(safeParseJSON(raw));
+  }
+
+  async evaluateSummary(input: SummaryEvaluationInput): Promise<SummaryEvaluation> {
+    const spec = buildSummaryEvaluationPrompt(input, this.targetLang);
+    const prompt = toSinglePrompt(spec);
+    const raw = await this.callOllama(prompt, ollamaContextFor(prompt, spec.maxTokens));
+    return parseSummaryEvaluation(safeParseJSON(raw));
   }
 
   async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {

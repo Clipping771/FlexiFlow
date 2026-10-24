@@ -23,7 +23,16 @@ import {
   runStageA,
   runStageB
 } from '../lib/stageTasks';
-import { runAnalyze, runAssistWriting, runCompareWords, runFollowUp, runHighlights, runUsageEvaluation } from '../lib/tasks';
+import {
+  runAnalyze,
+  runAssistWriting,
+  runCompareWords,
+  runFollowUp,
+  runHighlights,
+  runSummaryEvaluation,
+  runUsageEvaluation
+} from '../lib/tasks';
+import { SUMMARY_MAX_ARTICLE_CHARS, SUMMARY_MAX_CHARS } from '../../../src/services/ai/prompts/summary';
 import { dhakaDay, nextDhakaMidnight } from '../lib/time';
 import type { SelectionType, WritingGoal } from '../../../src/types';
 import { loadUser } from '../lib/users';
@@ -310,6 +319,27 @@ ai.post('/evaluate-usage', (c) =>
     },
     cacheKey: () => null,
     run: (gemini, input) => runUsageEvaluation(gemini, { targetWord: input.targetWord!, sentence: input.sentence!, targetLang: input.targetLang! })
+  })
+);
+
+ai.post('/evaluate-summary', (c) =>
+  metered(c, {
+    endpoint: 'evaluate-summary',
+    fields: {
+      articleText: { required: true, max: SUMMARY_MAX_ARTICLE_CHARS },
+      articleTitle: { max: 300 },
+      summary: { required: true, max: SUMMARY_MAX_CHARS },
+      targetLang: TARGET_LANG
+    },
+    // The article and the reader's own writing are private, and every summary is different
+    cacheKey: () => null,
+    run: (gemini, input) =>
+      runSummaryEvaluation(gemini, {
+        articleText: input.articleText!,
+        articleTitle: input.articleTitle,
+        summary: input.summary!,
+        targetLang: input.targetLang!
+      })
   })
 );
 

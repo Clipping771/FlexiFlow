@@ -19,6 +19,9 @@ import {
 } from './schemas';
 import { AIProvider } from './types';
 import { safeParseJSON } from './safeJson';
+import { SummaryEvaluation } from '../../types';
+import { buildSummaryEvaluationPrompt, SummaryEvaluationInput } from './prompts';
+import { parseSummaryEvaluation } from './summarySchema';
 import {
   buildStageAPrompt,
   buildStageACorrection,
@@ -254,6 +257,12 @@ export class OpenAIProvider implements AIProvider {
     const prompt = buildFollowUpPrompt({ text, context, question }, this.targetLang, 'compact');
     const raw = await this.callOpenAI(prompt.system, prompt.user);
     return FollowUpResponseSchema.parse(safeParseJSON(raw));
+  }
+
+  async evaluateSummary(input: SummaryEvaluationInput): Promise<SummaryEvaluation> {
+    const prompt = buildSummaryEvaluationPrompt(input, this.targetLang);
+    const raw = await this.callOpenAI(prompt.system, prompt.user, 60000);
+    return parseSummaryEvaluation(safeParseJSON(raw));
   }
 
   async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {

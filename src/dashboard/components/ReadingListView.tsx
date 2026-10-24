@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BookmarkPlus, CheckCircle2, Circle, ExternalLink, Sparkles, Trash2 } from 'lucide-react';
-import { VocabularyItem } from '../../types';
+import { BookmarkPlus, CheckCircle2, Circle, ExternalLink, Loader2, PenLine, Sparkles, Trash2 } from 'lucide-react';
+import { SummaryAttempt, VocabularyItem } from '../../types';
+import { SummaryPracticeService } from '../../services/storage/summaryPractice';
 import {
   ReadingListService,
   ReadingListItem,
@@ -11,6 +12,8 @@ import {
 interface ReadingListViewProps {
   /** The vocabulary library, used to show which words were saved from each article. */
   vocabItems: VocabularyItem[];
+  /** Switches to Summary Practice once the article's text is captured. */
+  onWriteSummary?: () => void;
 }
 
 type Filter = 'unread' | 'read' | 'all';
@@ -37,14 +40,19 @@ function openArticle(url: string, highlight: boolean): void {
 }
 
 /** Articles saved from the popup with "Save for later". */
-export const ReadingListView: React.FC<ReadingListViewProps> = ({ vocabItems }) => {
+export const ReadingListView: React.FC<ReadingListViewProps> = ({ vocabItems, onWriteSummary }) => {
   const [list, setList] = useState<ReadingListItem[]>([]);
+  const [attempts, setAttempts] = useState<SummaryAttempt[]>([]);
+  const [capturingId, setCapturingId] = useState<string | null>(null);
+  const [captureError, setCaptureError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<Filter>('unread');
 
   const reload = async () => {
     try {
-      setList(await ReadingListService.getAll());
+      const [items, marked] = await Promise.all([ReadingListService.getAll(), SummaryPracticeService.getAttempts()]);
+      setList(items);
+      setAttempts(marked);
     } finally {
       setLoaded(true);
     }
@@ -79,6 +87,22 @@ export const ReadingListView: React.FC<ReadingListViewProps> = ({ vocabItems }) 
     await reload();
   };
 
+  const writeSummary = async (item: ReadingListItem) => {
+    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+    setCapturingId(item.id);
+    setCaptureError(null);
+    // The list keeps only links, so the article is loaded briefly in the background to read its text
+    chrome.runtime.sendMessage({ type: 'CAPTURE_ARTICLE_TEXT', payload: { url: item.url } }, async (res) => {
+      setCapturingId(null);
+      if (chrome.runtime?.lastError || !res?.success || !res.data?.text) {
+        setCaptureError(res?.error || 'Could not read this article. Open it and use "Write a summary" from the popup.');
+        return;
+      }
+      await SummaryPracticeService.setDraft({ url: item.url, title: item.title, text: res.data.text });
+      onWriteSummary?.();
+    });
+  };
+
   const remove = async (item: ReadingListItem) => {
     if (!confirm(`Remove "${item.title}" from your reading list?`)) return;
     await ReadingListService.remove(item.id);
@@ -107,6 +131,12 @@ export const ReadingListView: React.FC<ReadingListViewProps> = ({ vocabItems }) 
         </select>
       </div>
 
+      {captureError && (
+        <div className="card rl-error" role="alert">
+          {captureError}
+        </div>
+      )}
+
       {loaded && shown.length === 0 ? (
         <div className="card rl-empty">
           <BookmarkPlus size={28} />
@@ -122,6 +152,7 @@ export const ReadingListView: React.FC<ReadingListViewProps> = ({ vocabItems }) 
           {shown.map((item) => {
             const words = wordsByArticle.get(normalizeArticleUrl(item.url)) || [];
             const minutes = item.wordCount ? Math.max(1, Math.round(item.wordCount / WORDS_PER_MINUTE)) : 0;
+            const lastMark = attempts.find((a) => normalizeArticleUrl(a.articleUrl) === normalizeArticleUrl(item.url));
             return (
               <article key={item.id} className={`card rl-card ${item.readAt ? 'is-read' : ''}`}>
                 <div className="rl-main">
@@ -146,6 +177,7 @@ export const ReadingListView: React.FC<ReadingListViewProps> = ({ vocabItems }) 
                       </>
                     )}
                     {item.readAt && <span className="tag-badge rl-done">Finished</span>}
+                    {lastMark && <span className="tag-badge rl-mark">Summary {lastMark.evaluation.totalScore}/10</span>}
                   </div>
 
                   {words.length > 0 && (
@@ -171,6 +203,15 @@ export const ReadingListView: React.FC<ReadingListViewProps> = ({ vocabItems }) 
                   <button type="button" className="btn-secondary" onClick={() => openArticle(item.url, false)}>
                     <ExternalLink size={14} />
                     <span>Open</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => writeSummary(item)}
+                    disabled={capturingId !== null}
+                  >
+                    {capturingId === item.id ? <Loader2 size={14} className="sp-spin" /> : <PenLine size={14} />}
+                    <span>{capturingId === item.id ? 'Loading article…' : 'Write summary'}</span>
                   </button>
                   <button
                     type="button"

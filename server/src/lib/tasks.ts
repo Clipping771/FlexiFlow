@@ -6,6 +6,7 @@ import {
   buildHighlightsPrompt,
   buildSchemaCorrection,
   buildUsageEvaluationPrompt,
+  buildSummaryEvaluationPrompt,
   buildWritingAssistPrompt,
   type PromptSpec
 } from '../../../src/services/ai/prompts';
@@ -19,11 +20,13 @@ import {
   WritingAssistSchema
 } from '../../../src/services/ai/schemas';
 import { UsageCoachFeedbackSchema } from '../../../src/services/ai/usageCoachSchema';
+import { parseSummaryEvaluation } from '../../../src/services/ai/summarySchema';
 import type {
   FollowUpResponse,
   HighlightExtractionResult,
   LinguisticAnalysisResult,
   SelectionType,
+  SummaryEvaluation,
   UsageCoachFeedback,
   WritingAssistResult,
   WritingGoal
@@ -174,6 +177,29 @@ export function runUsageEvaluation(
       raw.targetWord = input.targetWord;
     }
   ));
+}
+
+/**
+ * Summary practice: marks the reader's summary of an article. The shared parser checks every criterion
+ * is present and recomputes the total, so a malformed answer is retried and never charged.
+ */
+export function runSummaryEvaluation(
+  gemini: GeminiConfig,
+  input: { articleText: string; articleTitle?: string; summary: string; targetLang: string }
+): Promise<TaskResult<SummaryEvaluation>> {
+  const prompt = buildSummaryEvaluationPrompt(input, input.targetLang);
+  const validate = (raw: unknown): Validation<SummaryEvaluation> => {
+    try {
+      return { isValid: true, data: parseSummaryEvaluation(raw), errors: [] };
+    } catch (err) {
+      const issues = (err as { issues?: Array<{ path: unknown[]; message: string }> }).issues;
+      return {
+        isValid: false,
+        errors: issues ? issues.map((i) => `${i.path.join('.')}: ${i.message}`) : [(err as Error).message]
+      };
+    }
+  };
+  return run(gemini, prompt, validate, LONG_TIMEOUT_MS);
 }
 
 export interface CompareWordsResult {

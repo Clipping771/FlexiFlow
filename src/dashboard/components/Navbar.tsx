@@ -8,7 +8,8 @@ import {
   BarChart3,
   Settings as SettingsIcon,
   PanelRight,
-  BookmarkCheck
+  BookmarkCheck,
+  PenLine
 } from 'lucide-react';
 
 export type DashboardTab =
@@ -17,6 +18,7 @@ export type DashboardTab =
   | 'targeted_practice'
   | 'review'
   | 'reading_list'
+  | 'summary_practice'
   | 'word_difference'
   | 'usage_coach'
   | 'analytics'
@@ -104,6 +106,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               <BookmarkCheck size={16} strokeWidth={2} />
             </span>
             <span className="nav-item-label">Reading List</span>
+          </button>
+
+          <button
+            className={`nav-item ${activeTab === 'summary_practice' ? 'active' : ''}`}
+            onClick={() => onTabChange('summary_practice')}
+          >
+            <span className="nav-icon-box">
+              <PenLine size={16} strokeWidth={2} />
+            </span>
+            <span className="nav-item-label">Summary Practice</span>
           </button>
         </div>
 

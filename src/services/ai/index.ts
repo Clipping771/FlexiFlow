@@ -11,6 +11,8 @@ import { TwoStageCacheService } from './cache';
 import { CacheManager } from '../cache';
 import { hashString } from '../cache/normalization';
 import { AIProvider } from './types';
+import { SummaryEvaluation } from '../../types';
+import { SummaryEvaluationInput, SUMMARY_MAX_ARTICLE_CHARS, SUMMARY_MAX_CHARS } from './prompts';
 import {
   HighlightIntelligenceService,
   splitArticleIntoChunks,
@@ -261,6 +263,29 @@ export class AIService {
       processedMock.fallbackReason = fallbackReason;
       return processedMock;
     });
+  }
+
+  /**
+   * Summary practice. Marking needs a real model, so there is no offline fallback: without one this
+   * throws a message the page shows as-is, rather than inventing a score.
+   */
+  static async evaluateSummary(input: SummaryEvaluationInput): Promise<SummaryEvaluation> {
+    const summary = (input.summary || '').trim();
+    const articleText = (input.articleText || '').trim();
+    if (articleText.length < 200) throw new Error('This article is too short to summarize. Open a longer article and try again.');
+    if (summary.split(/\s+/).filter(Boolean).length < 15) throw new Error('Write at least 15 words so there is something to mark.');
+    if (summary.length > SUMMARY_MAX_CHARS) throw new Error(`Keep the summary under ${SUMMARY_MAX_CHARS} characters.`);
+
+    const userSettings = await SettingsService.getSettings();
+    const providerName = userSettings.aiProvider || 'mock';
+    const hasApiKey = Boolean(userSettings.apiKey?.trim());
+    const isLiveAI = providerName === 'lexiflow' || ((providerName === 'ollama' || hasApiKey) && providerName !== 'mock');
+    const provider = await this.getProvider(userSettings);
+
+    if (!isLiveAI || !provider.evaluateSummary) {
+      throw new Error('Marking a summary needs an AI provider. Set one up in Settings (LexiFlow Cloud, Gemini, OpenAI, Claude or Ollama).');
+    }
+    return provider.evaluateSummary({ ...input, summary, articleText: articleText.slice(0, SUMMARY_MAX_ARTICLE_CHARS) });
   }
 
   static getCacheKey(action: string, args: Record<string, unknown>): string {

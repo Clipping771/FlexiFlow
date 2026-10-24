@@ -3483,6 +3483,10 @@ html body [lang]:lang(he) {
   color: var(--hub-accent);
 }
 
+.popup-container .read-later-row > .read-later-btn {
+  margin-right: auto;
+}
+
 .popup-container .read-later-link {
   padding: 6px 4px;
   border: none;

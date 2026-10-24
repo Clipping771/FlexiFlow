@@ -5,7 +5,7 @@ import { FSRSEngine } from '../services/fsrs/engine';
 import { fetchProviderModels } from '../services/ai/modelFetcher';
 import { VocabularyItem, FSRSRating, SelectionType, WritingGoal, WrongMeaningReport } from '../types';
 import { setupOllamaOriginRules } from './ollamaRules';
-import { openSavedArticle } from './openArticle';
+import { openSavedArticle, captureArticleText } from './openArticle';
 import { setupBadgeListeners, updateAllTabBadges } from './badgeService';
 import { EventLogger, ApprovedEventName } from '../services/logging/eventLogger';
 import { AuthService, CloudAuthError } from '../services/auth/authService';
@@ -482,6 +482,19 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             const { url, highlight } = payload as { url: string; highlight?: boolean };
             await openSavedArticle(url, Boolean(highlight));
             sendResponse({ success: true });
+            break;
+          }
+
+          case 'EVALUATE_SUMMARY': {
+            const { articleText, articleTitle, summary } = payload as { articleText: string; articleTitle?: string; summary: string };
+            const result = await AIService.evaluateSummary({ articleText, articleTitle, summary });
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
+          case 'CAPTURE_ARTICLE_TEXT': {
+            const { url } = payload as { url: string };
+            sendResponse({ success: true, data: await captureArticleText(url) });
             break;
           }
 

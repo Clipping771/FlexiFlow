@@ -25,3 +25,4 @@ export * from './writing';
 export * from './followUp';
 export * from './highlights';
 export * from './usage';
+export * from './summary';

@@ -229,6 +229,54 @@ describe('POST /v1/ai/evaluate-usage', () => {
   });
 });
 
+const summaryMarking = {
+  summaryLanguage: 'en',
+  criteria: [
+    { id: 'main_idea', score: 3.5, comment: 'Clear central claim.' },
+    { id: 'key_points', score: 9, comment: 'Covers most points.' },
+    { id: 'accuracy', score: 2, comment: 'Nothing wrong.' },
+    { id: 'expression', score: 1, comment: 'Own words.' }
+  ],
+  totalScore: 10,
+  overallFeedback: 'You understood the article well.',
+  strengths: ['Names the main argument'],
+  missedPoints: ['The cost of storage'],
+  misunderstandings: [],
+  modelSummary: 'The article argues that grids need storage to use renewables reliably.',
+  languageFeedback: { comment: 'Mostly correct.', corrections: [{ original: 'grid need', corrected: 'grids need', explanation: 'Plural subject.' }] }
+};
+
+describe('POST /v1/ai/evaluate-summary', () => {
+  it('marks a summary for 3 credits and recomputes the total from clamped criteria', async () => {
+    outputs.push(summaryMarking);
+    const res = await call('evaluate-summary', {
+      articleText: 'Renewable grids need storage. Storage is costly.',
+      articleTitle: 'Grids',
+      summary: 'The grid need storage to work with renewables.'
+    });
+    expect(res.status).toBe(200);
+    const { data } = await json(res);
+    // key_points is capped at 3, so the total is 3.5 + 3 + 2 + 1 rather than the model's 10
+    expect(data.totalScore).toBe(9.5);
+    expect(data.criteria.find((c: { id: string }) => c.id === 'key_points').score).toBe(3);
+    expect(prompts[0]).toContain('The grid need storage to work with renewables.');
+    expect(await creditsUsed()).toBe(3);
+  });
+
+  it('does not charge when a criterion is missing', async () => {
+    const broken = { ...summaryMarking, criteria: summaryMarking.criteria.slice(0, 2) };
+    outputs.push(broken, broken);
+    const res = await call('evaluate-summary', { articleText: 'Some article.', summary: 'A summary.' });
+    expect(res.status).toBe(503);
+    expect(await creditsUsed()).toBe(0);
+  });
+
+  it('rejects a summary over the length limit', async () => {
+    const res = await call('evaluate-summary', { articleText: 'Some article.', summary: 'x'.repeat(3001) });
+    expect(res.status).toBe(413);
+  });
+});
+
 describe('writing, follow-up and highlights', () => {
   it('assists writing for 3 credits', async () => {
     outputs.push(writing);

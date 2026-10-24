@@ -40,3 +40,50 @@ function requestHighlight(tabId: number, attempt: number): void {
     }
   });
 }
+
+/**
+ * Loads a saved article in a background tab just long enough to read its main text (for summary
+ * practice from the Reading List), then closes the tab.
+ */
+export async function captureArticleText(url: string): Promise<{ url: string; title: string; text: string }> {
+  if (!normalizeArticleUrl(url)) throw new Error('Only web pages (http/https) can be opened.');
+
+  const tab = await chrome.tabs.create({ url, active: false });
+  if (tab.id === undefined) throw new Error('Could not open the article.');
+  const tabId = tab.id;
+
+  try {
+    await waitForLoad(tabId, 30000);
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const res = await new Promise<any>((resolve) => {
+        chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_ARTICLE_TEXT' }, (r) => resolve(chrome.runtime.lastError ? null : r));
+      });
+      if (res?.success && res.data?.text) return { url, title: res.data.title || url, text: res.data.text };
+      await new Promise((r) => setTimeout(r, 800));
+    }
+    throw new Error('Could not read the article text from this page. Open it and use "Write a summary" from the popup instead.');
+  } finally {
+    chrome.tabs.remove(tabId).catch(() => {});
+  }
+}
+
+function waitForLoad(tabId: number, timeoutMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('The article took too long to load.'));
+    }, timeoutMs);
+    function cleanup() {
+      clearTimeout(timeout);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+    }
+    function onUpdated(id: number, info: { status?: string }) {
+      if (id === tabId && info.status === 'complete') {
+        cleanup();
+        resolve();
+      }
+    }
+    chrome.tabs.onUpdated.addListener(onUpdated);
+  });
+}
+

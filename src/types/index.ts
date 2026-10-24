@@ -412,6 +412,51 @@ export interface UsageCoachFeedback {
   alternativeCollocations?: string[];
 }
 
+// Summary practice: the reader summarizes an article and AI marks how well they understood it
+export type SummaryCriterionId = 'main_idea' | 'key_points' | 'accuracy' | 'expression';
+
+export interface SummaryCriterion {
+  id: SummaryCriterionId;
+  label: string;
+  score: number;
+  maxScore: number;
+  comment: string;
+}
+
+export interface SummaryLanguageCorrection {
+  original: string;
+  corrected: string;
+  explanation: string;
+}
+
+export interface SummaryEvaluation {
+  /** Out of 10: always the sum of the criteria scores. */
+  totalScore: number;
+  criteria: SummaryCriterion[];
+  /** ISO 639-1 code of the language the summary was written in. */
+  summaryLanguage: string;
+  overallFeedback: string;
+  strengths: string[];
+  missedPoints: string[];
+  misunderstandings: string[];
+  /** A short summary of the article, in the learner's language, to compare against. */
+  modelSummary: string;
+  /** Grammar and wording notes; only for summaries written in English. Not part of the score. */
+  languageFeedback?: {
+    comment: string;
+    corrections: SummaryLanguageCorrection[];
+  };
+}
+
+export interface SummaryAttempt {
+  id: string;
+  articleUrl: string;
+  articleTitle: string;
+  summary: string;
+  createdAt: string;
+  evaluation: SummaryEvaluation;
+}
+
 // Follow-up Q&A
 export interface FollowUpResponse {
   question: string;

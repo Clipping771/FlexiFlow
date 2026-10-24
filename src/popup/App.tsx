@@ -23,6 +23,7 @@ import { SettingsService } from '../services/storage/settings';
 import { FSRSEngine } from '../services/fsrs/engine';
 import { getLanguageConfig } from '../config/languages';
 import { ReadingListService, ReadingListItem } from '../services/storage/readingList';
+import { SummaryPracticeService } from '../services/storage/summaryPractice';
 import { detectSelectionType } from '../content/selection';
 import {
   Search,
@@ -373,6 +374,27 @@ export const App: React.FC = () => {
     } catch (err) {
       setHighlightFeedback({ message: (err as Error).message || 'Could not update your reading list.', type: 'error' });
     }
+  };
+
+  const writeSummary = () => {
+    if (!activeTabId || typeof chrome === 'undefined' || !chrome.tabs?.sendMessage) return;
+    chrome.tabs.sendMessage(activeTabId, { type: 'EXTRACT_ARTICLE_TEXT' }, async (res) => {
+      if (chrome.runtime?.lastError || !res?.success || !res.data?.text) {
+        setHighlightFeedback({
+          message: chrome.runtime?.lastError
+            ? 'Could not read this page. Refresh the tab and try again.'
+            : 'No article text found on this page to summarize.',
+          type: 'error'
+        });
+        return;
+      }
+      await SummaryPracticeService.setDraft({
+        url: res.data.url,
+        title: highlightState?.articleTitle || res.data.title || currentPage?.title || 'Article',
+        text: res.data.text
+      });
+      chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html#summary') });
+    });
   };
 
   const openReadingList = () => {
@@ -1080,6 +1102,7 @@ export const App: React.FC = () => {
             readLater={currentPage ? { saved: Boolean(readLaterItem), unreadCount: readingListCount } : null}
             onToggleReadLater={toggleReadLater}
             onOpenReadingList={openReadingList}
+            onWriteSummary={writeSummary}
             textSize={textSize}
             showOnboarding={showOnboarding}
             dismissOnboarding={dismissOnboarding}

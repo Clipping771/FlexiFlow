@@ -1,3 +1,5 @@
+import { SummaryEvaluation } from '../../types';
+import { SummaryEvaluationInput } from './prompts';
 import {
   SelectionType,
   LinguisticAnalysisResult,
@@ -36,4 +38,6 @@ export interface AIProvider {
   compareWords?(wordA: string, wordB: string): Promise<{ wordA: LinguisticAnalysisResult; wordB: LinguisticAnalysisResult }>;
   /** Usage Coach evaluation of the learner's own sentence. */
   evaluateUsage?(targetWord: string, sentence: string): Promise<UsageCoachFeedback>;
+  /** Summary practice: marks the learner's summary of an article. Offline providers do not have it. */
+  evaluateSummary?(input: SummaryEvaluationInput): Promise<SummaryEvaluation>;
 }

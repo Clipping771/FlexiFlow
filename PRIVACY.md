@@ -29,6 +29,7 @@ LexiFlow is provided by **[TODO: your name or company]** ("we"). Contact: **[TOD
 |------|-------|---------|
 | Saved vocabulary, notes, spaced-repetition (FSRS) history, and the address and title of the page each word was saved from | IndexedDB (`lexiflow_db`) | Your word library and reviews, and linking words to the article they came from |
 | Reading list: the address, title and length of articles you press "Save for later" on (never their text) | `chrome.storage.local` | Coming back to those articles |
+| Summary practice: your marked summaries with their reviews, and the text of the one article you are currently summarizing (replaced by the next) | `chrome.storage.local` | Marking and your progress over time |
 | Settings, and API keys for your own AI provider if you add them | `chrome.storage.local` | Preferences and connecting to that provider |
 | LexiFlow Cloud sign-in tokens | `chrome.storage.local` (refresh token), `chrome.storage.session` (access token) | Keeping you signed in |
 | Cached explanations, a local usage log (feature events such as "word saved" with the selection type, never the text), wrong-meaning reports | `chrome.storage.local` / memory | Faster repeat lookups and local diagnostics |
@@ -51,6 +52,7 @@ Depending on the feature, an explanation request contains:
 - **Writing help:** the text you ask to improve.
 - **AI chat:** your question and the text it is about.
 - **Page highlights** (only when you press *Analyze page*): up to 15,000 characters of the page's main article text and its title.
+- **Summary practice** (only when you press *Mark my summary*): the summary you wrote, plus up to 15,000 characters of the article's main text and its title, so the summary can be marked against it.
 
 Page content is never read or sent unless you trigger one of these features. With the offline mode, nothing is sent.
 
