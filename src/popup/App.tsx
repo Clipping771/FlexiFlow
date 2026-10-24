@@ -13,6 +13,7 @@ import {
 } from '../types';
 import { PopupView } from '../content/popupView';
 import { POPUP_STYLES } from '../content/styles';
+import { observeTargetLanguage } from '../shared/targetLang';
 import { ReadingTab, PageHighlightState } from './components/ReadingTab';
 import { LookupTab } from './components/LookupTab';
 import { LibraryTab } from './components/LibraryTab';
@@ -276,6 +277,11 @@ export const App: React.FC = () => {
   const [isSaved, setIsSaved] = useState(false);
   const [isCardMode, setIsCardMode] = useState(false);
   const [targetLang, setTargetLang] = useState('bn');
+  const targetLangRef = useRef(targetLang);
+  targetLangRef.current = targetLang;
+
+  // Tag translated text with its language and direction as the popup re-renders
+  useEffect(() => observeTargetLanguage(document.body, () => targetLangRef.current), []);
   const [customLanguages, setCustomLanguages] = useState<any[]>([]);
 
   // Site domain & whitelist/blacklist toggle (eJOY-style)

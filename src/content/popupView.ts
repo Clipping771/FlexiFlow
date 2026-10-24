@@ -27,6 +27,7 @@ import { generateCloze } from '../services/cloze/generator';
 import { getSentenceOverviewTeaching, buildBeginnerBreakdownSections } from '../services/grammar/grammarL10n';
 import { decodeHtml, escapeHtml, isValidExampleTranslation, lfIcon } from './popupHtml';
 import { DragResizeController } from './dragResize';
+import { tagTargetLanguage } from '../shared/targetLang';
 import {
   CardRenderContext,
   renderPhraseBreakdownHtml as renderPhraseBreakdownHtmlImpl,
@@ -226,6 +227,11 @@ export class PopupView {
       <button type="button" class="lf-first-tip-close" aria-label="Dismiss tip">${lfIcon('close')}</button>
     `;
     host.prepend(tip);
+  }
+
+  /** English text, with the Bengali gloss appended only for Bengali readers. */
+  private bilingual(en: string, bn: string): string {
+    return this.targetLanguage === 'bn' ? `${en} / ${bn}` : en;
   }
 
   private renderRetryHtml(): string {
@@ -533,6 +539,8 @@ export class PopupView {
 
   private isolateInteractiveElements(): void {
     this.enhanceTabAccessibility();
+    this.element.setAttribute('lang', this.sourceLanguage || 'en');
+    tagTargetLanguage(this.element, this.targetLanguage);
     this.renderFirstUseTip();
     const interactives = this.element.querySelectorAll<HTMLElement>(
       'button, input, select, textarea, a, .lf-btn-icon, .lf-tab, .lf-sentence-word, .lf-quick-chip, .lf-vocab-chip-btn, [role="button"]'
@@ -829,7 +837,7 @@ export class PopupView {
 
           <div class="lf-u-mt-10px lf-u-p-12px-14px lf-u-bg-rgb239-68-68-005 lf-u-b-1px-solid-rgb239-68-68-02 lf-u-r-8px">
             <div class="lf-u-fs-12p5px lf-u-fw-700 lf-u-c-danger-ink lf-u-mb-4px">
-              Couldn't get an AI explanation / AI ব্যাখ্যা পাওয়া যায়নি
+              ${this.bilingual("Couldn't get an AI explanation", 'AI ব্যাখ্যা পাওয়া যায়নি')}
             </div>
             <div class="lf-u-fs-12px lf-u-c-ink lf-u-mb-6px lf-u-lh-1p45">
               ${escapeHtml(errorMessage || 'AI provider unavailable or offline.')}
@@ -1120,7 +1128,7 @@ export class PopupView {
           lemma: w.selectedText.toLowerCase(),
           partOfSpeech: w.partOfSpeech || 'word',
           easyEnglish: w.simpleEnglishExplanation || w.contextualMeaning || 'Meaning in context',
-          easyBengali: w.bengaliTranslation || 'বাংলা অর্থ',
+          easyBengali: w.bengaliTranslation || '—',
           contextMeaning: w.whyFitsContext || w.contextualMeaning || 'Meaning in this sentence.',
           example: w.examples?.[0],
           confidence: 'high',
@@ -1145,7 +1153,7 @@ export class PopupView {
           lemma: p.selectedText.toLowerCase(),
           partOfSpeech: p.phraseType || 'phrase',
           easyEnglish: p.simpleEnglishExplanation || p.overallMeaning || 'Phrase meaning',
-          easyBengali: p.bengaliTranslation || 'বাংলা অর্থ',
+          easyBengali: p.bengaliTranslation || '—',
           contextMeaning: p.whyFitsContext || p.overallMeaning || 'Meaning in this sentence.',
           example: p.examples?.[0],
           confidence: 'high',
@@ -1256,7 +1264,7 @@ export class PopupView {
             </button>
           ` : ''}
           <span class="lf-heading-word" title="${escapeHtml(a.selectedText)}">${escapeHtml(a.selectedText)}</span>
-          <button type="button" class="lf-btn-icon lf-voice-btn lf-u-w-26px lf-u-h-26px lf-u-minw-26px lf-u-minh-26px lf-u-m-0-2px" title="Pronounce word / উচ্চারণ শুনুন" aria-label="Listen pronunciation">${lfIcon('volume')}</button>
+          <button type="button" class="lf-btn-icon lf-voice-btn lf-u-w-26px lf-u-h-26px lf-u-minw-26px lf-u-minh-26px lf-u-m-0-2px" title="${this.bilingual('Pronounce word', 'উচ্চারণ শুনুন')}" aria-label="Listen pronunciation">${lfIcon('volume')}</button>
           <span class="lf-pos" title="${escapeHtml(rawPos)}">${escapeHtml(displayPos)}</span>
         </div>
         <div class="lf-actions-top">
@@ -1518,7 +1526,7 @@ export class PopupView {
         <div class="lf-title-row">
           <span class="lf-drag-indicator" title="Drag to reposition">⠿</span>
           <span class="lf-heading-sentence">Sentence Analysis</span>
-          <button type="button" class="lf-btn-icon lf-voice-btn lf-u-w-26px lf-u-h-26px lf-u-minw-26px lf-u-minh-26px lf-u-m-0-2px" title="Listen to sentence / বাক্যটি শুনুন" aria-label="Listen to sentence">${lfIcon('volume')}</button>
+          <button type="button" class="lf-btn-icon lf-voice-btn lf-u-w-26px lf-u-h-26px lf-u-minw-26px lf-u-minh-26px lf-u-m-0-2px" title="${this.bilingual('Listen to sentence', 'বাক্যটি শুনুন')}" aria-label="Listen to sentence">${lfIcon('volume')}</button>
           <span class="lf-pos">SENTENCE</span>
         </div>
         <div class="lf-actions-top">
@@ -1720,7 +1728,7 @@ export class PopupView {
         <div class="lf-title-row">
           <span class="lf-drag-indicator" title="Drag to reposition">⠿</span>
           <span class="lf-heading-sentence">Paragraph Analysis</span>
-          <button type="button" class="lf-btn-icon lf-voice-btn lf-u-w-26px lf-u-h-26px lf-u-minw-26px lf-u-minh-26px lf-u-m-0-2px" title="Listen to paragraph / প্যারাগ্রাফটি শুনুন" aria-label="Listen to paragraph">${lfIcon('volume')}</button>
+          <button type="button" class="lf-btn-icon lf-voice-btn lf-u-w-26px lf-u-h-26px lf-u-minw-26px lf-u-minh-26px lf-u-m-0-2px" title="${this.bilingual('Listen to paragraph', 'প্যারাগ্রাফটি শুনুন')}" aria-label="Listen to paragraph">${lfIcon('volume')}</button>
           <span class="lf-pos">PARAGRAPH</span>
         </div>
         <div class="lf-actions-top">
@@ -2422,7 +2430,7 @@ export class PopupView {
     return `
       <div class="lf-feedback-box">
         <div class="lf-u-fs-12px lf-u-fw-700 lf-u-c-danger-ink lf-u-mb-6px">
-          Report Issue / রিপোর্ট বা পরামর্শ
+          ${this.bilingual('Report Issue', 'রিপোর্ট বা পরামর্শ')}
         </div>
         <select class="lf-feedback-reason lf-u-w-100pct lf-u-b-0p5px-solid-rgb0-0-0-02 lf-u-r-6px lf-u-p-4px lf-u-fs-12px lf-u-mb-6px">
           <option value="wrong_context_meaning">Wrong meaning for this context</option>

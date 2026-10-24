@@ -4702,3 +4702,67 @@
 }
 
 .lexiflow-popup .lf-u-d-block.lf-u-d-block.lf-u-d-block { display: block; }
+
+/* ============================================================
+   Per-language fonts: translated text is tagged with lang (src/shared/targetLang.ts);
+   each script gets its best system font on Windows and macOS
+   ============================================================ */
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(bn),
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(as) {
+  font-family: "LexiFlow Bengali", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", "Nirmala UI", "Bangla Sangam MN", sans-serif;
+}
+
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(hi),
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(mr),
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(ne) {
+  font-family: "Nirmala UI", "Kohinoor Devanagari", "Devanagari Sangam MN", "Noto Sans Devanagari", "Mangal", sans-serif;
+}
+
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(ta) {
+  font-family: "Nirmala UI", "Tamil Sangam MN", "Noto Sans Tamil", "Latha", sans-serif;
+}
+
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(te) {
+  font-family: "Nirmala UI", "Telugu Sangam MN", "Noto Sans Telugu", "Gautami", sans-serif;
+}
+
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(gu) {
+  font-family: "Nirmala UI", "Gujarati Sangam MN", "Noto Sans Gujarati", "Shruti", sans-serif;
+}
+
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(pa) {
+  font-family: "Nirmala UI", "Gurmukhi MN", "Noto Sans Gurmukhi", "Raavi", sans-serif;
+}
+
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(ar),
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(fa),
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(ps) {
+  font-family: "Segoe UI", "Geeza Pro", "Noto Naskh Arabic", "Noto Sans Arabic", "Tahoma", sans-serif;
+  line-height: 1.75;
+}
+
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(ur) {
+  font-family: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", "Urdu Typesetting", "Segoe UI", "Geeza Pro", "Noto Naskh Arabic", "Tahoma", sans-serif;
+  line-height: 2;
+}
+
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(zh) {
+  font-family: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Noto Sans CJK SC", sans-serif;
+}
+
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(ja) {
+  font-family: "Yu Gothic UI", "Yu Gothic", "Meiryo", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Noto Sans CJK JP", sans-serif;
+}
+
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(ko) {
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "Noto Sans CJK KR", sans-serif;
+}
+
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(th) {
+  font-family: "Leelawadee UI", "Thonburi", "Noto Sans Thai", "Tahoma", sans-serif;
+  line-height: 1.7;
+}
+
+.lexiflow-popup.lexiflow-popup.lexiflow-popup [lang]:lang(he) {
+  font-family: "Segoe UI", "Arial Hebrew", "Noto Sans Hebrew", "Arial", sans-serif;
+}

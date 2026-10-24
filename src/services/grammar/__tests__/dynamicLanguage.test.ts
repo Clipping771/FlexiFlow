@@ -185,3 +185,17 @@ describe('Dynamic Explanation Language Support — Grammar Breakdown', () => {
     });
   });
 });
+
+describe('Teaching language fallback', () => {
+  it('uses English, not Bengali, for languages without hand-written grammar text', async () => {
+    const { teachingLanguage, getSentenceOverviewTeaching, buildBeginnerBreakdownSections } = await import('../grammarL10n');
+    expect(teachingLanguage('ur')).toBe('en');
+    expect(teachingLanguage('ja')).toBe('en');
+    expect(teachingLanguage('hi')).toBe('hi');
+    expect(teachingLanguage('bn')).toBe('bn');
+    const overview = getSentenceOverviewTeaching('compound', 'ar');
+    expect(overview.explanation).not.toMatch(/[\u0980-\u09FF]/);
+    const sections = buildBeginnerBreakdownSections({ text: 'The bank kept rates', subject: 'The bank' }, 'The bank kept rates', 'ja');
+    expect(JSON.stringify(sections)).not.toMatch(/[\u0980-\u09FF]/);
+  });
+});

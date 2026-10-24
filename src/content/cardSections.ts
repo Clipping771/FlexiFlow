@@ -58,7 +58,8 @@ export function ensurePhraseBreakdown(ctx: CardRenderContext, text: string,
     return existingBreakdown;
   }
 
-  const isEn = ctx.targetLanguage === 'en';
+  // Placeholder text: Bengali for Bengali readers, English for every other language
+  const isEn = ctx.targetLanguage !== 'bn';
 
   if (clauses && clauses.length > 0) {
     return clauses.map((c) => ({

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { observeTargetLanguage } from '../shared/targetLang';
 import { VocabularyItem, UserSettings, FSRSRating } from '../types';
 import { Navbar, DashboardTab } from './components/Navbar';
 import { VocabularyView } from './components/VocabularyView';
@@ -35,6 +36,11 @@ export const App: React.FC = () => {
   const [items, setItems] = useState<VocabularyItem[]>([]);
   const [dueItems, setDueItems] = useState<VocabularyItem[]>([]);
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
+  const targetLangRef = useRef(settings.targetLanguage || 'bn');
+  targetLangRef.current = settings.targetLanguage || 'bn';
+
+  // Tag translated text with its language and direction as the dashboard re-renders
+  useEffect(() => observeTargetLanguage(document.body, () => targetLangRef.current), []);
   const [coachWord, setCoachWord] = useState<string>('mitigate');
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');

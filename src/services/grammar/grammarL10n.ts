@@ -53,8 +53,20 @@ export interface GrammarL10n {
   getVocabularyWord: (word: string) => { meaning: string; localized: string; pos: string; role: string } | null;
 }
 
+/** Languages with hand-written grammar teaching text. */
+const TEACHING_LANGS = new Set(['en', 'es', 'hi', 'bn']);
+
+/**
+ * Language to teach in: the reader's target when it has hand-written text, otherwise English,
+ * so an Urdu or Japanese reader never sees Bengali teaching text.
+ */
+export function teachingLanguage(targetLang?: string): string {
+  const lang = (targetLang || 'bn').toLowerCase().trim().split('-')[0];
+  return TEACHING_LANGS.has(lang) ? lang : 'en';
+}
+
 export function getGrammarL10n(targetLang: string = 'bn'): GrammarL10n {
-  const cleanLang = (targetLang || 'bn').toLowerCase().trim();
+  const cleanLang = teachingLanguage(targetLang);
 
   // ENGLISH MODE ('en')
   if (cleanLang === 'en') {
@@ -326,7 +338,7 @@ export function getGrammarL10n(targetLang: string = 'bn'): GrammarL10n {
     };
   }
 
-  // DEFAULT: BENGALI MODE ('bn') OR OTHER
+  // DEFAULT: BENGALI MODE ('bn'); other languages are mapped to English by teachingLanguage()
   return {
     selfCorrection: (orig, corr, marker) =>
       `বক্তা প্রথমে "${orig}" শব্দটি ব্যবহার করেন এবং পরক্ষণেই "${marker}" বলে নিজেকে সংশোধন করে "${corr}" বলেন। এটি মুখের ভাষার একটি স্বাভাবিক আত্ম-সংশোধন (Self-Correction), কোনো আলাদা খণ্ডবাক্য নয়।`,
@@ -668,7 +680,7 @@ export function getSentenceOverviewTeaching(
   targetLang: string = 'bn'
 ): { badgeLabel: string; explanation: string } {
   const cleanType = (type || 'simple').toLowerCase();
-  const cleanLang = (targetLang || 'bn').toLowerCase();
+  const cleanLang = teachingLanguage(targetLang);
 
   if (cleanType === 'compound-complex') {
     return {
@@ -722,7 +734,7 @@ export function buildBeginnerBreakdownSections(
 ): BeginnerComponentSection[] {
   const sections: BeginnerComponentSection[] = [];
   const cleanSentence = (sentenceText || '').toLowerCase();
-  const cleanLang = (targetLang || 'bn').toLowerCase();
+  const cleanLang = teachingLanguage(targetLang);
 
   const isEn = cleanLang === 'en';
   const isEs = cleanLang === 'es';
