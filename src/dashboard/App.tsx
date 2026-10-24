@@ -29,6 +29,16 @@ const TAB_TITLES: Record<DashboardTab, string> = {
   settings: 'Settings'
 };
 
+/** Provider name only (no model) for the header's "AI:" pill. */
+const PROVIDER_NAMES: Record<string, string> = {
+  lexiflow: 'LexiFlow Cloud',
+  gemini: 'Gemini',
+  openai: 'OpenAI',
+  anthropic: 'Claude',
+  ollama: 'Ollama',
+  mock: 'Offline'
+};
+
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('vocabulary');
   const [items, setItems] = useState<VocabularyItem[]>([]);
@@ -611,8 +621,8 @@ export const App: React.FC = () => {
 
                 <div className="top-kpi-pill" title="Active AI provider">
                   <span className="top-kpi-label">AI:</span>
-                  <span className="top-kpi-val" style={{ textTransform: 'capitalize' }}>
-                    {settings.aiProvider === 'gemini' ? 'Gemini 2.0 Flash' : settings.aiProvider}
+                  <span className="top-kpi-val">
+                    {PROVIDER_NAMES[settings.aiProvider] || settings.aiProvider}
                   </span>
                 </div>
 
