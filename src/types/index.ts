@@ -373,38 +373,6 @@ export interface WrongMeaningReport {
   model?: string;
 }
 
-// Syntactic & Sentence X-Ray
-export interface SentenceXRayResult {
-  sentence: string;
-  bengaliTranslation: string;
-  paraphrase: string;
-  mainMessage?: string;
-  sentenceStructure?: SentenceStructureOverview;
-  clauses: SyntacticClause[];
-  structureMap?: SentenceStructureMap;
-  grammarRules?: GrammarRuleDetail[];
-  connectors?: ConnectorRelationship[];
-  wordLevelGrammar?: WordLevelGrammarDetail[];
-  commonMistakesAndAlternatives?: MistakeAndAlternative;
-  practice?: GrammarPractice;
-  grammaticalFeatures: string[];
-  grammaticalHighlights?: string[];
-  phraseBreakdown?: PhraseExplanation[];
-  difficultVocabulary?: Array<{
-    word: string;
-    meaningInContext: string;
-    bengali: string;
-    partOfSpeech?: string;
-    grammaticalRole?: string;
-  }>;
-  phraseConstituents?: PhraseConstituent[];
-  conversationalElements?: ConversationalElement[];
-  patternSummary?: GrammaticalPatternSummary;
-  clauseRelationship?: ClauseRelationshipInfo;
-  relevantGrammarFeatures?: RelevantGrammarFeature[];
-  toneAndRegister: string;
-}
-
 // Word Comparison / Nuance
 export interface MinimalPairComparison {
   sentenceA: string;

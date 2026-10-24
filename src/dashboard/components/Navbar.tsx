@@ -3,7 +3,6 @@ import {
   BookOpen,
   Target,
   RotateCw,
-  Microscope,
   Scale,
   PenTool,
   BarChart3,
@@ -18,7 +17,6 @@ export type DashboardTab =
   | 'targeted_practice'
   | 'review'
   | 'reading_list'
-  | 'sentence_xray'
   | 'word_difference'
   | 'usage_coach'
   | 'analytics'
@@ -112,16 +110,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Section: AI Studio */}
         <div className="nav-section">
           <div className="nav-section-title">AI Studio &amp; Tools</div>
-
-          <button
-            className={`nav-item ${activeTab === 'sentence_xray' ? 'active' : ''}`}
-            onClick={() => onTabChange('sentence_xray')}
-          >
-            <span className="nav-icon-box">
-              <Microscope size={16} strokeWidth={2} />
-            </span>
-            <span className="nav-item-label">Sentence X-Ray</span>
-          </button>
 
           <button
             className={`nav-item ${activeTab === 'word_difference' ? 'active' : ''}`}

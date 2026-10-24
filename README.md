@@ -12,7 +12,7 @@ LexiFlow AI is an intelligent reading companion for Google Chrome that helps use
 - **Shadow DOM Isolation**: Scoped CSS prevents styling collisions on complex modern websites.
 - **Context-Aware Dictionary**: Normalizes parts of speech, IPA pronunciation, audio, definitions, collocations, and contextual senses.
 - **Bengali Bilingual Explanations**: Understand subtle nuances and grammar structures in Bengali.
-- **Sentence X-Ray**: Clause-by-clause structural breakdown, grammatical roles, and natural Bengali translations.
+- **Sentence analysis**: Select a sentence on any page for a clause-by-clause breakdown, grammatical roles and a natural translation.
 - **Word Difference Engine**: Compare closely related or confusing words (e.g. *mitigate* vs *alleviate*).
 - **Spaced Repetition (FSRS)**: Free Spaced Repetition Scheduler tracks memory stability and schedules timely flashcard reviews.
 - **Local-First & Privacy Conscious**: IndexedDB stores vocabulary locally. API keys stay on your machine.

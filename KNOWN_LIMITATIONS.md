@@ -2,7 +2,7 @@
 
 ## 1. AI-Native Architectural Foundation
 LexiFlow AI is built as a pure **AI-native language engine**. It does not rely on or query conventional third-party dictionary APIs for semantic parsing, lexical breakdown, or contextual interpretation:
-- All contextual semantics, phrasal breakdowns, syntactic clause deconstructions (Sentence X-Ray), rhetorical connector analyses, and Bengali translations are generated dynamically through configured Large Language Models (LLMs) or deterministic offline fallbacks.
+- All contextual semantics, phrasal breakdowns, syntactic clause deconstructions (sentence analysis), rhetorical connector analyses, and Bengali translations are generated dynamically through configured Large Language Models (LLMs) or deterministic offline fallbacks.
 - Deterministic operations—including FSRS spaced repetition scheduling, personal weakness scoring, library filtering, multi-field search, starred bookmarks, and JSON backups—execute 100% locally on the user's machine without external network calls.
 
 ## 2. Configured AI Providers & Credentials

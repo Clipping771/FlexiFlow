@@ -5,7 +5,6 @@ import { Navbar, DashboardTab } from './components/Navbar';
 import { VocabularyView } from './components/VocabularyView';
 import { TargetedPracticeView } from './components/TargetedPracticeView';
 import { ReviewView } from './components/ReviewView';
-import { SentenceXRayView } from './components/SentenceXRayView';
 import { WordDifferenceView } from './components/WordDifferenceView';
 import { CoachView } from './components/CoachView';
 import { AnalyticsView } from './components/AnalyticsView';
@@ -24,7 +23,6 @@ const TAB_TITLES: Record<DashboardTab, string> = {
   targeted_practice: 'Targeted Practice',
   review: 'Spaced Review',
   reading_list: 'Reading List',
-  sentence_xray: 'Sentence X-Ray',
   word_difference: 'Word Difference',
   usage_coach: 'Usage Coach',
   analytics: 'Learning Analytics',
@@ -710,8 +708,6 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === 'reading_list' && <ReadingListView vocabItems={items} />}
-
-            {activeTab === 'sentence_xray' && <SentenceXRayView />}
 
             {activeTab === 'word_difference' && <WordDifferenceView />}
 

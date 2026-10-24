@@ -45,7 +45,7 @@ LexiFlow contacts a server only when you trigger a feature that needs one.
 Depending on the feature, an explanation request contains:
 
 - **Word or phrase lookups:** the selected text, its sentence and the surrounding paragraph (up to 2,000 characters).
-- **Sentence X-Ray and paragraph analysis:** the selected sentence or paragraph.
+- **Sentence and paragraph analysis:** the selected sentence or paragraph.
 - **Word Difference:** the two words you compare.
 - **Usage Coach:** the target word and the sentence you wrote.
 - **Writing help:** the text you ask to improve.

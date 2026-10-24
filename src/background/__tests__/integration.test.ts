@@ -36,7 +36,7 @@ describe('LexiFlow AI Full System Integration & Regression Suite', () => {
     }
   });
 
-  it('EXPLAIN_SENTENCE (Sentence X-Ray): deconstructs syntactic clauses with bilingual explanations', async () => {
+  it('Sentence analysis: deconstructs syntactic clauses with bilingual explanations', async () => {
     const provider = await AIService.getProvider();
     const result = await provider.analyze(
       'Although the project faced financial constraints, the engineering team completed the satellite ahead of schedule.',

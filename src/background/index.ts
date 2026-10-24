@@ -285,35 +285,6 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             break;
           }
 
-          case 'EXPLAIN_SENTENCE': {
-            const { sentence } = payload as { sentence: string };
-            const result = (await AIService.analyzeSelection(sentence, 'sentence')) as any;
-            const resMapped = {
-              ...result,
-              sentence: result.selectedText || sentence,
-              bengaliTranslation: result.bengaliTranslation || '',
-              paraphrase: result.plainEnglishParaphrase || result.overallMeaning || result.paraphrase || '',
-              mainMessage: result.mainMessage || result.plainEnglishParaphrase || '',
-              sentenceStructure: result.sentenceStructure || undefined,
-              clauses: Array.isArray(result.clauses) ? result.clauses : [],
-              structureMap: result.structureMap || undefined,
-              grammarRules: Array.isArray(result.grammarRules) ? result.grammarRules : [],
-              connectors: Array.isArray(result.connectors) ? result.connectors : [],
-              wordLevelGrammar: Array.isArray(result.wordLevelGrammar) ? result.wordLevelGrammar : [],
-              commonMistakesAndAlternatives: result.commonMistakesAndAlternatives || undefined,
-              practice: result.practice || undefined,
-              grammaticalFeatures: Array.isArray(result.grammaticalHighlights)
-                ? result.grammaticalHighlights
-                : (Array.isArray(result.grammaticalFeatures) ? result.grammaticalFeatures : []),
-              grammaticalHighlights: Array.isArray(result.grammaticalHighlights) ? result.grammaticalHighlights : [],
-              phraseBreakdown: Array.isArray(result.phraseBreakdown) ? result.phraseBreakdown : [],
-              difficultVocabulary: Array.isArray(result.difficultVocabulary) ? result.difficultVocabulary : [],
-              toneAndRegister: result.toneAndRegister || 'Standard English'
-            };
-            sendResponse({ success: true, data: resMapped });
-            break;
-          }
-
           case 'COMPARE_WORDS': {
             const { wordA, wordB } = payload as { wordA: string; wordB: string };
             const provider = await AIService.getProvider();

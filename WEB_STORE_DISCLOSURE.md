@@ -12,8 +12,8 @@ Items marked **[TODO]** need the publisher's own details.
 > meaning in context with an explanation in Bengali or another language, then save words and review them
 > with spaced repetition.
 
-Every feature (explanation popup, Sentence X-Ray, Word Difference, Usage Coach, page highlights, Article
-Reader, vocabulary and reviews) serves that one purpose: understanding and learning English from what you read.
+Every feature (explanation popup, sentence analysis, Word Difference, Usage Coach, page highlights, reading
+list, vocabulary and reviews) serves that one purpose: understanding and learning English from what you read.
 
 ## 2. Permission justifications
 
@@ -90,7 +90,7 @@ the store listing.
 >
 > • Double-click any word or select a phrase to see what it means in this sentence, with a simple English and
 >   Bengali explanation, pronunciation and examples.
-> • Sentence X-Ray breaks long sentences into clauses and explains the grammar.
+> • Select a long sentence to see it broken into clauses with the grammar explained.
 > • Word Difference compares confusing words like *mitigate* and *alleviate*.
 > • Usage Coach checks sentences you write with new words.
 > • Page highlights pick out the words in an article worth learning.
@@ -104,7 +104,7 @@ the store listing.
 
 **Category:** Education · **Language:** English (add Bengali listing text: **[TODO]**)
 
-**Screenshots (1280×800):** **[TODO]** the explanation popup on a news article, Sentence X-Ray, the
+**Screenshots (1280×800):** **[TODO]** the explanation popup on a news article, a sentence grammar breakdown, the
 vocabulary review screen, Settings with the LexiFlow Cloud account card.
 
 ## 6. Before submitting

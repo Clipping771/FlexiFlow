@@ -23,7 +23,7 @@ Last Updated: 2026-10-13
 | IndexedDB Vocabulary Storage | Storage | P0 | Tested | Local-first IndexedDB database for vocabulary records and review history |
 | Chrome Storage Settings | Settings | P0 | Tested | User preferences, trigger modes, and secure API key storage |
 | AI Provider Abstraction | AI | P1 | Tested | Mock (offline), Gemini, OpenAI, Claude, Ollama with Zod schema validation |
-| Sentence X-Ray | Reading Tools| P1 | Tested | Syntactic clause breakdown, paraphrase, and natural Bengali translation |
+| Sentence X-Ray | Reading Tools| P1 | Removed | Dashboard tab removed; the same analysis lives in the on-page card's Grammar tab |
 | Word Difference Engine | Reading Tools| P1 | Tested | Nuance comparison (e.g. scrutiny vs examination, minimal pairs) |
 | Reading Pattern Explainer | Reading Tools| P1 | Tested | Explains participial phrases, idioms, and reduced relative clauses |
 | FSRS Memory Engine | Spaced Repetition| P2 | Tested | Free Spaced Repetition Scheduler (Again, Hard, Good, Easy) |

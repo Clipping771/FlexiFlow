@@ -1442,7 +1442,7 @@ export class PopupView {
             ${this.readingMode === 'learn' && this.parentSentenceAnalysis ? `
               <div class="lf-u-mt-8px lf-u-pt-6px lf-u-bt-1px-dashed-rgb0-113-227-02 lf-u-d-flex lf-u-jc-flex-end">
                 <button type="button" class="lf-sentence-link-btn lf-u-bg-none lf-u-b-none lf-u-c-accent-ink lf-u-fs-11p5px lf-u-fw-600 lf-u-cur-pointer lf-u-p-2px-4px lf-u-td-underline" id="lf-view-parent-sentence-btn">
-                  View Full Sentence Grammar X-Ray →
+                  View Full Sentence Grammar →
                 </button>
               </div>
             ` : ''}
