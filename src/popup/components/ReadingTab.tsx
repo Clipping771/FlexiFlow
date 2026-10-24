@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AlertCircle, BookOpen, Check, ChevronDown, ChevronUp, FileText, Globe, Info, RotateCcw, Sparkles, X } from 'lucide-react';
 import { Onboarding, PopupTextSize } from './Onboarding';
 
@@ -28,6 +28,8 @@ interface ReadingTabProps {
   dueCount: number;
   setPopupTab: (tab: 'reading' | 'lookup' | 'library') => void;
   currentDomain: string;
+  /** The active tab's favicon URL, when the browser has one. */
+  currentFavicon?: string;
   textSize: PopupTextSize;
   showOnboarding: boolean;
   dismissOnboarding: () => void;
@@ -49,12 +51,32 @@ interface ReadingTabProps {
   meaningLanguageLabel: string;
 }
 
+/** The site's own favicon, or a globe when it has none or it fails to load. */
+const SiteIcon: React.FC<{ src?: string }> = ({ src }) => {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+
+  if (!src || failed) return <Globe size={15} className="site-banner-icon" />;
+  return (
+    <img
+      src={src}
+      alt=""
+      width={18}
+      height={18}
+      className="site-banner-favicon"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+    />
+  );
+};
+
 /** Reading AI tab: site switch, article scan and highlight controls, and progress at a glance. */
 export const ReadingTab: React.FC<ReadingTabProps> = ({
   savedCount,
   dueCount,
   setPopupTab,
   currentDomain,
+  currentFavicon,
   textSize,
   showOnboarding,
   dismissOnboarding,
@@ -83,7 +105,7 @@ export const ReadingTab: React.FC<ReadingTabProps> = ({
     <div className="reading-site-banner">
       <div className="site-banner-left">
         <span className="site-banner-icon-tile">
-          <Globe size={15} className="site-banner-icon" />
+          <SiteIcon src={currentFavicon} />
         </span>
         <div className="site-banner-info">
           <span className="site-banner-domain">{currentDomain || 'Current web page'}</span>

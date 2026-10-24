@@ -2549,6 +2549,14 @@ body {
   color: var(--hub-ink-muted);
 }
 
+.popup-container .site-banner-favicon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  object-fit: contain;
+  display: block;
+}
+
 .popup-container .site-banner-info {
   flex-direction: column;
   align-items: flex-start;

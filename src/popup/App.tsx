@@ -286,6 +286,7 @@ export const App: React.FC = () => {
 
   // Site domain & whitelist/blacklist toggle (eJOY-style)
   const [currentDomain, setCurrentDomain] = useState<string>('');
+  const [currentFavicon, setCurrentFavicon] = useState<string>('');
   const [disabledSites, setDisabledSites] = useState<string[]>([]);
 
   // Text size: small, medium, large, xlarge
@@ -353,6 +354,9 @@ export const App: React.FC = () => {
               if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
                 const host = parsed.hostname.replace(/^www\./, '');
                 setCurrentDomain(host);
+                // The browser already loaded this icon for the tab, so showing it costs no extra lookup
+                const icon = tabs[0].favIconUrl || '';
+                if (/^(https?:|data:image\/)/.test(icon)) setCurrentFavicon(icon);
                 // Fetch page highlight state from content script
                 chrome.tabs.sendMessage(tabId, { type: 'GET_PAGE_HIGHLIGHT_STATE' }, (res) => {
                   if (chrome.runtime?.lastError) {
@@ -1027,6 +1031,7 @@ export const App: React.FC = () => {
             dueCount={dueCount}
             setPopupTab={setPopupTab}
             currentDomain={currentDomain}
+            currentFavicon={currentFavicon}
             textSize={textSize}
             showOnboarding={showOnboarding}
             dismissOnboarding={dismissOnboarding}
