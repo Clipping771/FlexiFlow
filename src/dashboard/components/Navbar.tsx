@@ -8,7 +8,8 @@ import {
   PenTool,
   BarChart3,
   Settings as SettingsIcon,
-  PanelRight
+  PanelRight,
+  BookmarkCheck
 } from 'lucide-react';
 
 export type DashboardTab =
@@ -16,6 +17,7 @@ export type DashboardTab =
   | 'vocabulary'
   | 'targeted_practice'
   | 'review'
+  | 'reading_list'
   | 'sentence_xray'
   | 'word_difference'
   | 'usage_coach'
@@ -94,6 +96,16 @@ export const Navbar: React.FC<NavbarProps> = ({
             </span>
             <span className="nav-item-label">Targeted Practice</span>
             {weakCount > 0 && <span className="badge-count badge-warning">{weakCount}</span>}
+          </button>
+
+          <button
+            className={`nav-item ${activeTab === 'reading_list' ? 'active' : ''}`}
+            onClick={() => onTabChange('reading_list')}
+          >
+            <span className="nav-icon-box">
+              <BookmarkCheck size={16} strokeWidth={2} />
+            </span>
+            <span className="nav-item-label">Reading List</span>
           </button>
         </div>
 

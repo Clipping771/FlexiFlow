@@ -1898,3 +1898,118 @@ html body [lang]:lang(th) {
 html body [lang]:lang(he) {
   font-family: "Segoe UI", "Arial Hebrew", "Noto Sans Hebrew", "Arial", sans-serif;
 }
+
+/* ============================================================
+   Reading List
+   ============================================================ */
+
+.rl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rl-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.rl-card.is-read .rl-title {
+  color: var(--text-muted);
+}
+
+.rl-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.rl-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-main);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.rl-title:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.rl-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.rl-done {
+  color: var(--success);
+}
+
+.rl-words {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.rl-words-label,
+.rl-more {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.rl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.rl-actions .btn-primary,
+.rl-actions .btn-secondary {
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+
+.rl-remove:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.rl-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.rl-empty h3 {
+  color: var(--text-main);
+  font-size: 16px;
+}
+
+@media (max-width: 720px) {
+  .rl-card {
+    flex-direction: column;
+  }
+
+  .rl-actions {
+    justify-content: flex-start;
+  }
+}
+

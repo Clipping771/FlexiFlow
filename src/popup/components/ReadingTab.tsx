@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, BookOpen, Check, ChevronDown, ChevronUp, FileText, Globe, Info, RotateCcw, Sparkles, X } from 'lucide-react';
+import { AlertCircle, BookmarkCheck, BookmarkPlus, BookOpen, Check, ChevronDown, ChevronUp, FileText, Globe, Info, ListChecks, RotateCcw, Sparkles, X } from 'lucide-react';
 import { Onboarding, PopupTextSize } from './Onboarding';
 
 /** What the content script reports about highlights on the active page. */
 export interface PageHighlightState {
   isSiteDisabled: boolean;
   articleTitle?: string;
+  articleWordCount?: number;
   hasMainArticle: boolean;
   count: { total: number; visible: number; words: number; phrases: number; idioms: number };
   currentIndex: number;
@@ -30,6 +31,10 @@ interface ReadingTabProps {
   currentDomain: string;
   /** The active tab's favicon URL, when the browser has one. */
   currentFavicon?: string;
+  /** Read Later state for the active page; null on pages that cannot be saved (non-web tabs). */
+  readLater: { saved: boolean; unreadCount: number } | null;
+  onToggleReadLater: () => void;
+  onOpenReadingList: () => void;
   textSize: PopupTextSize;
   showOnboarding: boolean;
   dismissOnboarding: () => void;
@@ -77,6 +82,9 @@ export const ReadingTab: React.FC<ReadingTabProps> = ({
   setPopupTab,
   currentDomain,
   currentFavicon,
+  readLater,
+  onToggleReadLater,
+  onOpenReadingList,
   textSize,
   showOnboarding,
   dismissOnboarding,
@@ -126,6 +134,25 @@ export const ReadingTab: React.FC<ReadingTabProps> = ({
         <div className="reading-toggle-thumb" />
       </div>
     </div>
+
+    {readLater && (
+      <div className="read-later-row">
+        <button
+          type="button"
+          className={`read-later-btn ${readLater.saved ? 'saved' : ''}`}
+          onClick={onToggleReadLater}
+          aria-pressed={readLater.saved}
+          title={readLater.saved ? 'Remove this article from your reading list' : 'Save this article to read later'}
+        >
+          {readLater.saved ? <BookmarkCheck size={14} /> : <BookmarkPlus size={14} />}
+          <span>{readLater.saved ? 'Saved for later' : 'Save for later'}</span>
+        </button>
+        <button type="button" className="read-later-link" onClick={onOpenReadingList}>
+          <ListChecks size={13} />
+          <span>Reading list{readLater.unreadCount > 0 ? ` (${readLater.unreadCount})` : ''}</span>
+        </button>
+      </div>
+    )}
 
     {!isCurrentSiteEnabled ? (
       <div className="reading-paused-card">

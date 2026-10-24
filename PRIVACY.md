@@ -27,7 +27,8 @@ LexiFlow is provided by **[TODO: your name or company]** ("we"). Contact: **[TOD
 
 | Data | Where | Purpose |
 |------|-------|---------|
-| Saved vocabulary, notes, spaced-repetition (FSRS) history | IndexedDB (`lexiflow_db`) | Your word library and reviews |
+| Saved vocabulary, notes, spaced-repetition (FSRS) history, and the address and title of the page each word was saved from | IndexedDB (`lexiflow_db`) | Your word library and reviews, and linking words to the article they came from |
+| Reading list: the address, title and length of articles you press "Save for later" on (never their text) | `chrome.storage.local` | Coming back to those articles |
 | Settings, and API keys for your own AI provider if you add them | `chrome.storage.local` | Preferences and connecting to that provider |
 | LexiFlow Cloud sign-in tokens | `chrome.storage.local` (refresh token), `chrome.storage.session` (access token) | Keeping you signed in |
 | Cached explanations, a local usage log (feature events such as "word saved" with the selection type, never the text), wrong-meaning reports | `chrome.storage.local` / memory | Faster repeat lookups and local diagnostics |

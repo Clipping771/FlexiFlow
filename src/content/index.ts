@@ -430,6 +430,7 @@ class ContentScriptManager {
             data: {
               isSiteDisabled: this.isSiteDisabled(),
               articleTitle: article?.title || document.title,
+              articleWordCount: article?.cleanText ? article.cleanText.split(/\s+/).filter(Boolean).length : 0,
               hasMainArticle: Boolean(article && article.paragraphs.length > 0),
               count,
               currentIndex: (this.highlighter as any)?.currentIndex ?? -1,
@@ -632,7 +633,13 @@ class ContentScriptManager {
           );
         },
         onSave: async (item: VocabularyItem) => {
-          await this.sendMessage('SAVE_VOCAB', { item });
+          // Remember where the word was met so the Reading List can link saved words to their article
+          const withSource: VocabularyItem = {
+            ...item,
+            pageUrl: item.pageUrl || window.location.href,
+            pageTitle: item.pageTitle || document.title
+          };
+          await this.sendMessage('SAVE_VOCAB', { item: withSource });
         },
         onChangeMode: (mode: SelectionType) => {
           if (this.currentAnchorRect) {

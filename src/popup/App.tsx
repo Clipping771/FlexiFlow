@@ -22,6 +22,7 @@ import { AIService } from '../services/ai';
 import { SettingsService } from '../services/storage/settings';
 import { FSRSEngine } from '../services/fsrs/engine';
 import { getLanguageConfig } from '../config/languages';
+import { ReadingListService, ReadingListItem } from '../services/storage/readingList';
 import { detectSelectionType } from '../content/selection';
 import {
   Search,
@@ -341,6 +342,48 @@ export const App: React.FC = () => {
   const [showVocabDrawer, setShowVocabDrawer] = useState(false);
   const [highlightFeedback, setHighlightFeedback] = useState<{ message: string; type: 'info' | 'error' | 'success' } | null>(null);
 
+  // Read Later: the active page and whether it is already on the reading list
+  const [currentPage, setCurrentPage] = useState<{ url: string; title: string } | null>(null);
+  const [readLaterItem, setReadLaterItem] = useState<ReadingListItem | null>(null);
+  const [readingListCount, setReadingListCount] = useState(0);
+
+  const refreshReadLater = async (url: string) => {
+    try {
+      const [found, all] = await Promise.all([ReadingListService.findByUrl(url), ReadingListService.getAll()]);
+      setReadLaterItem(found);
+      setReadingListCount(all.filter((i) => !i.readAt).length);
+    } catch {
+      // storage unavailable; the button just shows the unsaved state
+    }
+  };
+
+  const toggleReadLater = async () => {
+    if (!currentPage) return;
+    try {
+      if (readLaterItem) {
+        await ReadingListService.remove(readLaterItem.id);
+      } else {
+        await ReadingListService.save({
+          url: currentPage.url,
+          title: highlightState?.articleTitle || currentPage.title,
+          wordCount: highlightState?.articleWordCount
+        });
+      }
+      await refreshReadLater(currentPage.url);
+    } catch (err) {
+      setHighlightFeedback({ message: (err as Error).message || 'Could not update your reading list.', type: 'error' });
+    }
+  };
+
+  const openReadingList = () => {
+    const url = 'dashboard.html#reading_list';
+    if (typeof chrome !== 'undefined' && chrome.tabs?.create && chrome.runtime?.getURL) {
+      chrome.tabs.create({ url: chrome.runtime.getURL(url) });
+    } else {
+      window.open(url, '_blank');
+    }
+  };
+
   useEffect(() => {
     // 0. Query active browser tab domain and highlight state
     if (typeof chrome !== 'undefined' && chrome.tabs?.query) {
@@ -357,6 +400,8 @@ export const App: React.FC = () => {
                 // The browser already loaded this icon for the tab, so showing it costs no extra lookup
                 const icon = tabs[0].favIconUrl || '';
                 if (/^(https?:|data:image\/)/.test(icon)) setCurrentFavicon(icon);
+                setCurrentPage({ url: tabs[0].url, title: tabs[0].title || host });
+                refreshReadLater(tabs[0].url);
                 // Fetch page highlight state from content script
                 chrome.tabs.sendMessage(tabId, { type: 'GET_PAGE_HIGHLIGHT_STATE' }, (res) => {
                   if (chrome.runtime?.lastError) {
@@ -1032,6 +1077,9 @@ export const App: React.FC = () => {
             setPopupTab={setPopupTab}
             currentDomain={currentDomain}
             currentFavicon={currentFavicon}
+            readLater={currentPage ? { saved: Boolean(readLaterItem), unreadCount: readingListCount } : null}
+            onToggleReadLater={toggleReadLater}
+            onOpenReadingList={openReadingList}
             textSize={textSize}
             showOnboarding={showOnboarding}
             dismissOnboarding={dismissOnboarding}

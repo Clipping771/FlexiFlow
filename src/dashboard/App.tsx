@@ -15,6 +15,7 @@ import { WeaknessDetector } from '../services/weakness/detector';
 import { FSRSEngine } from '../services/fsrs/engine';
 import { Menu, X, BookOpen, RotateCw, Settings as SettingsIcon, PanelRight } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ReadingListView } from './components/ReadingListView';
 import './dashboard.css';
 
 const TAB_TITLES: Record<DashboardTab, string> = {
@@ -22,6 +23,7 @@ const TAB_TITLES: Record<DashboardTab, string> = {
   vocabulary: 'Vocabulary Library',
   targeted_practice: 'Targeted Practice',
   review: 'Spaced Review',
+  reading_list: 'Reading List',
   sentence_xray: 'Sentence X-Ray',
   word_difference: 'Word Difference',
   usage_coach: 'Usage Coach',
@@ -40,7 +42,10 @@ const PROVIDER_NAMES: Record<string, string> = {
 };
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<DashboardTab>('vocabulary');
+  // dashboard.html#reading_list (from the popup) opens straight on that tab
+  const [activeTab, setActiveTab] = useState<DashboardTab>(() =>
+    window.location.hash === '#reading_list' ? 'reading_list' : 'vocabulary'
+  );
   const [items, setItems] = useState<VocabularyItem[]>([]);
   const [dueItems, setDueItems] = useState<VocabularyItem[]>([]);
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
@@ -703,6 +708,8 @@ export const App: React.FC = () => {
                 onReviewSubmit={handleReviewSubmit}
               />
             )}
+
+            {activeTab === 'reading_list' && <ReadingListView vocabItems={items} />}
 
             {activeTab === 'sentence_xray' && <SentenceXRayView />}
 

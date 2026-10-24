@@ -60,7 +60,7 @@ device, so a category is ticked when any feature sends it.
 | Authentication information | **Yes** | LexiFlow Cloud sign-in tokens; API keys the user adds are sent only to that AI provider. |
 | Personal communications | No | |
 | Location | **Yes** | IP address, which Cloudflare handles to serve requests. LexiFlow Cloud stores only a keyed hash of it at signup, for abuse prevention, and erases it within 48 hours. |
-| Web history | No | Visited pages are not sent. |
+| Web history | No | Visited pages are not sent. Pages the user saves to the reading list, and the page a saved word came from, are kept on the device only. |
 | User activity | No | No click, scroll, mouse or keystroke tracking. The local usage log never leaves the device. |
 | Website content | **Yes** | The text the user selects (with its sentence and paragraph), and the article text of a page when the user presses *Analyze page*, sent to the AI service they chose to generate explanations. |
 

@@ -5,6 +5,7 @@ import { FSRSEngine } from '../services/fsrs/engine';
 import { fetchProviderModels } from '../services/ai/modelFetcher';
 import { VocabularyItem, FSRSRating, SelectionType, WritingGoal, WrongMeaningReport } from '../types';
 import { setupOllamaOriginRules } from './ollamaRules';
+import { openSavedArticle } from './openArticle';
 import { setupBadgeListeners, updateAllTabBadges } from './badgeService';
 import { EventLogger, ApprovedEventName } from '../services/logging/eventLogger';
 import { AuthService, CloudAuthError } from '../services/auth/authService';
@@ -503,6 +504,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
           case 'TEST_AI_CONNECTION': {
             const result = await AIService.testConnection(payload || {});
             sendResponse({ success: true, data: result });
+            break;
+          }
+
+          case 'OPEN_SAVED_ARTICLE': {
+            const { url, highlight } = payload as { url: string; highlight?: boolean };
+            await openSavedArticle(url, Boolean(highlight));
+            sendResponse({ success: true });
             break;
           }
 
