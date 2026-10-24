@@ -50,7 +50,6 @@ Depending on the feature, an explanation request contains:
 - **Writing help:** the text you ask to improve.
 - **AI chat:** your question and the text it is about.
 - **Page highlights** (only when you press *Analyze page*): up to 15,000 characters of the page's main article text and its title.
-- **Article Reader:** runs on your device and sends nothing.
 
 Page content is never read or sent unless you trigger one of these features. With the offline mode, nothing is sent.
 

@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { AIService } from '../../services/ai';
 import { StorageService } from '../../services/storage/db';
 import { FSRSEngine } from '../../services/fsrs/engine';
-import { ArticleAnalyzer } from '../../services/article/analyzer';
 import { VocabularyItem, FSRSItemState } from '../../types';
 
 describe('LexiFlow AI Full System Integration & Regression Suite', () => {
@@ -104,37 +103,5 @@ describe('LexiFlow AI Full System Integration & Regression Suite', () => {
     const reviewResult = FSRSEngine.scheduleNextReview(cardInReview, 1);
     expect(reviewResult.reps).toBe(3);
     expect(reviewResult.lapses).toBe(1);
-  });
-
-  it('Article Reader & Intelligence: complete end-to-end extraction and draft lifecycle', async () => {
-    const article = `Autonomous vehicles rely on neural vision systems and real-time lidar telemetry. However, unpredictable weather conditions often introduce sensor noise. Consequently, redundant sensor architectures are mandatory to safeguard passenger safety.`;
-
-    const result = await ArticleAnalyzer.analyze(article, 'Autonomous Navigation Systems');
-
-    expect(result.paragraphs.length).toBe(1);
-    expect(result.connectors.length).toBeGreaterThan(0);
-    expect(result.claims.length).toBeGreaterThan(0);
-    expect(result.extractedVocabulary.length).toBeGreaterThan(0);
-
-    // Verify saving extracted vocabulary into storage with duplicate checking
-    const extractedWord = result.extractedVocabulary[0];
-    const item: VocabularyItem = {
-      id: 'vocab_extracted_1',
-      word: extractedWord.word,
-      selectionType: 'word',
-      meaning: extractedWord.contextualMeaning,
-      bengaliMeaning: extractedWord.bengaliMeaning,
-      contextSentence: extractedWord.contextSentence,
-      dateAdded: new Date().toISOString(),
-      tags: ['article_reader'],
-      collection: 'Reading Mastery',
-      difficulty: 'medium',
-      fsrs: FSRSEngine.createInitialState()
-    };
-
-    await StorageService.saveItem(item);
-    const found = await StorageService.findByWord(extractedWord.word);
-    expect(found).not.toBeNull();
-    expect(found?.word).toBe(extractedWord.word);
   });
 });

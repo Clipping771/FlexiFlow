@@ -5,7 +5,6 @@ import { Navbar, DashboardTab } from './components/Navbar';
 import { VocabularyView } from './components/VocabularyView';
 import { TargetedPracticeView } from './components/TargetedPracticeView';
 import { ReviewView } from './components/ReviewView';
-import { ArticleReaderView } from './components/ArticleReaderView';
 import { SentenceXRayView } from './components/SentenceXRayView';
 import { WordDifferenceView } from './components/WordDifferenceView';
 import { CoachView } from './components/CoachView';
@@ -14,7 +13,7 @@ import { SettingsView } from './components/SettingsView';
 import { DEFAULT_SETTINGS } from '../services/storage/settings';
 import { WeaknessDetector } from '../services/weakness/detector';
 import { FSRSEngine } from '../services/fsrs/engine';
-import { Menu, X, BookOpen, RotateCw, Newspaper, Settings as SettingsIcon, PanelRight } from 'lucide-react';
+import { Menu, X, BookOpen, RotateCw, Settings as SettingsIcon, PanelRight } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './dashboard.css';
 
@@ -23,7 +22,6 @@ const TAB_TITLES: Record<DashboardTab, string> = {
   vocabulary: 'Vocabulary Library',
   targeted_practice: 'Targeted Practice',
   review: 'Spaced Review',
-  article_reader: 'Article Reader',
   sentence_xray: 'Sentence X-Ray',
   word_difference: 'Word Difference',
   usage_coach: 'Usage Coach',
@@ -535,7 +533,6 @@ export const App: React.FC = () => {
 
   // Weakness count for badge
   const weakCount = WeaknessDetector.getTargetedPracticeList(items).length;
-  const existingVocabWordSet = new Set(items.map((i) => i.word.toLowerCase().trim()));
 
   if (loading) {
     return (
@@ -697,13 +694,6 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'article_reader' && (
-              <ArticleReaderView
-                onSaveVocabulary={handleSaveVocabulary}
-                existingVocabWords={existingVocabWordSet}
-              />
-            )}
-
             {activeTab === 'sentence_xray' && <SentenceXRayView />}
 
             {activeTab === 'word_difference' && <WordDifferenceView />}
@@ -744,14 +734,6 @@ export const App: React.FC = () => {
                 <RotateCw size={16} />
                 <span>Review</span>
                 {dueItems.length > 0 && <span className="bottom-nav-pill">{dueItems.length}</span>}
-              </button>
-              <button
-                type="button"
-                className={`bottom-nav-item ${activeTab === 'article_reader' ? 'active' : ''}`}
-                onClick={() => handleTabSelect('article_reader')}
-              >
-                <Newspaper size={16} />
-                <span>Reader</span>
               </button>
               <button
                 type="button"

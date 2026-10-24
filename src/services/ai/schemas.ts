@@ -716,64 +716,6 @@ export const FollowUpResponseSchema = z.preprocess((val: any) => {
   })).default([])
 }));
 
-export const ArticleAnalysisSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  sourceUrl: z.string().optional(),
-  rawText: z.string(),
-  createdAt: z.string(),
-  summary: z.object({
-    mainIdea: z.string(),
-    conciseSummary: z.string(),
-    keyTakeaways: z.array(z.string()).default([]),
-    centralArgument: z.string()
-  }),
-  paragraphs: z.array(z.object({
-    paragraphIndex: z.number(),
-    originalText: z.string(),
-    explanation: z.string(),
-    sentenceClarifications: z.array(z.object({
-      sentence: z.string(),
-      clarification: z.string()
-    })).default([]),
-    difficultVocabulary: z.array(z.object({
-      word: z.string(),
-      meaningInContext: z.string(),
-      bengali: z.string()
-    })).default([]),
-    bengaliExplanation: z.string().optional()
-  })).default([]),
-  connectors: z.array(z.object({
-    expression: z.string(),
-    type: z.enum(['contrast', 'cause_effect', 'concession', 'addition', 'example', 'conclusion', 'transition']),
-    functionInContext: z.string(),
-    paragraphIndex: z.number()
-  })).default([]),
-  claims: z.array(z.object({
-    claim: z.string(),
-    paragraphIndex: z.number(),
-    evidenceProvided: z.string().optional(),
-    isAssertedWithoutEvidence: z.boolean().default(false),
-    excerpt: z.string(),
-    aiInference: z.string().optional(),
-    examples: z.array(z.string()).optional()
-  })).default([]),
-  argumentStructure: z.object({
-    developmentFlow: z.string(),
-    paragraphRelationships: z.array(z.string()).default([]),
-    mainSupportingReasons: z.array(z.string()).default([]),
-    counterargumentsAndConcessions: z.array(z.string()).optional(),
-    conclusionRole: z.string()
-  }),
-  extractedVocabulary: z.array(z.object({
-    word: z.string(),
-    partOfSpeech: z.string().optional(),
-    contextualMeaning: z.string(),
-    bengaliMeaning: z.string(),
-    contextSentence: z.string()
-  })).default([])
-});
-
 // Stage A — Immediate Contextual Explanation Schema
 export const StageAContextualSchema = z.object({
   selectedText: z.string().min(1),

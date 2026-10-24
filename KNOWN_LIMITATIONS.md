@@ -19,11 +19,6 @@ LexiFlow supports multi-provider LLM integrations configured directly in user se
 
 ## 3. Quotas, Rate Limits & Token Limits
 - Cloud LLM providers apply tier-based rate limits (e.g., Gemini Free tier: 15 RPM; OpenAI pay-as-you-go). When rate limits occur, LexiFlow presents actionable error indicators and utilizes in-memory LRU caching to eliminate redundant API requests for identical text selections.
-- **Article Reader Context Limits & Auto-Chunking**:
-  - Articles under 1,200 words (~7,000 characters) are analyzed in a single unified prompt.
-  - Long documents exceeding 1,200 words automatically trigger ordered paragraph chunking. Chunking preserves paragraph numbering and discourse continuity across sections without silently dropping text.
-  - Character and token counts are estimated client-side prior to submission.
-  - Active analysis requests can be cancelled at any time via the UI without leaving orphaned background tasks.
 
 ## 4. Personal Weakness Scoring Engine
 The Personal Weakness Detector operates deterministically using the user's actual historical learning data:
@@ -45,7 +40,7 @@ LexiFlow implements the modern Free Spaced Repetition Scheduler (FSRS v5):
 ## 6. Chrome Side Panel Integration
 - Manifest V3 native Side Panel (`sidePanel` permission) is configured via `dashboard.html`.
 - Users can launch the side panel directly from the extension popup, dashboard navigation bar, or Chrome action bar.
-- Allows reading long-form web articles and using the Article Reader side-by-side with active browser tabs.
+- Allows reading long-form web articles with the dashboard side-by-side with active browser tabs.
 - Backward compatibility: On Chromium environments where `chrome.sidePanel` is disabled or unsupported, LexiFlow automatically falls back to opening the full dashboard tab in the browser window.
 - The floating contextual popup and selection trigger continue to operate uninterrupted on all standard web pages.
 
@@ -58,7 +53,7 @@ LexiFlow implements the modern Free Spaced Repetition Scheduler (FSRS v5):
 
 ## 8. Browser Sandbox & Restricted Pages
 - **Chrome Internal Pages**: Content scripts cannot run on `chrome://*`, `chrome-extension://*`, or Chrome Web Store pages due to native browser security policies.
-- **Embedded PDF Viewer**: Built-in Chrome PDF viewer (`chrome-extension://mhjfb...`) restricts arbitrary DOM script injection. Users should copy and paste PDF passages into the Article Reader or dashboard.
+- **Embedded PDF Viewer**: Built-in Chrome PDF viewer (`chrome-extension://mhjfb...`) restricts arbitrary DOM script injection. Users should copy PDF passages into a regular web page or the dashboard tools.
 - **Cross-Origin iframes**: Double-click detection inside sandboxed cross-origin iframes without script access is restricted by standard browser security models.
 - **Audio Pronunciation**: LexiFlow utilizes the browser's native `window.speechSynthesis` API labeled as "Machine voice", eliminating dependencies on external pronunciation audio CDNs. AI-generated IPA transcriptions are omitted unless explicitly confirmed by a verified phonetic dictionary source.
 

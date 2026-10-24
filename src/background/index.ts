@@ -2,7 +2,6 @@ import { AIService } from '../services/ai';
 import { StorageService } from '../services/storage/db';
 import { SettingsService } from '../services/storage/settings';
 import { FSRSEngine } from '../services/fsrs/engine';
-import { ArticleAnalyzer } from '../services/article/analyzer';
 import { fetchProviderModels } from '../services/ai/modelFetcher';
 import { VocabularyItem, FSRSRating, SelectionType, WritingGoal, WrongMeaningReport } from '../types';
 import { setupOllamaOriginRules } from './ollamaRules';
@@ -254,18 +253,6 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
               paragraphContext?: string;
             };
             const result = await AIService.analyzeSelection(text, selectionType, contextSentence, paragraphContext);
-            sendResponse({ success: true, data: result });
-            break;
-          }
-
-          case 'ANALYZE_ARTICLE': {
-            const { rawText, title, sourceUrl, mode } = payload as {
-              rawText: string;
-              title?: string;
-              sourceUrl?: string;
-              mode?: 'comprehensive' | 'summary' | 'structural' | 'vocabulary';
-            };
-            const result = await ArticleAnalyzer.analyze(rawText, title, sourceUrl, mode);
             sendResponse({ success: true, data: result });
             break;
           }

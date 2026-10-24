@@ -4,7 +4,6 @@ import {
   WritingGoal,
   WritingAssistResult,
   FollowUpResponse,
-  ArticleAnalysisResult,
   StageAExplanation,
   StageBDetailedVocabulary,
   HighlightExtractionResult,
@@ -32,7 +31,6 @@ export interface AIProvider {
   ): Promise<LinguisticAnalysisResult>;
   assistWriting(text: string, goal: WritingGoal): Promise<WritingAssistResult>;
   askFollowUp(text: string, context: string, question: string): Promise<FollowUpResponse>;
-  analyzeArticle?(rawText: string, title?: string, mode?: string, signal?: AbortSignal): Promise<ArticleAnalysisResult>;
   extractHighlights?(rawText: string, pageTitle?: string, signal?: AbortSignal): Promise<HighlightExtractionResult>;
   /** Word Difference in one call; providers without it get two analyze(word) calls. */
   compareWords?(wordA: string, wordB: string): Promise<{ wordA: LinguisticAnalysisResult; wordB: LinguisticAnalysisResult }>;

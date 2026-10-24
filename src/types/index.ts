@@ -537,87 +537,6 @@ export interface TargetedPracticeItem {
   isDismissed?: boolean;
 }
 
-// Article Reader & Reading Intelligence
-export interface ArticleSummarySection {
-  mainIdea: string;
-  conciseSummary: string;
-  keyTakeaways: string[];
-  centralArgument: string;
-}
-
-export interface ArticleParagraphItem {
-  paragraphIndex: number;
-  originalText: string;
-  explanation: string;
-  sentenceClarifications: Array<{
-    sentence: string;
-    clarification: string;
-  }>;
-  difficultVocabulary: Array<{
-    word: string;
-    meaningInContext: string;
-    bengali: string;
-  }>;
-  bengaliExplanation?: string;
-}
-
-export interface ArticleConnectorItem {
-  expression: string;
-  type: 'contrast' | 'cause_effect' | 'concession' | 'addition' | 'example' | 'conclusion' | 'transition';
-  functionInContext: string;
-  paragraphIndex: number;
-}
-
-export interface ArticleClaimItem {
-  claim: string;
-  paragraphIndex: number;
-  evidenceProvided?: string;
-  isAssertedWithoutEvidence: boolean;
-  excerpt: string;
-  aiInference?: string;
-  examples?: string[];
-}
-
-export interface ArticleArgumentStructure {
-  developmentFlow: string;
-  paragraphRelationships: string[];
-  mainSupportingReasons: string[];
-  counterargumentsAndConcessions?: string[];
-  conclusionRole: string;
-}
-
-export interface ArticleExtractedVocab {
-  word: string;
-  partOfSpeech?: string;
-  contextualMeaning: string;
-  bengaliMeaning: string;
-  contextSentence: string;
-}
-
-export interface ArticleAnalysisResult {
-  id: string;
-  title: string;
-  sourceUrl?: string;
-  rawText: string;
-  createdAt: string;
-  summary: ArticleSummarySection;
-  paragraphs: ArticleParagraphItem[];
-  connectors: ArticleConnectorItem[];
-  claims: ArticleClaimItem[];
-  argumentStructure: ArticleArgumentStructure;
-  extractedVocabulary: ArticleExtractedVocab[];
-}
-
-export interface ArticleDraft {
-  id: string;
-  title: string;
-  sourceUrl?: string;
-  rawText: string;
-  analysisMode: 'comprehensive' | 'summary' | 'structural' | 'vocabulary';
-  lastModified: string;
-  analysisResult?: ArticleAnalysisResult;
-}
-
 // Offline Lexicon / Fallback types
 export interface PhoneticItem {
   text?: string;
@@ -708,7 +627,6 @@ export interface UserSettings {
   sourceLanguage?: string;
   targetLanguage?: string;
   customLanguages?: CustomLanguageConfig[];
-  articleDrafts?: ArticleDraft[];
   disabledSites?: string[];
   isGloballyPaused?: boolean;
   // Feature A: AI Highlight Mode

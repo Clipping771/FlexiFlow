@@ -45,7 +45,7 @@ Paste each justification into the matching field on the **Privacy practices** ta
 **"No, I am not using remote code."**
 
 > All JavaScript is bundled in the package. The extension loads no external scripts, does not use `eval` or
-> `new Function`, and runs pdf.js with eval disabled. Servers return JSON data only (explanations), never code.
+> `new Function`. Servers return JSON data only (explanations), never code.
 
 ## 4. Data usage
 
@@ -60,7 +60,7 @@ device, so a category is ticked when any feature sends it.
 | Authentication information | **Yes** | LexiFlow Cloud sign-in tokens; API keys the user adds are sent only to that AI provider. |
 | Personal communications | No | |
 | Location | **Yes** | IP address, which Cloudflare handles to serve requests. LexiFlow Cloud stores only a keyed hash of it at signup, for abuse prevention, and erases it within 48 hours. |
-| Web history | No | Visited pages are not sent; the Article Reader's source URL stays on the device. |
+| Web history | No | Visited pages are not sent. |
 | User activity | No | No click, scroll, mouse or keystroke tracking. The local usage log never leaves the device. |
 | Website content | **Yes** | The text the user selects (with its sentence and paragraph), and the article text of a page when the user presses *Analyze page*, sent to the AI service they chose to generate explanations. |
 

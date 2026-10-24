@@ -3,7 +3,6 @@ import {
   BookOpen,
   Target,
   RotateCw,
-  Newspaper,
   Microscope,
   Scale,
   PenTool,
@@ -17,7 +16,6 @@ export type DashboardTab =
   | 'vocabulary'
   | 'targeted_practice'
   | 'review'
-  | 'article_reader'
   | 'sentence_xray'
   | 'word_difference'
   | 'usage_coach'
@@ -102,16 +100,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Section: AI Studio */}
         <div className="nav-section">
           <div className="nav-section-title">AI Studio &amp; Tools</div>
-
-          <button
-            className={`nav-item ${activeTab === 'article_reader' ? 'active' : ''}`}
-            onClick={() => onTabChange('article_reader')}
-          >
-            <span className="nav-icon-box">
-              <Newspaper size={16} strokeWidth={2} />
-            </span>
-            <span className="nav-item-label">Article Reader</span>
-          </button>
 
           <button
             className={`nav-item ${activeTab === 'sentence_xray' ? 'active' : ''}`}
