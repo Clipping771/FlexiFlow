@@ -1188,7 +1188,7 @@ export class PopupView {
     this.render();
   }
 
-  private render(options?: { preserveScroll?: boolean; scrollToAskAI?: boolean; scrollToExpanded?: boolean }): void {
+  private render(options?: { preserveScroll?: boolean; scrollToAskAI?: boolean; scrollToExpanded?: boolean; scrollToFeedback?: boolean }): void {
     const contentEl = this.element.querySelector('.lf-content');
     const prevScrollTop = contentEl ? contentEl.scrollTop : 0;
 
@@ -1232,6 +1232,26 @@ export class PopupView {
         }, 50);
       } else if ((options?.preserveScroll || prevScrollTop > 0) && prevScrollTop > 0) {
         newContentEl.scrollTop = prevScrollTop;
+      }
+
+      if (options?.scrollToFeedback) {
+        // The report form renders at the bottom of the scrollable content; bring it into view
+        // within the card only (scrollIntoView could also scroll the host page).
+        setTimeout(() => {
+          const form = newContentEl.querySelector('.lf-feedback-box') as HTMLElement | null;
+          if (!form) return;
+          const formRect = form.getBoundingClientRect();
+          const boxRect = newContentEl.getBoundingClientRect();
+          // Show the whole form if it fits, otherwise keep its top edge visible
+          const delta = Math.min(formRect.bottom - boxRect.bottom + 8, formRect.top - boxRect.top - 8);
+          const top = newContentEl.scrollTop + Math.max(0, delta);
+          if (typeof newContentEl.scrollTo === 'function') {
+            newContentEl.scrollTo({ top, behavior: 'smooth' });
+          } else {
+            newContentEl.scrollTop = top;
+          }
+          (form.querySelector('.lf-feedback-reason') as HTMLElement | null)?.focus({ preventScroll: true });
+        }, 40);
       }
     }
 
@@ -3010,7 +3030,7 @@ export class PopupView {
     el.querySelector('.lf-report-trigger-btn')?.addEventListener('click', () => {
       this.showFeedbackModal = !this.showFeedbackModal;
       this.feedbackSuccess = false;
-      this.render();
+      this.render({ preserveScroll: true, scrollToFeedback: this.showFeedbackModal });
     });
 
     el.querySelector('.lf-feedback-cancel-btn')?.addEventListener('click', () => {
@@ -3199,7 +3219,7 @@ export class PopupView {
     el.querySelector('.lf-report-trigger-btn')?.addEventListener('click', () => {
       this.showFeedbackModal = !this.showFeedbackModal;
       this.feedbackSuccess = false;
-      this.render();
+      this.render({ preserveScroll: true, scrollToFeedback: this.showFeedbackModal });
     });
 
     el.querySelector('.lf-feedback-cancel-btn')?.addEventListener('click', () => {
@@ -3416,7 +3436,7 @@ export class PopupView {
     el.querySelector('.lf-report-trigger-btn')?.addEventListener('click', () => {
       this.showFeedbackModal = !this.showFeedbackModal;
       this.feedbackSuccess = false;
-      this.render();
+      this.render({ preserveScroll: true, scrollToFeedback: this.showFeedbackModal });
     });
 
     el.querySelector('.lf-feedback-cancel-btn')?.addEventListener('click', () => {
