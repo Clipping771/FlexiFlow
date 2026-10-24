@@ -4371,6 +4371,12 @@
   border-radius: 6px;
 }
 
+/* The Ask AI bar already shows focus around the whole bar (:focus-within); a second ring on the
+   input inside it reads as a doubled border */
+.lexiflow-popup .lf-qa-input:focus-visible {
+  outline: none;
+}
+
 /* Loading progress line and retry action */
 .lf-loading-step {
   display: flex;
