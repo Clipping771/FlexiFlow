@@ -109,7 +109,7 @@ export const CoachView: React.FC<CoachViewProps> = ({ initialWord }) => {
 
             <div style={{ marginTop: '12px', background: 'rgba(0, 113, 227, 0.05)', padding: '10px 14px', borderRadius: '8px', borderLeft: '3px solid var(--accent)' }}>
               <strong style={{ fontSize: '12px', color: 'var(--accent)' }}>Bengali Coaching Feedback:</strong>
-              <p style={{ color: '#48484a', fontSize: '13px', marginTop: '3px', lineHeight: 1.45 }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '3px', lineHeight: 1.45 }}>
                 {feedback.bengaliFeedback}
               </p>
             </div>

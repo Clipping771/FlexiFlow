@@ -1,7 +1,11 @@
 import { calculatePopupPosition, clampPositionToViewport } from './positioning';
 import { getSelectionData, isEditableElement, detectSelectionType } from './selection';
 import { POPUP_STYLES } from './styles';
+import { installBengaliFont, extensionFontUrl } from '../shared/bengaliFont';
 import { PopupView } from './popupView';
+
+/** Set once the reader dismisses the first-use tip on the reading card. */
+const CARD_TIP_KEY = 'lexiflow_card_tip_done';
 import { TriggerView } from './triggerView';
 import { DOMHighlighter } from './highlighter';
 import { HighlightToolbar } from './highlightToolbar';
@@ -38,6 +42,8 @@ class ContentScriptManager {
   private currentContextSentence: string = '';
   private currentNearbyParagraph: string = '';
   private currentAnchorRect: DOMRect | null = null;
+  /** Element to refocus when a card that took keyboard focus closes. */
+  private focusReturnTarget: HTMLElement | null = null;
 
   // Concurrency, Cancellation & Debounce controls
   private currentRequestId: number = 0;
@@ -75,6 +81,9 @@ class ContentScriptManager {
     this.shadowHost.style.pointerEvents = 'none';
 
     this.shadowRoot = this.shadowHost.attachShadow({ mode: 'open' });
+
+    // Bengali typeface for the card (font faces must be declared on the page document)
+    installBengaliFont(document, extensionFontUrl);
 
     // Inject scoped stylesheet
     const styleEl = document.createElement('style');
@@ -407,7 +416,7 @@ class ContentScriptManager {
           } as DOMRect;
           const clean = text.trim();
           const selType = detectSelectionType(clean);
-          this.executeAnalysis(clean, selType, clean, '', dummyRect);
+          this.executeAnalysis(clean, selType, clean, '', dummyRect, { focusCard: true });
           sendResponse?.({ success: true });
           return;
         }
@@ -540,7 +549,8 @@ class ContentScriptManager {
           data.selectionType,
           data.contextSentence,
           data.nearbyParagraph,
-          data.rect
+          data.rect,
+          { focusCard: true }
         );
       });
       return;
@@ -582,7 +592,8 @@ class ContentScriptManager {
     selectionType: SelectionType,
     contextSentence: string,
     nearbyParagraph: string,
-    anchorRect: DOMRect
+    anchorRect: DOMRect,
+    options: { focusCard?: boolean } = {}
   ): void {
     const requestId = ++this.currentRequestId;
     this.activeAbortController?.abort();
@@ -601,6 +612,11 @@ class ContentScriptManager {
     if (!this.popupView) {
       this.popupView = new PopupView({
         onClose: () => this.hidePopup(),
+        onDismissTip: () => {
+          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            chrome.storage.local.set({ [CARD_TIP_KEY]: true });
+          }
+        },
         onRetry: () => {
           if (!this.currentText || !this.currentAnchorRect) return;
           this.executeAnalysis(
@@ -680,6 +696,12 @@ class ContentScriptManager {
         }
       });
       this.shadowRoot.appendChild(this.popupView.getElement());
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        const view = this.popupView;
+        chrome.storage.local.get(CARD_TIP_KEY, (res) => {
+          if (!res?.[CARD_TIP_KEY]) view.setFirstUseTip(true);
+        });
+      }
     }
 
     const popupEl = this.popupView.getElement();
@@ -689,6 +711,11 @@ class ContentScriptManager {
     popupEl.style.setProperty('display', 'flex', 'important');
     popupEl.style.setProperty('visibility', 'visible', 'important');
     popupEl.style.pointerEvents = 'auto';
+    if (options.focusCard) {
+      const active = document.activeElement;
+      this.focusReturnTarget = active instanceof HTMLElement && active !== document.body ? active : null;
+      this.popupView.focusCard();
+    }
 
     // Telemetry: Record approved popup_shown lifecycle event (no text, URLs, or personal data)
     this.sendMessage('LOG_EVENT', {
@@ -856,6 +883,11 @@ class ContentScriptManager {
       el.style.setProperty('display', 'none', 'important');
       el.style.setProperty('visibility', 'hidden', 'important');
       el.style.pointerEvents = 'none';
+      // Give keyboard focus back to where the reader was before the card took it
+      if (this.shadowRoot?.activeElement && this.focusReturnTarget?.isConnected) {
+        this.focusReturnTarget.focus({ preventScroll: true });
+      }
+      this.focusReturnTarget = null;
     }
   }
 

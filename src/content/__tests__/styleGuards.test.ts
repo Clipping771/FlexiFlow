@@ -83,12 +83,12 @@ describe('Stylesheet guards', () => {
 
   it('reading card markup keeps fixed styling in CSS classes, not inline styles', () => {
     const src = read('src/content/popupView.ts');
-    // Allowed inline: values computed at render time (${...}) and display toggles the view reads back.
+    // Only values computed at render time (${...}) may stay inline; visibility uses the hidden attribute.
     const fixedInline = [...src.matchAll(/style="([^"]*)"/g)]
       .map((m) => m[1])
-      .filter((style) => !style.includes('${'))
-      .filter((style) => !/^\s*display:\s*(none|block);?\s*$/.test(style));
+      .filter((style) => !style.includes('${'));
     expect(fixedInline).toEqual([]);
+    expect(src).not.toMatch(/\.style\.display\s*=/);
   });
 
   it('reading card ink tokens stay readable in light and dark themes', () => {

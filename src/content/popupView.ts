@@ -26,6 +26,7 @@ import { getValidatedWhyThisMatters, findDiscourseConnectors, MatchedConnector }
 import { generateCloze } from '../services/cloze/generator';
 import { getSentenceOverviewTeaching, buildBeginnerBreakdownSections } from '../services/grammar/grammarL10n';
 import { decodeHtml, escapeHtml, isValidExampleTranslation, lfIcon } from './popupHtml';
+import { DragResizeController } from './dragResize';
 import {
   CardRenderContext,
   renderPhraseBreakdownHtml as renderPhraseBreakdownHtmlImpl,
@@ -57,6 +58,8 @@ export interface PopupCallbacks {
   onUpdateSettings?: (updates: Partial<UserSettings>) => Promise<void>;
   /** Re-runs the last lookup after a failure. */
   onRetry?: () => void;
+  /** The reader closed the first-use tip; it should not show again. */
+  onDismissTip?: () => void;
 }
 
 export class PopupView {
@@ -89,33 +92,8 @@ export class PopupView {
   private isFollowUpLoading: boolean = false;
   private callbacks: PopupCallbacks;
 
-  // Header drag movement state
-  private isDragging: boolean = false;
-  private isUserDragged: boolean = false;
-  private dragStartX: number = 0;
-  private dragStartY: number = 0;
-  private dragInitialLeft: number = 0;
-  private dragInitialTop: number = 0;
-  private activePointerId: number | null = null;
-  private currentHeaderEl: HTMLElement | null = null;
-  private boundPointerMove: ((e: PointerEvent) => void) | null = null;
-  private boundPointerUp: ((e: PointerEvent) => void) | null = null;
-  private boundPointerCancel: ((e: PointerEvent) => void) | null = null;
-
-  // 8-Directional Resizing state
-  private isResizing: boolean = false;
-  private isUserResized: boolean = false;
-  private resizeDirection: string = '';
-  private resizeStartX: number = 0;
-  private resizeStartY: number = 0;
-  private resizeInitialRect: DOMRect | null = null;
-  private activeResizePointerId: number | null = null;
-  private activeResizeHandle: HTMLElement | null = null;
-  private boundResizeMove: ((e: PointerEvent) => void) | null = null;
-  private boundResizeUp: ((e: PointerEvent) => void) | null = null;
-  private boundResizeCancel: ((e: PointerEvent) => void) | null = null;
-  private userResizedWidth: number | null = null;
-  private userResizedHeight: number | null = null;
+  // Header dragging and edge resizing
+  private dragResize: DragResizeController;
 
   private currentSize: 'small' | 'medium' | 'large' | 'xlarge' = 'medium';
   private sourceLanguage: string = 'en';
@@ -131,6 +109,7 @@ export class PopupView {
     this.element.setAttribute('role', 'dialog');
     this.element.setAttribute('aria-label', 'LexiFlow Definition');
     this.element.tabIndex = -1;
+    this.dragResize = new DragResizeController(this.element, () => this.callbacks.onResize?.());
     this.setupListeners();
   }
 
@@ -218,9 +197,58 @@ export class PopupView {
     }, 1800);
   }
 
+  private showFirstUseTip = false;
+
+  setFirstUseTip(show: boolean): void {
+    this.showFirstUseTip = show;
+    this.renderFirstUseTip();
+  }
+
+  /** Moves keyboard focus into the card (used when the reader explicitly opened it). */
+  focusCard(): void {
+    this.element.focus({ preventScroll: true });
+  }
+
+  /** Inserts the one-time tip at the top of the card content after each render. */
+  private renderFirstUseTip(): void {
+    const existing = this.element.querySelector('.lf-first-tip');
+    if (!this.showFirstUseTip) {
+      existing?.remove();
+      return;
+    }
+    const host = this.element.querySelector('.lf-content:not(.lf-skeleton-content)');
+    if (!host || existing) return;
+    const tip = document.createElement('div');
+    tip.className = 'lf-first-tip';
+    tip.setAttribute('role', 'note');
+    tip.innerHTML = `
+      <span class="lf-first-tip-text"><strong>Tip:</strong> click any word in this card to see its meaning. Use <strong>Aa</strong> to change the text size.</span>
+      <button type="button" class="lf-first-tip-close" aria-label="Dismiss tip">${lfIcon('close')}</button>
+    `;
+    host.prepend(tip);
+  }
+
   private renderRetryHtml(): string {
     if (!this.callbacks.onRetry) return '';
     return `<button type="button" class="lf-retry-btn">${lfIcon('refresh')}<span>Try again</span></button>`;
+  }
+
+  /** Tab and Shift+Tab cycle through the card's controls instead of leaving it for the page. */
+  private keepFocusInside(e: KeyboardEvent): void {
+    const focusable = Array.from(this.element.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select, textarea, a[href], summary, [tabindex]:not([tabindex="-1"])'
+    )).filter((el) => !el.closest('[hidden]') && el.getClientRects().length > 0);
+    if (!focusable.length) return;
+    const root = this.element.getRootNode() as Document | ShadowRoot;
+    const current = (root.activeElement as HTMLElement | null) || null;
+    const i = current ? focusable.indexOf(current) : -1;
+    const next = e.shiftKey
+      ? (i <= 0 ? focusable[focusable.length - 1] : null)
+      : (i === focusable.length - 1 || i === -1 ? focusable[0] : null);
+    if (next) {
+      e.preventDefault();
+      next.focus();
+    }
   }
 
   /** Gives every segmented control tab semantics and roving focus so it works from the keyboard. */
@@ -354,13 +382,13 @@ export class PopupView {
   }
 
   isUserDraggedMode(): boolean {
-    return this.isUserDragged;
+    return this.dragResize.isUserDragged;
   }
 
   resetDrag(): void {
-    this.finishDrag();
-    this.finishResize();
-    this.isUserDragged = false;
+    this.dragResize.finishDrag();
+    this.dragResize.finishResize();
+    this.dragResize.isUserDragged = false;
   }
 
   setParentSentence(parent: SentenceAnalysisResult | null): void {
@@ -406,6 +434,12 @@ export class PopupView {
         this.callbacks.onRetry?.();
         return;
       }
+      if (target?.closest('.lf-first-tip-close')) {
+        this.showFirstUseTip = false;
+        this.renderFirstUseTip();
+        this.callbacks.onDismissTip?.();
+        return;
+      }
       if (target?.closest('.lf-textsize-btn')) {
         const menu = this.element.querySelector('.lf-textsize-menu') as HTMLElement | null;
         this.setTextSizeMenuOpen(Boolean(menu?.hidden));
@@ -449,6 +483,10 @@ export class PopupView {
 
     // Keyboard navigation & accessible Escape behavior
     this.element.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        this.keepFocusInside(e);
+        return;
+      }
       const tab = (e.target as HTMLElement | null)?.closest('[role="tab"]') as HTMLElement | null;
       if (tab && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
         const tabs = Array.from(tab.closest('[role="tablist"]')?.querySelectorAll<HTMLElement>('[role="tab"]') || []);
@@ -495,6 +533,7 @@ export class PopupView {
 
   private isolateInteractiveElements(): void {
     this.enhanceTabAccessibility();
+    this.renderFirstUseTip();
     const interactives = this.element.querySelectorAll<HTMLElement>(
       'button, input, select, textarea, a, .lf-btn-icon, .lf-tab, .lf-sentence-word, .lf-quick-chip, .lf-vocab-chip-btn, [role="button"]'
     );
@@ -510,308 +549,13 @@ export class PopupView {
   }
 
   private setupDragHandler(): void {
-    const header = this.element.querySelector('.lf-header') as HTMLElement | null;
-    if (!header) return;
-
-    this.currentHeaderEl = header;
-
-    header.addEventListener('pointerdown', (e: PointerEvent) => {
-      // Allow only primary button (0 for mouse) or touch/pen (0)
-      if (e.button !== 0) return;
-
-      // Do not initiate drag when user clicks interactive buttons, tabs, input controls, or interactive words
-      const target = e.target as HTMLElement | null;
-      if (
-        target?.closest('button, input, select, textarea, a, .lf-btn-icon, .lf-tab, .lf-sentence-word, .lf-back-sentence-btn, [role="button"]')
-      ) {
-        return;
-      }
-
-      e.preventDefault();
-      e.stopPropagation();
-
-      this.isDragging = true;
-      this.isUserDragged = true;
-      this.activePointerId = e.pointerId;
-
-      document.documentElement.style.setProperty('cursor', 'move', 'important');
-      document.documentElement.style.setProperty('user-select', 'none', 'important');
-
-      try {
-        header.setPointerCapture(e.pointerId);
-      } catch {
-        // Fallback if setPointerCapture is unsupported in environment
-      }
-
-      this.dragStartX = e.clientX;
-      this.dragStartY = e.clientY;
-
-      const currentRect = this.element.getBoundingClientRect();
-      this.dragInitialLeft = currentRect.left;
-      this.dragInitialTop = currentRect.top;
-
-      header.classList.add('dragging');
-      this.element.classList.add('dragging');
-
-      this.removeDragWindowListeners();
-
-      this.boundPointerMove = (moveEv: PointerEvent) => {
-        if (!this.isDragging) return;
-        if (this.activePointerId !== null && moveEv.pointerId !== this.activePointerId) return;
-        moveEv.preventDefault();
-
-        const deltaX = moveEv.clientX - this.dragStartX;
-        const deltaY = moveEv.clientY - this.dragStartY;
-
-        const rawLeft = this.dragInitialLeft + deltaX;
-        const rawTop = this.dragInitialTop + deltaY;
-
-        const popupWidth = this.element.offsetWidth || currentRect.width || 410;
-        const popupHeight = this.element.offsetHeight || currentRect.height || 380;
-
-        const clamped = clampPositionToViewport(
-          rawLeft,
-          rawTop,
-          popupWidth,
-          popupHeight,
-          window.innerWidth,
-          window.innerHeight,
-          8
-        );
-
-        this.element.style.left = `${clamped.left}px`;
-        this.element.style.top = `${clamped.top}px`;
-      };
-
-      this.boundPointerUp = (upEv: PointerEvent) => {
-        if (this.activePointerId !== null && upEv.pointerId !== this.activePointerId) return;
-        this.finishDrag();
-      };
-
-      this.boundPointerCancel = (cancelEv: PointerEvent) => {
-        if (this.activePointerId !== null && cancelEv.pointerId !== this.activePointerId) return;
-        this.finishDrag();
-      };
-
-      window.addEventListener('pointermove', this.boundPointerMove, { passive: false });
-      window.addEventListener('pointerup', this.boundPointerUp);
-      window.addEventListener('pointercancel', this.boundPointerCancel);
-    });
-  }
-
-  private finishDrag(): void {
-    if (!this.isDragging && this.activePointerId === null) return;
-    this.isDragging = false;
-
-    if (this.currentHeaderEl && this.activePointerId !== null) {
-      try {
-        if (this.currentHeaderEl.hasPointerCapture(this.activePointerId)) {
-          this.currentHeaderEl.releasePointerCapture(this.activePointerId);
-        }
-      } catch {
-        // Fallback for mock environments
-      }
-    }
-    this.activePointerId = null;
-
-    document.documentElement.style.removeProperty('cursor');
-    document.documentElement.style.removeProperty('user-select');
-
-    if (this.currentHeaderEl) {
-      this.currentHeaderEl.classList.remove('dragging');
-    }
-    this.element.classList.remove('dragging');
-    this.removeDragWindowListeners();
-  }
-
-  private removeDragWindowListeners(): void {
-    if (this.boundPointerMove) {
-      window.removeEventListener('pointermove', this.boundPointerMove);
-      this.boundPointerMove = null;
-    }
-    if (this.boundPointerUp) {
-      window.removeEventListener('pointerup', this.boundPointerUp);
-      this.boundPointerUp = null;
-    }
-    if (this.boundPointerCancel) {
-      window.removeEventListener('pointercancel', this.boundPointerCancel);
-      this.boundPointerCancel = null;
-    }
+    this.dragResize.setupDragHandler();
   }
 
   private setupResizeHandlers(): void {
-    const directions = ['n', 's', 'w', 'e', 'nw', 'ne', 'sw', 'se'];
-    directions.forEach((dir) => {
-      let handle = this.element.querySelector(`.lf-resize-${dir}`) as HTMLElement | null;
-      if (!handle) {
-        handle = document.createElement('div');
-        handle.className = `lf-resize-handle lf-resize-${dir}`;
-        handle.setAttribute('data-direction', dir);
-        if (dir === 'se') {
-          handle.setAttribute('title', 'Drag corner to resize diagonally');
-          handle.innerHTML = `
-            <svg class="lf-resize-grip-icon" width="10" height="10" viewBox="0 0 10 10">
-              <line x1="8" y1="2" x2="2" y2="8" stroke="#0071e3" stroke-width="1.5" stroke-linecap="round"/>
-              <line x1="8" y1="5" x2="5" y2="8" stroke="#0071e3" stroke-width="1.5" stroke-linecap="round"/>
-              <line x1="8" y1="8" x2="8" y2="8" stroke="#0071e3" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-          `;
-        }
-        this.element.appendChild(handle);
-      }
-
-      // Fresh listener
-      const newHandle = handle.cloneNode(true) as HTMLElement;
-      handle.replaceWith(newHandle);
-
-      newHandle.addEventListener('pointerdown', (e: PointerEvent) => {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        this.isResizing = true;
-        this.isUserResized = true;
-        this.isUserDragged = true;
-        this.resizeDirection = dir;
-        this.activeResizePointerId = e.pointerId;
-        this.activeResizeHandle = newHandle;
-
-        try {
-          newHandle.setPointerCapture(e.pointerId);
-        } catch {
-          // Fallback
-        }
-
-        this.resizeStartX = e.clientX;
-        this.resizeStartY = e.clientY;
-        this.resizeInitialRect = this.element.getBoundingClientRect();
-
-        const cursorMap: Record<string, string> = {
-          n: 'ns-resize',
-          s: 'ns-resize',
-          w: 'ew-resize',
-          e: 'ew-resize',
-          nw: 'nwse-resize',
-          se: 'nwse-resize',
-          ne: 'nesw-resize',
-          sw: 'nesw-resize'
-        };
-        const activeCursor = cursorMap[dir] || 'nwse-resize';
-        document.documentElement.style.setProperty('cursor', activeCursor, 'important');
-        document.documentElement.style.setProperty('user-select', 'none', 'important');
-
-        this.element.classList.add('resizing', 'is-resized');
-        this.removeResizeWindowListeners();
-
-        this.boundResizeMove = (moveEv: PointerEvent) => {
-          if (!this.isResizing || !this.resizeInitialRect) return;
-          if (this.activeResizePointerId !== null && moveEv.pointerId !== this.activeResizePointerId) return;
-          moveEv.preventDefault();
-
-          const deltaX = moveEv.clientX - this.resizeStartX;
-          const deltaY = moveEv.clientY - this.resizeStartY;
-          const init = this.resizeInitialRect;
-
-          let newWidth = init.width;
-          let newHeight = init.height;
-          let newLeft = init.left;
-          let newTop = init.top;
-
-          const minW = 310;
-          const minH = 220;
-          const maxW = Math.max(minW, window.innerWidth - 16);
-          const maxH = Math.max(minH, window.innerHeight - 16);
-
-          // Horizontal adjustment
-          if (dir.includes('e')) {
-            newWidth = Math.max(minW, Math.min(maxW - newLeft, init.width + deltaX));
-          } else if (dir.includes('w')) {
-            const clampedDeltaX = Math.min(deltaX, init.width - minW);
-            const targetLeft = Math.max(8, init.left + clampedDeltaX);
-            newWidth = Math.max(minW, init.width - (targetLeft - init.left));
-            newLeft = targetLeft;
-          }
-
-          // Vertical adjustment
-          if (dir.includes('s')) {
-            newHeight = Math.max(minH, Math.min(maxH - newTop, init.height + deltaY));
-          } else if (dir.includes('n')) {
-            const clampedDeltaY = Math.min(deltaY, init.height - minH);
-            const targetTop = Math.max(8, init.top + clampedDeltaY);
-            newHeight = Math.max(minH, init.height - (targetTop - init.top));
-            newTop = targetTop;
-          }
-
-          this.userResizedWidth = newWidth;
-          this.userResizedHeight = newHeight;
-          this.element.style.left = `${newLeft}px`;
-          this.element.style.top = `${newTop}px`;
-          this.element.style.width = `${newWidth}px`;
-          this.element.style.height = `${newHeight}px`;
-        };
-
-        this.boundResizeUp = (upEv: PointerEvent) => {
-          if (this.activeResizePointerId !== null && upEv.pointerId !== this.activeResizePointerId) return;
-          this.finishResize();
-        };
-
-        this.boundResizeCancel = (cancelEv: PointerEvent) => {
-          if (this.activeResizePointerId !== null && cancelEv.pointerId !== this.activeResizePointerId) return;
-          this.finishResize();
-        };
-
-        window.addEventListener('pointermove', this.boundResizeMove, { passive: false });
-        window.addEventListener('pointerup', this.boundResizeUp);
-        window.addEventListener('pointercancel', this.boundResizeCancel);
-      });
-    });
-
-    // If user previously resized, re-apply their custom width and height
-    if (this.isUserResized && this.userResizedWidth && this.userResizedHeight) {
-      this.element.classList.add('is-resized');
-      this.element.style.width = `${this.userResizedWidth}px`;
-      this.element.style.height = `${this.userResizedHeight}px`;
-    }
+    this.dragResize.setupResizeHandlers();
   }
 
-  private finishResize(): void {
-    if (!this.isResizing && this.activeResizePointerId === null) return;
-    this.isResizing = false;
-
-    if (this.activeResizeHandle && this.activeResizePointerId !== null) {
-      try {
-        if (this.activeResizeHandle.hasPointerCapture(this.activeResizePointerId)) {
-          this.activeResizeHandle.releasePointerCapture(this.activeResizePointerId);
-        }
-      } catch {
-        // Fallback
-      }
-    }
-    this.activeResizePointerId = null;
-    this.activeResizeHandle = null;
-
-    document.documentElement.style.removeProperty('cursor');
-    document.documentElement.style.removeProperty('user-select');
-
-    this.element.classList.remove('resizing');
-    this.removeResizeWindowListeners();
-    this.callbacks.onResize?.();
-  }
-
-  private removeResizeWindowListeners(): void {
-    if (this.boundResizeMove) {
-      window.removeEventListener('pointermove', this.boundResizeMove);
-      this.boundResizeMove = null;
-    }
-    if (this.boundResizeUp) {
-      window.removeEventListener('pointerup', this.boundResizeUp);
-      this.boundResizeUp = null;
-    }
-    if (this.boundResizeCancel) {
-      window.removeEventListener('pointercancel', this.boundResizeCancel);
-      this.boundResizeCancel = null;
-    }
-  }
 
   showLoading(text: string, type: SelectionType): void {
     const isSentence = type === 'sentence';
@@ -1155,7 +899,7 @@ export class PopupView {
         <button class="lf-btn-icon lf-close-btn" title="Close" aria-label="Close popup">${lfIcon('close')}</button>
       </div>
       <div class="lf-u-p-16px lf-u-fs-13px lf-u-c-ink lf-u-lh-1p5">
-        <strong class="lf-u-mb-6px lf-u-c-danger-ink" style="display: block;">Couldn't get an AI explanation</strong>
+        <strong class="lf-u-mb-6px lf-u-c-danger-ink lf-u-d-block">Couldn't get an AI explanation</strong>
         <span>${escapeHtml(errorMessage)}</span>
         <div class="lf-u-mt-10px lf-u-fs-11p5px lf-u-c-ink-muted">
           Check your internet connection, or your AI provider settings in the LexiFlow dashboard.
@@ -1253,13 +997,13 @@ export class PopupView {
 
     if (aiResult.example && exampleBox && exampleText) {
       exampleText.textContent = `"${aiResult.example}"`;
-      exampleBox.style.display = 'block';
+      exampleBox.hidden = false;
       if (isValidExampleTranslation(aiResult.exampleBengali) && exampleBengali) {
         exampleBengali.textContent = `(${aiResult.exampleBengali})`;
-        exampleBengali.style.display = 'block';
+        exampleBengali.hidden = false;
       } else if (exampleBengali) {
         exampleBengali.textContent = '';
-        exampleBengali.style.display = 'none';
+        exampleBengali.hidden = true;
       }
     }
 
@@ -1611,7 +1355,7 @@ export class PopupView {
                     Test memory: click to reveal answer
                   </button>
                 </div>
-                <div class="lf-cloze-answer lf-u-mt-6px lf-u-p-5px-8px lf-u-bg-rgb147-51-234-012 lf-u-r-5px lf-u-fs-12px lf-u-fw-700 lf-u-c-purple-ink" hidden style="display: none;">
+                <div class="lf-cloze-answer lf-u-mt-6px lf-u-p-5px-8px lf-u-bg-rgb147-51-234-012 lf-u-r-5px lf-u-fs-12px lf-u-fw-700 lf-u-c-purple-ink" hidden>
                   Word: <strong>${escapeHtml(cloze.targetWord)}</strong> ${a.easyBengali ? `(${escapeHtml(a.easyBengali)})` : ''}
                 </div>
               </div>
@@ -1619,9 +1363,9 @@ export class PopupView {
           })()}
 
           <!-- 4. Natural Example -->
-          <div class="lf-example-box lf-u-mb-8px lf-u-pl-8px lf-u-bl-2px-solid-rgb0-113-227-04 lf-u-fs-example lf-u-fst-italic" style="display: ${a.example ? 'block' : 'none'};">
+          <div class="lf-example-box lf-u-mb-8px lf-u-pl-8px lf-u-bl-2px-solid-rgb0-113-227-04 lf-u-fs-example lf-u-fst-italic" ${a.example ? '' : 'hidden'}>
             <span class="lf-example-text">"${this.renderInteractiveSentence(a.example || '', a.example)}"</span>
-            <div class="lf-example-bengali lf-u-fst-normal lf-u-fs-context-2 lf-u-mt-2px" style="display: ${isValidExampleTranslation(a.exampleBengali) ? 'block' : 'none'};">${isValidExampleTranslation(a.exampleBengali) ? `(${escapeHtml(a.exampleBengali || '')})` : ''}</div>
+            <div class="lf-example-bengali lf-u-fst-normal lf-u-fs-context-2 lf-u-mt-2px" ${isValidExampleTranslation(a.exampleBengali) ? '' : 'hidden'}>${isValidExampleTranslation(a.exampleBengali) ? `(${escapeHtml(a.exampleBengali || '')})` : ''}</div>
           </div>
 
           <!-- 4.5. Grammar Breakdown (Streamlined in Quick Mode, In-depth in Learn Mode) -->
@@ -1717,18 +1461,18 @@ export class PopupView {
           ${this.showAskAI ? this.renderAskAIPanel('word', a.selectedText) : ''}
 
           <!-- Compatibility Container for Stage B -->
-          <div id="lf-expanded-section" role="region" aria-label="Detailed Vocabulary" style="display: ${this.isExpanded ? 'block' : 'none'};">
+          <div id="lf-expanded-section" role="region" aria-label="Detailed Vocabulary" ${this.isExpanded ? '' : 'hidden'}>
             ${this.renderStageBContent()}
           </div>
         ` : ''}
 
         ${this.activeTab === 'ask-ai' ? `
           ${this.renderAskAIPanel('word', a.selectedText)}
-          <div id="lf-expanded-section" style="display: none;"></div>
+          <div id="lf-expanded-section" hidden></div>
         ` : ''}
 
         ${this.activeTab === 'details' ? `
-          <div id="lf-expanded-section" role="region" aria-label="Detailed Vocabulary" style="display: block;">
+          <div id="lf-expanded-section" role="region" aria-label="Detailed Vocabulary">
             ${this.renderStageBContent()}
           </div>
         ` : ''}
@@ -1738,24 +1482,13 @@ export class PopupView {
       </div>
 
       <div class="lf-footer">
+        <!-- Meanings and Ask AI live in the tabs above; the footer keeps the two actions -->
         <div class="lf-footer-left">
-          <button
-            class="lf-btn-action secondary lf-expand-btn"
-            id="lf-expand-toggle"
-            aria-expanded="${this.activeTab === 'details' || this.isExpanded}"
-            aria-controls="lf-expanded-section"
-            title="Toggle full dictionary definitions and examples"
-          >
-            ${(this.activeTab === 'details' || this.isExpanded) ? 'Overview' : `${lfIcon('book')} Meanings`}
-          </button>
-          <button type="button" class="lf-btn-action secondary lf-qa-toggle-btn" title="Ask AI follow-up" aria-label="Ask AI">
-            ${lfIcon('message')} Ask AI
-          </button>
-        </div>
-        <div class="lf-footer-right">
           <button class="lf-btn-action secondary lf-report-trigger-btn" title="Report inaccurate explanation" aria-label="Report wrong meaning">
             ${lfIcon('flag')} Report
           </button>
+        </div>
+        <div class="lf-footer-right">
           <button class="lf-btn-action lf-save-btn ${this.isSaved ? 'saved' : ''}" title="${this.readingMode === 'learn' ? 'Save with context sentence and Active Recall for spaced review' : 'Quick save vocabulary'}">
             ${this.isSaved ? (this.readingMode === 'learn' ? '✓ Saved<span class="lf-label-extra"> with Context</span>' : '✓ Saved') : (this.readingMode === 'learn' ? 'Save<span class="lf-label-extra"> with Context</span>' : '+ Save')}
           </button>
@@ -1919,26 +1652,26 @@ export class PopupView {
           ${this.showAskAI ? this.renderAskAIPanel('sentence', s.selectedText) : ''}
 
           <!-- Compatibility Container for Detailed Sentence Breakdown -->
-          <div id="lf-sentence-expanded-section" role="region" aria-label="Detailed Sentence Breakdown" style="display: ${this.isSentenceAnalysisExpanded ? 'block' : 'none'};">
+          <div id="lf-sentence-expanded-section" role="region" aria-label="Detailed Sentence Breakdown" ${this.isSentenceAnalysisExpanded ? '' : 'hidden'}>
             ${this.renderSentenceGrammarTab(s)}
           </div>
         ` : ''}
 
         ${this.activeSentenceTab === 'grammar' ? `
-          <div id="lf-sentence-expanded-section" role="region" aria-label="Grammar Analysis" style="display: block;">
+          <div id="lf-sentence-expanded-section" role="region" aria-label="Grammar Analysis">
             ${this.renderSentenceGrammarTab(s)}
           </div>
         ` : ''}
 
         ${this.activeSentenceTab === 'clauses' ? `
-          <div id="lf-sentence-expanded-section" role="region" aria-label="Clauses Breakdown" style="display: block;">
+          <div id="lf-sentence-expanded-section" role="region" aria-label="Clauses Breakdown">
             ${this.renderSentenceClausesTab(s)}
           </div>
         ` : ''}
 
         ${this.activeSentenceTab === 'ask-ai' ? `
           ${this.renderAskAIPanel('sentence', s.selectedText)}
-          <div id="lf-sentence-expanded-section" style="display: none;"></div>
+          <div id="lf-sentence-expanded-section" hidden></div>
         ` : ''}
 
         <!-- Inline Report Form across all sentence tabs -->
@@ -1946,24 +1679,13 @@ export class PopupView {
       </div>
 
       <div class="lf-footer">
+        <!-- Grammar, Clauses and Ask AI live in the tabs above; the footer keeps the two actions -->
         <div class="lf-footer-left">
-          <button
-            class="lf-btn-action secondary lf-sentence-expand-btn"
-            id="lf-sentence-expand-toggle"
-            aria-expanded="${this.isSentenceAnalysisExpanded}"
-            aria-controls="lf-sentence-expanded-section"
-            title="Expand Grammar and Clause analysis"
-          >
-            ${lfIcon('puzzle')} Grammar<span class="lf-label-extra"> &amp; Clauses</span>
-          </button>
-          <button type="button" class="lf-btn-action secondary lf-qa-toggle-btn" title="Ask AI about this sentence" aria-label="Ask AI">
-            ${lfIcon('message')} Ask AI
-          </button>
-        </div>
-        <div class="lf-footer-right">
           <button class="lf-btn-action secondary lf-report-trigger-btn" title="Report inaccurate explanation" aria-label="Report wrong meaning">
             ${lfIcon('flag')} Report
           </button>
+        </div>
+        <div class="lf-footer-right">
           <button class="lf-btn-action lf-save-btn ${this.isSaved ? 'saved' : ''}">
             ${this.isSaved ? (this.readingMode === 'learn' ? '✓ Saved<span class="lf-label-extra"> with Context</span>' : '✓ Saved') : (this.readingMode === 'learn' ? 'Save<span class="lf-label-extra"> with Context</span>' : '+ Save')}
           </button>
@@ -2070,11 +1792,11 @@ export class PopupView {
       <div class="lf-content" id="lf-main-content">
         <!-- Render Sentence Panels (Using exact same structure as normal Sentence Mode!) -->
         ${hierarchical.paragraphs.map((para, pIdx) => `
-          <div class="lf-para-panel" data-para-panel-idx="${pIdx}" style="display: ${this.activeParaIndex === pIdx ? 'block' : 'none'};">
+          <div class="lf-para-panel" data-para-panel-idx="${pIdx}" ${this.activeParaIndex === pIdx ? '' : 'hidden'}>
             ${para.sentences.map((sent, sIdx) => {
               const isSentenceVisible = (this.activeParaIndex === pIdx && this.activeParaSentenceIndex === sIdx);
               return `
-                <div class="lf-sentence-panel" data-panel-idx="${sIdx}" style="display: ${isSentenceVisible ? 'block' : 'none'};">
+                <div class="lf-sentence-panel" data-panel-idx="${sIdx}" ${isSentenceVisible ? '' : 'hidden'}>
                   <!-- A. Original Sentence Text (Exact Sentence Mode Pattern!) -->
                   <div class="lf-sentence-card">
                     <div class="lf-section-label">
@@ -2191,7 +1913,7 @@ export class PopupView {
         ${this.showFeedbackModal ? this.renderFeedbackForm(p.selectedText, p.selectedText) : ''}
 
         <!-- Expandable Paragraph Details -->
-        <div id="lf-para-expanded-section" role="region" aria-label="Paragraph Details" style="display: ${this.isSentenceAnalysisExpanded ? 'block' : 'none'};">
+        <div id="lf-para-expanded-section" role="region" aria-label="Paragraph Details" ${this.isSentenceAnalysisExpanded ? '' : 'hidden'}>
           ${this.renderParagraphAnalysisDetails(p)}
         </div>
       </div>
@@ -2591,7 +2313,7 @@ export class PopupView {
 
     return `
       <div class="lf-u-mt-10px lf-u-pt-10px lf-u-bt-0p5px-solid-rgb0-0-0-008">
-        <strong class="lf-u-fs-sublabel-2 lf-u-c-accent-ink lf-u-tt-uppercase lf-u-mb-8px" style="display: block;">
+        <strong class="lf-u-fs-sublabel-2 lf-u-c-accent-ink lf-u-tt-uppercase lf-u-mb-8px lf-u-d-block">
           📚 Senses & Meanings (${senses.length}):
         </strong>
 
@@ -2720,8 +2442,8 @@ export class PopupView {
         </div>
 
         <!-- Diagnostic Preview (only visible when opted in) -->
-        <div class="lf-feedback-preview lf-u-mb-8px lf-u-p-6px-8px lf-u-bg-rgb0-113-227-008 lf-u-b-1px-dashed-rgb0-113-227-035 lf-u-r-6px lf-u-fs-11px lf-u-lh-1p35" style="display: none;">
-          <strong class="lf-u-mb-3px lf-u-c-accent-ink" style="display: block;">Preview of diagnostic data to be included:</strong>
+        <div class="lf-feedback-preview lf-u-mb-8px lf-u-p-6px-8px lf-u-bg-rgb0-113-227-008 lf-u-b-1px-dashed-rgb0-113-227-035 lf-u-r-6px lf-u-fs-11px lf-u-lh-1p35" hidden>
+          <strong class="lf-u-mb-3px lf-u-c-accent-ink lf-u-d-block">Preview of diagnostic data to be included:</strong>
           <div><strong>Text:</strong> "${escapeHtml(selectedText)}"</div>
           ${effectiveContext ? `<div><strong>Context:</strong> "${escapeHtml(effectiveContext)}"</div>` : ''}
         </div>
@@ -3122,14 +2844,11 @@ export class PopupView {
       const ans = el.querySelector('.lf-cloze-answer') as HTMLElement | null;
       const btn = el.querySelector('.lf-reveal-cloze-btn') as HTMLElement | null;
       if (ans) {
-        const isHidden = ans.hasAttribute('hidden') || ans.style.display === 'none' || !ans.style.display;
-        if (isHidden) {
-          ans.removeAttribute('hidden');
-          ans.style.display = 'block';
+        if (ans.hidden) {
+          ans.hidden = false;
           if (btn) btn.textContent = 'Hide answer';
         } else {
-          ans.setAttribute('hidden', '');
-          ans.style.display = 'none';
+          ans.hidden = true;
           if (btn) btn.textContent = 'Test memory: click to reveal answer';
         }
       }
@@ -3291,7 +3010,7 @@ export class PopupView {
       const isChecked = (e.target as HTMLInputElement).checked;
       const previewEl = el.querySelector('.lf-feedback-preview') as HTMLElement | null;
       if (previewEl) {
-        previewEl.style.display = isChecked ? 'block' : 'none';
+        previewEl.hidden = !isChecked;
       }
     });
 
@@ -3480,7 +3199,7 @@ export class PopupView {
       const isChecked = (e.target as HTMLInputElement).checked;
       const previewEl = el.querySelector('.lf-feedback-preview') as HTMLElement | null;
       if (previewEl) {
-        previewEl.style.display = isChecked ? 'block' : 'none';
+        previewEl.hidden = !isChecked;
       }
     });
 
@@ -3552,7 +3271,7 @@ export class PopupView {
         e.stopPropagation();
         const reveal = el.querySelector('.lf-practice-answer-reveal') as HTMLElement;
         if (reveal) {
-          reveal.style.display = reveal.style.display === 'none' ? 'block' : 'none';
+          reveal.hidden = !reveal.hidden;
         }
       });
     });
@@ -3563,7 +3282,7 @@ export class PopupView {
         e.stopPropagation();
         const reveal = el.querySelector('.lf-practice-answer-reveal') as HTMLElement;
         if (reveal) {
-          reveal.style.display = 'block';
+          reveal.hidden = false;
         }
       });
     });
@@ -3697,7 +3416,7 @@ export class PopupView {
       const isChecked = (e.target as HTMLInputElement).checked;
       const previewEl = el.querySelector('.lf-feedback-preview') as HTMLElement | null;
       if (previewEl) {
-        previewEl.style.display = isChecked ? 'block' : 'none';
+        previewEl.hidden = !isChecked;
       }
     });
 

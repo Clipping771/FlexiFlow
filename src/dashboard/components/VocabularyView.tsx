@@ -605,7 +605,7 @@ export const VocabularyView: React.FC<VocabularyViewProps> = ({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button
                 className="btn-secondary"
-                style={{ color: '#ef4444', padding: '6px 12px', fontSize: '12px' }}
+                style={{ color: 'var(--danger)', padding: '6px 12px', fontSize: '12px' }}
                 onClick={() => {
                   onDeleteItem(modalItem.id);
                   setModalItem(null);
@@ -670,7 +670,7 @@ export const VocabularyView: React.FC<VocabularyViewProps> = ({
               onChange={(e) => setImportText(e.target.value)}
             />
             {importStatus && (
-              <p style={{ marginTop: '8px', fontSize: '12px', color: importStatus.includes('error') ? '#ef4444' : '#10b981' }}>
+              <p style={{ marginTop: '8px', fontSize: '12px', color: importStatus.includes('error') ? 'var(--danger)' : 'var(--success)' }}>
                 {importStatus}
               </p>
             )}

@@ -1,12 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PopupView } from '../popupView';
-import {
-  StageAExplanation,
-  StageBDetailedVocabulary,
-  SentenceAnalysisResult,
-  PhraseAnalysisResult,
-  ParagraphAnalysisResult
-} from '../../types';
+import { mockWordStageA, mockPhraseAnalysis, mockSentenceResult, mockStageB } from './fixtures';
+import { StageAExplanation, SentenceAnalysisResult, ParagraphAnalysisResult } from '../../types';
 
 describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
   let onClose: ReturnType<typeof vi.fn>;
@@ -16,102 +11,6 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
   let onSelectWord: ReturnType<typeof vi.fn>;
   let onAskFollowUp: ReturnType<typeof vi.fn>;
   let popup: PopupView;
-
-  const mockWordStageA: StageAExplanation = {
-    selectedText: 'scrutiny',
-    lemma: 'scrutiny',
-    partOfSpeech: 'noun',
-    easyEnglish: 'Very careful and thorough examination of something.',
-    easyBengali: 'পুঙ্খানুপুঙ্খ পরীক্ষা বা গভীর পর্যবেক্ষণ',
-    contextMeaning: 'In this sentence, the policy was analyzed strictly by officials.',
-    example: 'The documents were placed under close scrutiny.',
-    exampleBengali: 'নথিগুলো গভীর পর্যবেক্ষণের আওতায় আনা হয়েছিল।',
-    confidence: 'high',
-    contextualSenseId: 'sense_1'
-  };
-
-  const mockPhraseAnalysis: PhraseAnalysisResult = {
-    selectedText: 'on the other hand',
-    selectionType: 'phrase',
-    phraseType: 'fixed_expression',
-    overallMeaning: 'Used to introduce an alternative viewpoint or contrasting fact.',
-    simpleEnglishExplanation: 'Looking at another side of an argument or situation.',
-    bengaliTranslation: 'অন্য দিকে বা অপর পক্ষে',
-    literalVsFigurative: 'Figurative connective marker balancing opposing statements.',
-    whyFitsContext: 'Provides balance to the previous claim.',
-    examples: ['On the other hand, costs may increase significantly.']
-  };
-
-  const mockSentenceResult: SentenceAnalysisResult = {
-    selectedText: 'Although inflation increased rapidly, the central bank maintained steady interest rates.',
-    selectionType: 'sentence',
-    plainEnglishParaphrase: 'Even though prices went up fast, the main bank did not change interest rates.',
-    overallMeaning: 'The central bank decided to hold interest rates despite high inflation.',
-    bengaliTranslation: 'মুদ্রাস্ফীতি দ্রুত বৃদ্ধি পাওয়া সত্ত্বেও কেন্দ্রীয় ব্যাংক সুদের হার অপরিবর্তিত রেখেছে।',
-    phraseBreakdown: [
-      {
-        phrase: 'Although inflation increased rapidly',
-        easyEnglish: 'Even though prices rose very quickly',
-        easyBengali: 'যদিও দ্রব্যমূল্য দ্রুত বৃদ্ধি পেয়েছিল'
-      },
-      {
-        phrase: 'the central bank maintained steady interest rates',
-        easyEnglish: 'the main bank kept the loan rates unchanged',
-        easyBengali: 'মূল ব্যাংক সুদের হার স্থির রেখেছিল'
-      }
-    ],
-    clauses: [
-      {
-        text: 'Although inflation increased rapidly',
-        type: 'subordinate',
-        role: 'Concessive Clause',
-        explanationBengali: 'শর্তমূলক বা বিপরীতমুখী খণ্ডবাক্য'
-      },
-      {
-        text: 'the central bank maintained steady interest rates',
-        type: 'main',
-        role: 'Independent Proposition',
-        explanationBengali: 'প্রধান খণ্ডবাক্য যা মূল সিদ্ধান্ত নির্দেশ করে'
-      }
-    ],
-    grammaticalHighlights: [
-      'Subordinate concessive clause introduced by "Although"',
-      'Past simple active voice ("increased", "maintained")'
-    ],
-    difficultVocabulary: [
-      {
-        word: 'inflation',
-        meaningInContext: 'A general increase in prices and fall in the purchasing value of money',
-        bengali: 'মুদ্রাস্ফীতি'
-      },
-      {
-        word: 'steady',
-        meaningInContext: 'Firmly fixed, constant, or not changing',
-        bengali: 'স্থির বা অপরিবর্তিত'
-      }
-    ],
-    toneAndRegister: 'Formal / Economic Journalistic'
-  };
-
-  const mockStageB: StageBDetailedVocabulary = {
-    lemma: 'scrutiny',
-    partOfSpeech: 'noun',
-    contextualSenseId: 'sense_1',
-    senses: [
-      {
-        id: 'sense_1',
-        partOfSpeech: 'noun',
-        easyEnglish: 'Critical observation or examination.',
-        easyBengali: 'গভীর নজরদারি বা পুঙ্খানুপুঙ্খ অনুসন্ধান',
-        isContextual: true,
-        examples: [{ english: 'The company faced public scrutiny.', bengali: 'কোম্পানিটি জনসমক্ষে তীব্র পর্যালোচনার মুখোমুখি হয়েছিল।' }],
-        synonyms: [{ word: 'inspection', easyEnglish: 'close look', easyBengali: 'পরিদর্শন' }],
-        antonyms: []
-      }
-    ],
-    collocations: [{ english: 'close scrutiny', bengali: 'গভীর পর্যবেক্ষণ' }],
-    idiomsAndPhrases: []
-  };
 
   beforeEach(() => {
     onClose = vi.fn();
@@ -396,7 +295,8 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
 
     // Switch to paragraph 2
     paraTabs[1].click();
-    expect(el.querySelector('.lf-para-panel[data-para-panel-idx="1"]')?.getAttribute('style')).toContain('block');
+    expect((el.querySelector('.lf-para-panel[data-para-panel-idx="1"]') as HTMLElement).hidden).toBe(false);
+    expect((el.querySelector('.lf-para-panel[data-para-panel-idx="0"]') as HTMLElement).hidden).toBe(true);
 
     // Toggle Full Paragraph Overview
     const toggleBtn = el.querySelector('#lf-para-text-toggle') as HTMLButtonElement;
@@ -510,41 +410,39 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
 
   // 8. Expanding detailed meanings without closing the popup
   it('8. Expanding detailed meanings without closing the popup: handles Word and Sentence expansion', async () => {
-    // A. Word Mode Details Expansion
+    // A. Word Mode Details tab
     popup.showStageA(mockWordStageA, 'The plan came under scrutiny.', '');
     const el = popup.getElement();
 
-    const expandBtn = el.querySelector('#lf-expand-toggle') as HTMLElement;
-    expect(expandBtn.getAttribute('aria-expanded')).toBe('false');
+    const detailsTab = el.querySelector('.lf-tab[data-tab="details"]') as HTMLElement;
+    expect(detailsTab.getAttribute('aria-selected')).toBe('false');
 
-    expandBtn.click();
+    detailsTab.click();
     await Promise.resolve();
 
     expect(onFetchStageB).toHaveBeenCalledWith('scrutiny', 'noun', 'sense_1');
-    const updatedExpand = el.querySelector('#lf-expand-toggle');
-    expect(updatedExpand?.getAttribute('aria-expanded')).toBe('true');
     expect(onClose).not.toHaveBeenCalled();
 
-    // B. Sentence Mode Breakdown Expansion
+    // B. Sentence Mode Grammar tab
     popup.showSentence(mockSentenceResult, '', '');
-    const sentenceExpandBtn = el.querySelector('#lf-sentence-expand-toggle') as HTMLElement;
-    expect(sentenceExpandBtn.getAttribute('aria-expanded')).toBe('false');
+    const grammarTab = el.querySelector('.lf-tab[data-tab="grammar"]') as HTMLElement;
+    expect(grammarTab.getAttribute('aria-selected')).toBe('false');
 
-    sentenceExpandBtn.click();
-    const updatedSentenceExpand = el.querySelector('#lf-sentence-expand-toggle');
-    expect(updatedSentenceExpand?.getAttribute('aria-expanded')).toBe('true');
-    expect(el.textContent).toContain('Difficult Words & Key Terms');
+    grammarTab.click();
+    expect(el.querySelector('.lf-tab[data-tab="grammar"]')?.getAttribute('aria-selected')).toBe('true');
     expect(el.textContent).toContain('Sentence structure');
     expect(onClose).not.toHaveBeenCalled();
 
-    // Difficult vocab chip clicking inside expanded section
+    // Difficult vocab chip on the Sentence tab
+    (el.querySelector('.lf-tab[data-tab="breakdown"]') as HTMLElement).click();
+    expect(el.textContent).toContain('Difficult Words & Key Terms');
     const vocabChip = el.querySelector('.lf-vocab-chip-btn') as HTMLElement;
     expect(vocabChip).not.toBeNull();
     vocabChip.click();
     expect(onSelectWord).toHaveBeenCalledWith('inflation', mockSentenceResult.selectedText);
   });
 
-  // 9. Claude-style Advanced & Engaging Ask AI Coach
+  // 9. Claude Ask AI Coach
   it('9. Claude Ask AI Coach: renders engaging Claude interface, quick prompt chips, and handles Enter key submission', async () => {
     const mockClaudeResponse = {
       question: "Explain this word in super simple terms like I'm 5 years old",
@@ -569,7 +467,7 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     const el = popup.getElement();
 
     // 1. Toggle Ask AI panel
-    const toggleBtn = el.querySelector('.lf-qa-toggle-btn') as HTMLElement;
+    const toggleBtn = el.querySelector('.lf-tab[data-tab="ask-ai"]') as HTMLElement;
     expect(toggleBtn).not.toBeNull();
     toggleBtn.click();
 
@@ -651,7 +549,7 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     popup.showStageA(mockWordStageA, "The prime minister's visit to Tokyo came under scrutiny.", '');
     const el = popup.getElement();
 
-    const toggleBtn = el.querySelector('.lf-qa-toggle-btn') as HTMLElement;
+    const toggleBtn = el.querySelector('.lf-tab[data-tab="ask-ai"]') as HTMLElement;
     expect(toggleBtn).not.toBeNull();
     toggleBtn.click();
 
@@ -861,16 +759,19 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     expect(popup.isUserDraggedMode()).toBe(false);
   });
 
-  it('15. All footer action buttons (Meanings, Ask AI, Report, Save) function properly', async () => {
+  it('15. Word card: Details and Ask AI tabs plus the Report and Save footer actions work', async () => {
     popup.showStageA(mockWordStageA, 'In this sentence, the policy was analyzed strictly by officials.', '');
     const el = popup.getElement();
 
-    // 1. Footer "📖 Meanings" toggle
-    const expandToggle = el.querySelector('#lf-expand-toggle') as HTMLElement;
-    expect(expandToggle).not.toBeNull();
-    expandToggle.click();
+    // 1. Details tab opens the full meanings
+    const detailsTab = el.querySelector('.lf-tab[data-tab="details"]') as HTMLElement;
+    expect(detailsTab).not.toBeNull();
+    detailsTab.click();
     await Promise.resolve();
-    expect(el.querySelector('#lf-expanded-section')?.getAttribute('style')).toContain('display: block');
+    expect(el.querySelector('.lf-tab[data-tab="details"]')?.getAttribute('aria-selected')).toBe('true');
+    // Footer keeps only the two actions
+    expect(el.querySelector('#lf-expand-toggle')).toBeNull();
+    expect(el.querySelector('.lf-footer .lf-qa-toggle-btn')).toBeNull();
 
     // 2. Footer "🚩 Report" toggle
     const reportBtn = el.querySelector('.lf-report-trigger-btn') as HTMLElement;
@@ -893,7 +794,7 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     expect(updatedSaveBtn?.classList.contains('saved')).toBe(true);
 
     // 4. Footer "💬 Ask AI" button
-    const askAIBtn = el.querySelector('.lf-qa-toggle-btn') as HTMLElement;
+    const askAIBtn = el.querySelector('.lf-tab[data-tab="ask-ai"]') as HTMLElement;
     expect(askAIBtn).not.toBeNull();
     askAIBtn.click();
     expect(el.querySelector('.lf-ask-ai-panel')).not.toBeNull();
@@ -941,18 +842,15 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     const grammarTab = freshEl.querySelector('.lf-tab[data-tab="grammar"]') as HTMLElement;
     expect(grammarTab).not.toBeNull();
     grammarTab.click();
-    expect(freshEl.querySelector('#lf-sentence-expanded-section')?.getAttribute('style')).toContain('display: block');
+    expect((freshEl.querySelector('#lf-sentence-expanded-section') as HTMLElement).hidden).toBe(false);
 
     const sentenceTab = freshEl.querySelector('.lf-tab[data-tab="breakdown"]') as HTMLElement;
     expect(sentenceTab).not.toBeNull();
     sentenceTab.click();
     expect(freshEl.textContent).toContain('Phrase by phrase');
 
-    // 5. Footer Grammar toggle button
-    const sentenceExpandToggle = freshEl.querySelector('#lf-sentence-expand-toggle') as HTMLElement;
-    expect(sentenceExpandToggle).not.toBeNull();
-    sentenceExpandToggle.click();
-    expect(freshEl.querySelector('#lf-sentence-expanded-section')?.getAttribute('style')).toContain('display: block');
+    // 5. Footer has no duplicate of the Grammar tab
+    expect(freshEl.querySelector('#lf-sentence-expand-toggle')).toBeNull();
 
     // 6. Footer Save button
     const saveBtn = freshEl.querySelector('.lf-save-btn') as HTMLElement;
@@ -1240,9 +1138,9 @@ describe('PopupView UI, Progressive Disclosure & Mode Transitions', () => {
     const revealBtn = learnEl.querySelector('.lf-reveal-cloze-btn') as HTMLElement;
     expect(revealBtn).not.toBeNull();
     const answerEl = learnEl.querySelector('.lf-cloze-answer') as HTMLElement;
-    expect(answerEl.hasAttribute('hidden') || answerEl.style.display === 'none').toBe(true);
+    expect(answerEl.hidden).toBe(true);
     revealBtn.click();
-    expect(answerEl.style.display).toBe('block');
+    expect(answerEl.hidden).toBe(false);
     expect(answerEl.textContent).toContain('resilient');
   });
 

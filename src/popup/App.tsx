@@ -13,7 +13,7 @@ import {
 } from '../types';
 import { PopupView } from '../content/popupView';
 import { POPUP_STYLES } from '../content/styles';
-import { Onboarding } from './components/Onboarding';
+import { ReadingTab, PageHighlightState } from './components/ReadingTab';
 import { LookupTab } from './components/LookupTab';
 import { LibraryTab } from './components/LibraryTab';
 import { DictionaryService, dictionaryResultToStageA } from '../services/dictionary';
@@ -28,19 +28,10 @@ import {
   Check,
   PanelRight,
   ExternalLink,
-  X,
-  BookOpen,
-  ChevronUp,
-  ChevronDown,
-  RotateCcw,
   Settings,
   Sun,
   Moon,
-  AlertCircle,
-  Info,
-  Globe,
-  BookMarked,
-  FileText
+  BookMarked
 } from 'lucide-react';
 import { MONETIZATION_ENABLED } from '../config/features';
 import './popup.css';
@@ -338,25 +329,7 @@ export const App: React.FC = () => {
 
   // Page AI Article Highlighting Studio state
   const [activeTabId, setActiveTabId] = useState<number | null>(null);
-  const [highlightState, setHighlightState] = useState<{
-    isSiteDisabled: boolean;
-    articleTitle?: string;
-    hasMainArticle: boolean;
-    count: { total: number; visible: number; words: number; phrases: number; idioms: number };
-    currentIndex: number;
-    items: Array<{
-      id?: string;
-      text: string;
-      type: 'word' | 'phrase' | 'idiom';
-      contextSentence?: string;
-      easyEnglish?: string;
-      easyBengali?: string;
-      contextualMeaning?: string;
-      bengaliMeaning?: string;
-    }>;
-    color: string;
-    filters: { words: boolean; phrases: boolean; idioms: boolean };
-  } | null>(null);
+  const [highlightState, setHighlightState] = useState<PageHighlightState | null>(null);
   const [highlightLoading, setHighlightLoading] = useState(false);
   const [showVocabDrawer, setShowVocabDrawer] = useState(false);
   const [highlightFeedback, setHighlightFeedback] = useState<{ message: string; type: 'info' | 'error' | 'success' } | null>(null);
@@ -1028,255 +1001,29 @@ export const App: React.FC = () => {
         {/* TAB 1: READING AI (Current Tab Article Companion)         */}
         {/* ======================================================== */}
         {popupTab === 'reading' && (
-          <div className="hub-tab-pane">
-            {showOnboarding && (
-              <Onboarding textSize={textSize} onChooseSize={chooseTextSize} onDone={dismissOnboarding} />
-            )}
-
-            {/* Site status capsule banner */}
-            <div className="reading-site-banner">
-              <div className="site-banner-left">
-                <span className="site-banner-icon-tile">
-                  <Globe size={15} className="site-banner-icon" />
-                </span>
-                <div className="site-banner-info">
-                  <span className="site-banner-domain">{currentDomain || 'Current web page'}</span>
-                  <span className={`site-banner-label ${isCurrentSiteEnabled ? 'on' : 'off'}`}>
-                    <span className={`domain-dot ${isCurrentSiteEnabled ? 'active' : ''}`} />
-                    {isCurrentSiteEnabled ? 'Active on this site' : 'Paused on this site'}
-                  </span>
-                </div>
-              </div>
-
-              <div
-                className={`reading-toggle-switch ${isCurrentSiteEnabled ? 'active' : ''}`}
-                onClick={toggleCurrentSite}
-                role="switch"
-                aria-checked={isCurrentSiteEnabled}
-                title={`Click to ${isCurrentSiteEnabled ? 'disable' : 'enable'} on this site`}
-              >
-                <div className="reading-toggle-thumb" />
-              </div>
-            </div>
-
-            {!isCurrentSiteEnabled ? (
-              <div className="reading-paused-card">
-                <Info size={16} className="paused-icon" />
-                <div className="paused-text-wrap">
-                  <div className="paused-title">LexiFlow is paused on {currentDomain || 'this site'}</div>
-                  <div className="paused-desc">Enable to access inline word popups, paragraph explanations, and article vocabulary discovery.</div>
-                </div>
-                <button type="button" className="btn-enable-site" onClick={toggleCurrentSite}>
-                  Re-enable on this site
-                </button>
-              </div>
-            ) : highlightLoading ? (
-              <div className="reading-scanning-card">
-                <div className="reading-scanning-spinner" />
-                <div className="reading-scanning-title">Analyzing Article Body...</div>
-                <div className="reading-scanning-desc">Filtering page headers, footers & ads to extract high-value vocabulary, idioms & collocations.</div>
-              </div>
-            ) : !highlightState || highlightState.count.total === 0 ? (
-              <div className="reading-ready-hero">
-                <div className="hero-article">
-                  <span className="hero-article-icon">
-                    <FileText size={16} />
-                  </span>
-                  <div className="hero-article-text">
-                    <span className="hero-article-label">
-                      {highlightState?.articleTitle ? 'Article on this page' : 'Ready to scan'}
-                    </span>
-                    <span className="hero-article-title" title={highlightState?.articleTitle || ''}>
-                      {highlightState?.articleTitle ? highlightState.articleTitle : 'Main article text (ads & sidebars skipped)'}
-                    </span>
-                  </div>
-                </div>
-
-                <ul className="hero-feature-list">
-                  <li>
-                    <Check size={13} className="check-icon" />
-                    <span>Finds the hard, high-impact words</span>
-                  </li>
-                  <li>
-                    <Check size={13} className="check-icon" />
-                    <span>Bengali meaning in context</span>
-                  </li>
-                  <li>
-                    <Check size={13} className="check-icon" />
-                    <span>Skips banners, ads & sidebars</span>
-                  </li>
-                </ul>
-
-                {highlightFeedback && (
-                  <div className={`studio-feedback-banner ${highlightFeedback.type}`}>
-                    <span>{highlightFeedback.type === 'error' ? <AlertCircle size={14} /> : highlightFeedback.type === 'success' ? <Sparkles size={14} /> : <Info size={14} />}</span>
-                    <span>{highlightFeedback.message}</span>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  className="btn-hero-highlight"
-                  onClick={handleTriggerHighlight}
-                >
-                  <Sparkles size={15} />
-                  <span>Scan & Highlight Article</span>
-                </button>
-              </div>
-            ) : (
-              /* Active Highlights Control Center */
-              <div className="reading-active-center">
-                <div className="active-highlight-summary">
-                  <div className="summary-left">
-                    <span className="summary-badge">ACTIVE</span>
-                    <span className="summary-text">
-                      <strong>{highlightState.count.visible}</strong> of {highlightState.count.total} active highlights
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-clear-highlights"
-                    onClick={handleClearHighlights}
-                    title="Clear highlights from page"
-                  >
-                    <X size={13} />
-                    <span>Clear</span>
-                  </button>
-                </div>
-
-                {/* Highlight Navigator */}
-                <div className="reading-nav-bar">
-                  <div className="nav-btn-group">
-                    <button
-                      type="button"
-                      className="nav-step-btn"
-                      onClick={() => handleNavigateHighlight('prev')}
-                      title="Previous term (Shift+Tab)"
-                    >
-                      <ChevronUp size={14} />
-                      <span>Prev</span>
-                    </button>
-                    <span className="nav-counter-display">
-                      {(highlightState.currentIndex ?? -1) >= 0 ? highlightState.currentIndex + 1 : 1} / {highlightState.count.visible || highlightState.count.total}
-                    </span>
-                    <button
-                      type="button"
-                      className="nav-step-btn"
-                      onClick={() => handleNavigateHighlight('next')}
-                      title="Next term (Tab)"
-                    >
-                      <span>Next</span>
-                      <ChevronDown size={14} />
-                    </button>
-                  </div>
-
-                  <button
-                    type="button"
-                    className={`btn-vocab-drawer ${showVocabDrawer ? 'active' : ''}`}
-                    onClick={() => setShowVocabDrawer(!showVocabDrawer)}
-                  >
-                    <BookOpen size={12} />
-                    <span>Terms ({highlightState.items?.length || highlightState.count.total})</span>
-                  </button>
-                </div>
-
-                {/* Palette & Category Filters */}
-                <div className="reading-tools-row">
-                  <div className="color-swatches-group" title="Select highlight tint">
-                    {(['yellow', 'blue', 'green', 'pink', 'purple'] as const).map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        className={`color-swatch-dot ${highlightState.color === c ? 'selected' : ''}`}
-                        data-color={c}
-                        onClick={() => handleChangeHighlightColor(c)}
-                        aria-label={`Color ${c}`}
-                      />
-                    ))}
-                  </div>
-
-                  <div className="filter-pills-group">
-                    <button
-                      type="button"
-                      className={`filter-tab-pill ${highlightState.filters.words ? 'active' : ''}`}
-                      onClick={() => handleToggleFilter('words')}
-                    >
-                      Words
-                    </button>
-                    <button
-                      type="button"
-                      className={`filter-tab-pill ${highlightState.filters.phrases ? 'active' : ''}`}
-                      onClick={() => handleToggleFilter('phrases')}
-                    >
-                      Phrases
-                    </button>
-                    <button
-                      type="button"
-                      className={`filter-tab-pill ${highlightState.filters.idioms ? 'active' : ''}`}
-                      onClick={() => handleToggleFilter('idioms')}
-                    >
-                      Idioms
-                    </button>
-                  </div>
-                </div>
-
-                {/* Vocabulary Drawer */}
-                {showVocabDrawer && highlightState.items && highlightState.items.length > 0 && (
-                  <div className="reading-vocab-drawer">
-                    <div className="drawer-header-row">
-                      <span className="drawer-heading">Discovered Terms in Article</span>
-                      <span className="drawer-hint">Tap word to jump ↗</span>
-                    </div>
-                    <div className="drawer-vocab-list">
-                      {highlightState.items.map((it, idx) => {
-                        const meaning = it.easyBengali || it.bengaliMeaning || it.easyEnglish || it.contextualMeaning;
-                        return (
-                          <div
-                            key={idx}
-                            className="drawer-vocab-card"
-                            onClick={() => handleScrollToItem(it.text)}
-                            title={`Click to scroll to "${it.text}" in article`}
-                          >
-                            <div className="card-top-line">
-                              <span className="card-word-text">{it.text}</span>
-                              <span className={`card-type-tag ${it.type}`}>{it.type}</span>
-                            </div>
-                            {meaning && (
-                              <div className="card-meaning-line">{meaning}</div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Re-scan button */}
-                <div className="reading-rescan-row">
-                  <button type="button" className="btn-rescan-page" onClick={handleTriggerHighlight}>
-                    <RotateCcw size={12} />
-                    <span>Re-scan Article Body</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Learning progress at a glance */}
-            <div className="hub-stats-row">
-              <button type="button" className="hub-stat" onClick={() => setPopupTab('library')}>
-                <span className="hub-stat-num">{savedCount}</span>
-                <span className="hub-stat-label">Words saved</span>
-              </button>
-              <button
-                type="button"
-                className={`hub-stat ${dueCount > 0 ? 'due' : ''}`}
-                onClick={() => setPopupTab('library')}
-              >
-                <span className="hub-stat-num">{dueCount}</span>
-                <span className="hub-stat-label">Due for review</span>
-              </button>
-            </div>
-          </div>
+          <ReadingTab
+            savedCount={savedCount}
+            dueCount={dueCount}
+            setPopupTab={setPopupTab}
+            currentDomain={currentDomain}
+            textSize={textSize}
+            showOnboarding={showOnboarding}
+            dismissOnboarding={dismissOnboarding}
+            chooseTextSize={chooseTextSize}
+            highlightState={highlightState}
+            highlightLoading={highlightLoading}
+            showVocabDrawer={showVocabDrawer}
+            setShowVocabDrawer={setShowVocabDrawer}
+            highlightFeedback={highlightFeedback}
+            isCurrentSiteEnabled={isCurrentSiteEnabled}
+            toggleCurrentSite={toggleCurrentSite}
+            handleTriggerHighlight={handleTriggerHighlight}
+            handleNavigateHighlight={handleNavigateHighlight}
+            handleChangeHighlightColor={handleChangeHighlightColor}
+            handleToggleFilter={handleToggleFilter}
+            handleClearHighlights={handleClearHighlights}
+            handleScrollToItem={handleScrollToItem}
+          />
         )}
 
         {/* ======================================================== */}

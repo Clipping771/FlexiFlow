@@ -114,6 +114,37 @@ describe('Reading card UX', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
+  it('first-use tip shows once and reports its dismissal', () => {
+    const onDismissTip = vi.fn();
+    (popup as any).callbacks.onDismissTip = onDismissTip;
+    popup.setFirstUseTip(true);
+    popup.showSentence(sentence, '', '');
+    const el = popup.getElement();
+    expect(el.querySelector('.lf-first-tip')?.textContent).toContain('click any word');
+
+    (el.querySelector('.lf-first-tip-close') as HTMLElement).click();
+    expect(el.querySelector('.lf-first-tip')).toBeNull();
+    expect(onDismissTip).toHaveBeenCalledTimes(1);
+
+    popup.showSentence(sentence, '', '');
+    expect(el.querySelector('.lf-first-tip')).toBeNull();
+  });
+
+  it('Tab from the last control wraps to the first so focus stays in the card', () => {
+    popup.showError('Network error', 'scrutiny');
+    const el = popup.getElement();
+    // jsdom has no layout, so give every control a client rect
+    el.querySelectorAll<HTMLElement>('button').forEach((b) => {
+      b.getClientRects = () => [{} as DOMRect] as unknown as DOMRectList;
+    });
+    const buttons = Array.from(el.querySelectorAll<HTMLElement>('button'));
+    buttons[buttons.length - 1].focus();
+    const evt = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    buttons[buttons.length - 1].dispatchEvent(evt);
+    expect(evt.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(buttons[0]);
+  });
+
   it('loading card names the current step', () => {
     popup.showLoading('scrutiny', 'word');
     expect(popup.getElement().querySelector('.lf-loading-step')?.textContent).toContain('Reading the sentence');

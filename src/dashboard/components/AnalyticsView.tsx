@@ -114,7 +114,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           </p>
         ) : (
           <div>
-            <div style={{ fontSize: '13px', color: '#d97706', marginBottom: '10px', fontWeight: 500 }}>
+            <div style={{ fontSize: '13px', color: 'var(--warning)', marginBottom: '10px', fontWeight: 500 }}>
               ⚠️ Found {weakItems.length} vulnerable words needing prioritized practice:
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>

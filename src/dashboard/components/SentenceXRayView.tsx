@@ -120,7 +120,7 @@ export const SentenceXRayView: React.FC = () => {
       </div>
 
       {error && (
-        <div className="card" style={{ borderLeft: '4px solid #ef4444', color: '#b91c1c', marginBottom: '20px' }}>
+        <div className="card" style={{ borderLeft: '4px solid #ef4444', color: 'var(--danger)', marginBottom: '20px' }}>
           {error}
         </div>
       )}
@@ -176,7 +176,7 @@ export const SentenceXRayView: React.FC = () => {
                 Visual hierarchy showing how the main action connects to subordinate clauses and modifiers:
               </p>
               <div style={{ padding: '12px 14px', background: 'rgba(0, 113, 227, 0.06)', borderRadius: '8px', border: '1px solid rgba(0, 113, 227, 0.2)', marginBottom: '12px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#0071e3', textTransform: 'uppercase' }}>⭐ Core Main Clause (Anchor):</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase' }}>⭐ Core Main Clause (Anchor):</span>
                 <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)', marginTop: '4px' }}>
                   "{structureMap.rootMainClause}"
                 </div>
@@ -187,7 +187,7 @@ export const SentenceXRayView: React.FC = () => {
                   {structureMap.branches.map((b, idx) => (
                     <div key={idx} style={{ padding: '10px 12px', background: 'rgba(0,0,0,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                        <span className="tag-badge" style={{ color: '#0071e3', fontSize: '11px', textTransform: 'uppercase' }}>
+                        <span className="tag-badge" style={{ color: 'var(--accent)', fontSize: '11px', textTransform: 'uppercase' }}>
                           ↳ {b.relationType}
                         </span>
                         <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)' }}>
@@ -207,7 +207,7 @@ export const SentenceXRayView: React.FC = () => {
           {/* CLAUSE RELATIONSHIP */}
           {(result as any)?.clauseRelationship && (
             <div className="card" style={{ borderLeft: '4px solid #10b981' }}>
-              <h4 style={{ color: '#059669', fontSize: '14px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>
+              <h4 style={{ color: 'var(--success)', fontSize: '14px', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>
                 🔗 Clause Relationship
               </h4>
               <div style={{ fontFamily: 'monospace', fontSize: '13.5px', fontWeight: 600, color: 'var(--text-main)', background: 'rgba(16, 185, 129, 0.08)', padding: '6px 10px', borderRadius: '6px', marginBottom: '8px' }}>
@@ -217,7 +217,7 @@ export const SentenceXRayView: React.FC = () => {
                 {(result as any).clauseRelationship.explanation}
               </div>
               {(result as any).clauseRelationship.explanationBengali && (
-                <div style={{ fontSize: '12.5px', color: '#059669', marginTop: '4px', fontWeight: 500 }}>
+                <div style={{ fontSize: '12.5px', color: 'var(--success)', marginTop: '4px', fontWeight: 500 }}>
                   {(result as any).clauseRelationship.explanationBengali}
                 </div>
               )}
@@ -227,14 +227,14 @@ export const SentenceXRayView: React.FC = () => {
           {/* RELEVANT GRAMMAR FEATURES */}
           {(result as any)?.relevantGrammarFeatures && (result as any).relevantGrammarFeatures.length > 0 && (
             <div className="card" style={{ borderLeft: '4px solid #6366f1' }}>
-              <h4 style={{ color: '#4f46e5', fontSize: '14px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>
+              <h4 style={{ color: 'var(--accent)', fontSize: '14px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>
                 ✨ Relevant Grammar Features
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {(result as any).relevantGrammarFeatures.map((feat: any, fIdx: number) => (
                   <div key={fIdx} style={{ padding: '8px 12px', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '8px', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
-                      <strong style={{ fontSize: '13px', color: '#4f46e5' }}>{feat.feature}</strong>
+                      <strong style={{ fontSize: '13px', color: 'var(--accent)' }}>{feat.feature}</strong>
                       {feat.text && <code style={{ fontSize: '12px', color: 'var(--text-main)' }}>"{feat.text}"</code>}
                     </div>
                     <div style={{ fontSize: '12.5px', color: 'var(--text-main)' }}>{feat.explanation}</div>
@@ -271,13 +271,13 @@ export const SentenceXRayView: React.FC = () => {
                           {clause.type || 'clause'}
                         </span>
                         {clause.category && (
-                          <span style={{ fontSize: '11px', background: 'rgba(0, 113, 227, 0.08)', color: '#0071e3', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                          <span style={{ fontSize: '11px', background: 'rgba(0, 113, 227, 0.08)', color: 'var(--accent)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
                             {clause.category}
                           </span>
                         )}
                         <strong style={{ fontSize: '13.5px', color: 'var(--text-main)' }}>{clause.role || 'Clause'}</strong>
                       </div>
-                      <span style={{ fontSize: '11.5px', padding: '2px 8px', borderRadius: '4px', background: clause.canStandAlone ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.1)', color: clause.canStandAlone ? '#15803d' : '#b91c1c', fontWeight: 600 }}>
+                      <span style={{ fontSize: '11.5px', padding: '2px 8px', borderRadius: '4px', background: clause.canStandAlone ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.1)', color: clause.canStandAlone ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
                         {clause.canStandAlone ? '✓ Can Stand Alone (Complete)' : '↳ Dependent (Cannot Stand Alone)'}
                       </span>
                     </div>
@@ -287,7 +287,7 @@ export const SentenceXRayView: React.FC = () => {
                     </div>
 
                     {clause.subordinator && (
-                      <div style={{ fontSize: '12px', color: '#8b5cf6', marginBottom: '4px' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--purple)', marginBottom: '4px' }}>
                         <strong>Subordinator:</strong> <code>"{clause.subordinator}"</code>
                       </div>
                     )}
@@ -299,14 +299,14 @@ export const SentenceXRayView: React.FC = () => {
                     )}
 
                     {clause.typeExplanation && (
-                      <div style={{ fontSize: '12.5px', color: '#0071e3', marginBottom: '6px' }}>
+                      <div style={{ fontSize: '12.5px', color: 'var(--accent)', marginBottom: '6px' }}>
                         💡 <em>{clause.typeExplanation}</em>
                       </div>
                     )}
 
                     {clause.clausePattern && (
                       <div style={{ marginBottom: '8px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#0071e3', background: 'rgba(0,113,227,0.1)', padding: '2px 8px', borderRadius: '4px', fontFamily: 'monospace' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', background: 'rgba(0,113,227,0.1)', padding: '2px 8px', borderRadius: '4px', fontFamily: 'monospace' }}>
                           Clause Pattern: {clause.clausePattern}
                         </span>
                       </div>
@@ -315,39 +315,39 @@ export const SentenceXRayView: React.FC = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', margin: '10px 0', fontSize: '12.5px', color: 'var(--text-muted)' }}>
                       {clause.subject && (
                         <div>
-                          <strong style={{ color: '#0071e3' }}>Subject:</strong> {clause.subject}
+                          <strong style={{ color: 'var(--accent)' }}>Subject:</strong> {clause.subject}
                           {clause.subjectExplanation && <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>↳ {clause.subjectExplanation}</div>}
-                          {clause.subjectExplanationBengali && <div style={{ fontSize: '11px', color: '#0071e3' }}>↳ {clause.subjectExplanationBengali}</div>}
+                          {clause.subjectExplanationBengali && <div style={{ fontSize: '11px', color: 'var(--accent)' }}>↳ {clause.subjectExplanationBengali}</div>}
                         </div>
                       )}
                       {(clause.verbPhrase || clause.verb) && (
                         <div>
-                          <strong style={{ color: '#34c759' }}>Verb Phrase:</strong> {clause.verbPhrase || clause.verb}
-                          {clause.tenseAspect && <div style={{ fontSize: '11.5px', color: '#15803d', fontWeight: 600 }}>Tense/Aspect: {clause.tenseAspect}</div>}
+                          <strong style={{ color: 'var(--success)' }}>Verb Phrase:</strong> {clause.verbPhrase || clause.verb}
+                          {clause.tenseAspect && <div style={{ fontSize: '11.5px', color: 'var(--success)', fontWeight: 600 }}>Tense/Aspect: {clause.tenseAspect}</div>}
                           {clause.coordinatedVerbs && clause.coordinatedVerbs.length > 0 && (
-                            <div style={{ fontSize: '11.5px', color: '#15803d' }}>
+                            <div style={{ fontSize: '11.5px', color: 'var(--success)' }}>
                               Coordinated verbs: {clause.coordinatedVerbs.join(' & ')}
                             </div>
                           )}
                           {clause.verbExplanation && <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>↳ {clause.verbExplanation}</div>}
-                          {clause.verbExplanationBengali && <div style={{ fontSize: '11px', color: '#34c759' }}>↳ {clause.verbExplanationBengali}</div>}
+                          {clause.verbExplanationBengali && <div style={{ fontSize: '11px', color: 'var(--success)' }}>↳ {clause.verbExplanationBengali}</div>}
                         </div>
                       )}
                       {clause.directObject && (
                         <div>
-                          <strong style={{ color: '#ff9500' }}>Direct Object:</strong> {clause.directObject}
+                          <strong style={{ color: 'var(--warning)' }}>Direct Object:</strong> {clause.directObject}
                           {clause.directObjectExplanation && <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>↳ {clause.directObjectExplanation}</div>}
-                          {clause.directObjectExplanationBengali && <div style={{ fontSize: '11px', color: '#d97706' }}>↳ {clause.directObjectExplanationBengali}</div>}
+                          {clause.directObjectExplanationBengali && <div style={{ fontSize: '11px', color: 'var(--warning)' }}>↳ {clause.directObjectExplanationBengali}</div>}
                         </div>
                       )}
                       {clause.indirectObject && (
                         <div>
-                          <strong style={{ color: '#af52de' }}>Indirect Object:</strong> {clause.indirectObject}
+                          <strong style={{ color: 'var(--purple)' }}>Indirect Object:</strong> {clause.indirectObject}
                         </div>
                       )}
                       {clause.complement && (
                         <div>
-                          <strong style={{ color: '#ff2d55' }}>Complement:</strong> {clause.complement}
+                          <strong style={{ color: 'var(--danger)' }}>Complement:</strong> {clause.complement}
                         </div>
                       )}
                       {clause.questionAnswered && <div><strong>Answers:</strong> {clause.questionAnswered}</div>}
@@ -356,7 +356,7 @@ export const SentenceXRayView: React.FC = () => {
 
                     {clause.adverbials && clause.adverbials.length > 0 && (
                       <div style={{ marginTop: '8px', fontSize: '12px', background: 'rgba(0,0,0,0.02)', padding: '6px 10px', borderRadius: '6px' }}>
-                        <strong style={{ color: '#5856d6' }}>Adverbials: </strong>
+                        <strong style={{ color: 'var(--accent)' }}>Adverbials: </strong>
                         {clause.adverbials.map((a: any, aIdx: number) => (
                           <span key={aIdx} style={{ marginRight: '8px' }}>
                             "{a.text}" ({a.explanation})
@@ -397,25 +397,25 @@ export const SentenceXRayView: React.FC = () => {
                   {conversationalElements.map((ce: any, idx: number) => (
                     <div key={idx} style={{ padding: '12px 14px', background: 'rgba(255, 45, 85, 0.05)', borderRadius: '8px', border: '1px solid rgba(255, 45, 85, 0.2)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#ff2d55', textTransform: 'uppercase' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--danger)', textTransform: 'uppercase' }}>
                           {ce.typeLabel}
                         </span>
-                        <span style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#ff2d55' }}>
+                        <span style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--danger)' }}>
                           "{ce.text}"
                         </span>
                       </div>
                       {ce.targetOriginal && ce.correctedTo && (
                         <div style={{ fontSize: '13px', marginBottom: '6px' }}>
                           <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)' }}>"{ce.targetOriginal}"</span>
-                          <span style={{ color: '#ff2d55', fontWeight: 700 }}> ➔ </span>
-                          <span style={{ color: '#15803d', fontWeight: 700 }}>"{ce.correctedTo}"</span>
+                          <span style={{ color: 'var(--danger)', fontWeight: 700 }}> ➔ </span>
+                          <span style={{ color: 'var(--success)', fontWeight: 700 }}>"{ce.correctedTo}"</span>
                         </div>
                       )}
                       <div style={{ fontSize: '13px', color: 'var(--text-main)', lineHeight: '1.45' }}>
                         {ce.explanation}
                       </div>
                       {ce.explanationBengali && (
-                        <div style={{ fontSize: '12.5px', color: '#ff2d55', marginTop: '4px', fontWeight: 500 }}>
+                        <div style={{ fontSize: '12.5px', color: 'var(--danger)', marginTop: '4px', fontWeight: 500 }}>
                           {ce.explanationBengali}
                         </div>
                       )}
@@ -430,14 +430,14 @@ export const SentenceXRayView: React.FC = () => {
                     <div key={idx} style={{ padding: '12px 14px', background: 'rgba(0,0,0,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <strong style={{ fontSize: '13.5px', color: 'var(--text-main)' }}>"{pc.phrase}"</strong>
-                        <span className="tag-badge" style={{ color: '#0071e3', fontSize: '11px' }}>
+                        <span className="tag-badge" style={{ color: 'var(--accent)', fontSize: '11px' }}>
                           {pc.phraseTypeLabel}
                         </span>
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
                         {pc.components.map((comp: any, cIdx: number) => (
                           <div key={cIdx} style={{ padding: '6px 8px', background: 'rgba(0,0,0,0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '12px' }}>
-                            <span style={{ fontWeight: 700, color: '#0071e3' }}>"{comp.text}"</span>
+                            <span style={{ fontWeight: 700, color: 'var(--accent)' }}>"{comp.text}"</span>
                             <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10.5px' }}>{comp.roleLabel}</span>
                             {comp.roleBengali && <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px' }}>{comp.roleBengali}</span>}
                           </div>
@@ -447,7 +447,7 @@ export const SentenceXRayView: React.FC = () => {
                         {pc.explanation}
                       </div>
                       {pc.explanationBengali && (
-                        <div style={{ fontSize: '12px', color: '#0071e3', marginTop: '2px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--accent)', marginTop: '2px' }}>
                           {pc.explanationBengali}
                         </div>
                       )}
@@ -461,17 +461,17 @@ export const SentenceXRayView: React.FC = () => {
           {/* REUSABLE PATTERN SUMMARY */}
           {patternSummary && (
             <div className="card" style={{ borderLeft: '4px solid #34c759' }}>
-              <h4 style={{ color: '#2e7d32', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700, margin: '0 0 6px 0' }}>
+              <h4 style={{ color: 'var(--success)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700, margin: '0 0 6px 0' }}>
                 📐 Reusable Grammatical Pattern:
               </h4>
-              <div style={{ fontSize: '14.5px', fontFamily: 'monospace', fontWeight: 700, color: '#1b5e20', marginBottom: '6px' }}>
+              <div style={{ fontSize: '14.5px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--success)', marginBottom: '6px' }}>
                 {patternSummary.formula}
               </div>
               <p style={{ fontSize: '13px', color: 'var(--text-main)', margin: '0 0 4px 0', lineHeight: '1.45' }}>
                 {patternSummary.explanation}
               </p>
               {patternSummary.explanationBengali && (
-                <div style={{ fontSize: '12.5px', color: '#2e7d32', fontWeight: 500 }}>
+                <div style={{ fontSize: '12.5px', color: 'var(--success)', fontWeight: 500 }}>
                   {patternSummary.explanationBengali}
                 </div>
               )}
@@ -573,7 +573,7 @@ export const SentenceXRayView: React.FC = () => {
                       <strong>How it works:</strong> {rule.howItWorks}
                     </div>
                     {rule.reusablePattern && (
-                      <div style={{ padding: '6px 10px', background: 'rgba(0, 113, 227, 0.06)', borderRadius: '6px', fontSize: '12px', color: '#0071e3', margin: '6px 0', fontFamily: 'monospace' }}>
+                      <div style={{ padding: '6px 10px', background: 'rgba(0, 113, 227, 0.06)', borderRadius: '6px', fontSize: '12px', color: 'var(--accent)', margin: '6px 0', fontFamily: 'monospace' }}>
                         Formula: {rule.reusablePattern}
                       </div>
                     )}
@@ -587,7 +587,7 @@ export const SentenceXRayView: React.FC = () => {
                       </div>
                     )}
                     {rule.commonConfusion && (
-                      <div style={{ fontSize: '12px', color: '#d97706', marginTop: '6px' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--warning)', marginTop: '6px' }}>
                         ⚠️ <strong>Watch out:</strong> {rule.commonConfusion}
                       </div>
                     )}
@@ -617,7 +617,7 @@ export const SentenceXRayView: React.FC = () => {
                       <strong>Pattern:</strong> <code style={{ fontFamily: 'monospace' }}>{c.pattern}</code>
                     </div>
                     {c.contrastWith && (
-                      <div style={{ fontSize: '12px', color: '#0071e3', marginTop: '4px' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--accent)', marginTop: '4px' }}>
                         💡 <strong>Comparison:</strong> {c.contrastWith}
                       </div>
                     )}
@@ -657,7 +657,7 @@ export const SentenceXRayView: React.FC = () => {
           {/* LAYER 8: COMMON MISTAKES & ALTERNATIVES */}
           {mistakes && (
             <div className="card" style={{ borderLeft: '4px solid #f59e0b' }}>
-              <h4 style={{ color: '#d97706', fontSize: '14px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>
+              <h4 style={{ color: 'var(--warning)', fontSize: '14px', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase' }}>
                 ⚠️ Layer 8: Common Mistakes &amp; Natural Alternatives
               </h4>
               {mistakes.studentMisconception && (
@@ -666,12 +666,12 @@ export const SentenceXRayView: React.FC = () => {
                 </div>
               )}
               {mistakes.commonMistake && (
-                <div style={{ padding: '8px 10px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: '6px', fontSize: '13px', color: '#b91c1c', marginBottom: '6px' }}>
+                <div style={{ padding: '8px 10px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: '6px', fontSize: '13px', color: 'var(--danger)', marginBottom: '6px' }}>
                   ❌ <strong>Typical Error:</strong> "{mistakes.commonMistake}"
                 </div>
               )}
               {mistakes.correctedSentence && (
-                <div style={{ padding: '8px 10px', background: 'rgba(34, 197, 94, 0.08)', borderRadius: '6px', fontSize: '13px', color: '#15803d', marginBottom: '8px' }}>
+                <div style={{ padding: '8px 10px', background: 'rgba(34, 197, 94, 0.08)', borderRadius: '6px', fontSize: '13px', color: 'var(--success)', marginBottom: '8px' }}>
                   ✓ <strong>Corrected:</strong> "{mistakes.correctedSentence}"
                 </div>
               )}
@@ -691,7 +691,7 @@ export const SentenceXRayView: React.FC = () => {
           {/* LAYER 9: LEARN AND PRACTISE */}
           {practice && (
             <div className="card" style={{ background: 'var(--card)', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
-              <h4 style={{ color: '#16a34a', fontSize: '15px', fontWeight: 700, marginBottom: '6px' }}>
+              <h4 style={{ color: 'var(--success)', fontSize: '15px', fontWeight: 700, marginBottom: '6px' }}>
                 🎯 Layer 9: Learn &amp; Practise
               </h4>
               <p style={{ fontSize: '13px', color: 'var(--text-main)', marginBottom: '10px' }}>
@@ -738,7 +738,7 @@ export const SentenceXRayView: React.FC = () => {
 
               {revealedPractice && (
                 <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '8px', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#15803d' }}>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--success)' }}>
                     Correct Answer: {practice.correctAnswer}
                   </div>
                   <div style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '4px' }}>
@@ -794,7 +794,7 @@ export const SentenceXRayView: React.FC = () => {
                 Grammatical Features
               </h5>
               {features.length > 0 ? (
-                <ul style={{ listStyle: 'disc', paddingLeft: '18px', fontSize: '13px', color: '#48484a' }}>
+                <ul style={{ listStyle: 'disc', paddingLeft: '18px', fontSize: '13px', color: 'var(--text-muted)' }}>
                   {features.map((feat, i) => (
                     <li key={i}>{feat}</li>
                   ))}

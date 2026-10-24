@@ -32,7 +32,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="card" style={{ padding: '24px', margin: '20px 0', borderLeft: '4px solid #ef4444' }}>
-          <h3 style={{ color: '#ef4444', marginBottom: '8px', fontSize: '16px', fontWeight: 600 }}>
+          <h3 style={{ color: 'var(--danger)', marginBottom: '8px', fontSize: '16px', fontWeight: 600 }}>
             {this.props.fallbackTitle || 'Something went wrong'}
           </h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginBottom: '16px' }}>

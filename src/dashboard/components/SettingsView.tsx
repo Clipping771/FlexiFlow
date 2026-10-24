@@ -944,7 +944,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                             <button
                               type="button"
                               className="btn-secondary"
-                              style={{ padding: '3px 8px', fontSize: '11px', color: '#ef4444' }}
+                              style={{ padding: '3px 8px', fontSize: '11px', color: 'var(--danger)' }}
                               onClick={() => setDeleteConfirmCode(c.code)}
                               title="Delete custom language"
                             >
@@ -1025,7 +1025,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Card 2: AI Provider & Linguistic Intelligence */}
         <div className="card">
           <div className="settings-section-header">
-            <div className="settings-section-icon" style={{ color: '#c084fc', background: 'rgba(192, 132, 252, 0.12)' }}>
+            <div className="settings-section-icon" style={{ color: 'var(--purple)', background: 'rgba(192, 132, 252, 0.12)' }}>
               <Sparkles size={18} />
             </div>
             <div>
@@ -1177,13 +1177,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
 
               {fetchSuccessMsg && (
-                <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid #10b981', borderRadius: '8px', fontSize: '12px', color: '#34d399', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid #10b981', borderRadius: '8px', fontSize: '12px', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Check size={14} strokeWidth={2.5} /> {fetchSuccessMsg}
                 </div>
               )}
 
               {fetchErrorMsg && (
-                <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid #ef4444', borderRadius: '8px', fontSize: '12px', color: '#f87171' }}>
+                <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid #ef4444', borderRadius: '8px', fontSize: '12px', color: 'var(--danger)' }}>
                   ⚠️ {fetchErrorMsg}
                 </div>
               )}
@@ -1207,7 +1207,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     Model for {form.aiProvider.toUpperCase()}:
                   </label>
                   {dynamicModels[form.aiProvider] && dynamicModels[form.aiProvider].length > 0 && (
-                    <span style={{ fontSize: '10.5px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', padding: '1px 7px', borderRadius: 'var(--r-pill)', fontWeight: 700 }}>
+                    <span style={{ fontSize: '10.5px', background: 'rgba(16, 185, 129, 0.2)', color: 'var(--success)', padding: '1px 7px', borderRadius: 'var(--r-pill)', fontWeight: 700 }}>
                       ● {dynamicModels[form.aiProvider].length} Models Detected
                     </span>
                   )}
@@ -1352,7 +1352,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <span style={{
                       fontSize: '13.5px',
                       fontWeight: 700,
-                      color: testResult.success ? '#34d399' : '#f87171',
+                      color: testResult.success ? 'var(--success)' : 'var(--danger)',
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '6px'
@@ -1401,7 +1401,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     )}
                   </div>
                 ) : (
-                  <div style={{ fontSize: '13px', color: '#f87171', lineHeight: '1.5', fontWeight: 600, marginTop: '6px' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--danger)', lineHeight: '1.5', fontWeight: 600, marginTop: '6px' }}>
                     {testResult.error || 'Connection failed.'}
                   </div>
                 )}
@@ -1413,7 +1413,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Card 3: Daily Spaced Repetition Limits */}
         <div className="card">
           <div className="settings-section-header">
-            <div className="settings-section-icon" style={{ color: '#fbbf24', background: 'rgba(251, 191, 36, 0.12)' }}>
+            <div className="settings-section-icon" style={{ color: 'var(--warning)', background: 'rgba(251, 191, 36, 0.12)' }}>
               <RotateCw size={18} />
             </div>
             <div>
@@ -1507,7 +1507,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <button
               type="button"
               className="btn-secondary"
-              style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              style={{ color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.3)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               onClick={handleClearTelemetry}
             >
               <Trash2 size={13} />
@@ -1526,7 +1526,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <Check size={16} strokeWidth={2.5} /> Save All Changes
             </button>
             {status && (
-              <span style={{ color: '#10b981', fontSize: '13px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ color: 'var(--success)', fontSize: '13px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                 <Check size={14} strokeWidth={3} /> {status}
               </span>
             )}
@@ -1578,7 +1578,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
 
             {modalError && (
-              <div style={{ marginBottom: '14px', padding: '8px 12px', background: '#fee2e2', border: '1px solid #f87171', borderRadius: '6px', color: '#b91c1c', fontSize: '12.5px' }}>
+              <div style={{ marginBottom: '14px', padding: '8px 12px', background: '#fee2e2', border: '1px solid #f87171', borderRadius: '6px', color: 'var(--danger)', fontSize: '12.5px' }}>
                 ⚠️ {modalError}
               </div>
             )}
@@ -1686,7 +1686,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   Live Preview in LexiFlow Popup:
                 </div>
                 <div style={{ padding: '8px 12px', background: 'rgba(0, 113, 227, 0.08)', borderLeft: '3px solid #0071e3', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#0071e3', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ background: 'rgba(0, 113, 227, 0.18)', padding: '1px 6px', borderRadius: '4px', fontSize: '10px' }}>
                       {customEmoji || '🌐'} {customNativeName || customName || 'Language'}
                     </span>
@@ -1705,7 +1705,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: '#0071e3',
+                    color: 'var(--accent)',
                     fontSize: '12px',
                     fontWeight: 600,
                     cursor: 'pointer',

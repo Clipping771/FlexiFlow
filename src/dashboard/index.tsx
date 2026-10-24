@@ -1,6 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
+import { installBengaliFont, extensionFontUrl } from '../shared/bengaliFont';
+
+installBengaliFont(document, extensionFontUrl);
 
 const rootEl = document.getElementById('root');
 if (rootEl) {

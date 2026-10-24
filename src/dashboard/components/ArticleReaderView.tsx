@@ -223,7 +223,7 @@ Therefore, achieving true grid reliability without fossil-fuel backup requires a
           <button className="btn-secondary" onClick={handleLoadSample} disabled={analyzing || loadingPdf}>
             💡 Load Sample
           </button>
-          <button className="btn-secondary" onClick={handleClear} disabled={analyzing || loadingPdf} style={{ color: '#ef4444' }}>
+          <button className="btn-secondary" onClick={handleClear} disabled={analyzing || loadingPdf} style={{ color: 'var(--danger)' }}>
             🗑️ Clear
           </button>
         </div>
@@ -354,7 +354,7 @@ Therefore, achieving true grid reliability without fossil-fuel backup requires a
             {analyzing ? (
               <button
                 className="btn-secondary"
-                style={{ color: '#ef4444', borderColor: '#ef4444' }}
+                style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
                 onClick={handleCancel}
               >
                 ⏹️ Cancel
@@ -392,7 +392,7 @@ Therefore, achieving true grid reliability without fossil-fuel backup requires a
         )}
 
         {error && (
-          <div style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.08)', borderLeft: '4px solid #ef4444', color: '#b91c1c', fontSize: '13px' }}>
+          <div style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.08)', borderLeft: '4px solid #ef4444', color: 'var(--danger)', fontSize: '13px' }}>
             {error}
           </div>
         )}
@@ -575,7 +575,7 @@ Therefore, achieving true grid reliability without fossil-fuel backup requires a
 
                       <div>
                         <span className="tag-badge" style={{
-                          color: c.type === 'contrast' ? '#d97706' : c.type === 'cause_effect' ? '#059669' : '#7c3aed',
+                          color: c.type === 'contrast' ? 'var(--warning)' : c.type === 'cause_effect' ? 'var(--success)' : '#7c3aed',
                           textTransform: 'uppercase'
                         }}>
                           {c.type.replace('_', ' ')}
@@ -614,7 +614,7 @@ Therefore, achieving true grid reliability without fossil-fuel backup requires a
                       Claim from Paragraph {claim.paragraphIndex}:
                     </span>
                     <span className="tag-badge" style={{
-                      color: claim.isAssertedWithoutEvidence ? '#d97706' : '#059669',
+                      color: claim.isAssertedWithoutEvidence ? 'var(--warning)' : 'var(--success)',
                       fontSize: '12px'
                     }}>
                       {claim.isAssertedWithoutEvidence ? '⚠️ Assertion without explicit citation' : '✓ Evidence substantiated'}
@@ -626,11 +626,11 @@ Therefore, achieving true grid reliability without fossil-fuel backup requires a
                   </p>
 
                   {claim.evidenceProvided ? (
-                    <div style={{ marginTop: '10px', fontSize: '13px', color: '#059669' }}>
+                    <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--success)' }}>
                       <strong>Supporting Evidence in Text:</strong> {claim.evidenceProvided}
                     </div>
                   ) : (
-                    <div style={{ marginTop: '10px', fontSize: '13px', color: '#d97706' }}>
+                    <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--warning)' }}>
                       <strong>Linguistic Observation:</strong> {claim.aiInference}
                     </div>
                   )}
@@ -667,7 +667,7 @@ Therefore, achieving true grid reliability without fossil-fuel backup requires a
               </div>
 
               <div className="card" style={{ borderLeft: '4px solid #059669' }}>
-                <h4 style={{ color: '#059669', fontSize: '14px', marginBottom: '6px' }}>
+                <h4 style={{ color: 'var(--success)', fontSize: '14px', marginBottom: '6px' }}>
                   Role of Conclusion:
                 </h4>
                 <p style={{ color: 'var(--text-main)', fontSize: '14px' }}>
@@ -701,7 +701,7 @@ Therefore, achieving true grid reliability without fossil-fuel backup requires a
                           )}
                         </div>
 
-                        <div style={{ fontSize: '14px', color: '#059669', fontWeight: 600, marginBottom: '6px' }}>
+                        <div style={{ fontSize: '14px', color: 'var(--success)', fontWeight: 600, marginBottom: '6px' }}>
                           {vocab.bengaliMeaning}
                         </div>
 

@@ -2,7 +2,7 @@
 
 :host {
   all: initial;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", "Nirmala UI", sans-serif;
+  font-family: "LexiFlow Bengali", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", "Nirmala UI", sans-serif;
   color: #1d1d1f;
   font-size: 13.5px;
   line-height: 1.5;
@@ -19,8 +19,44 @@
   padding: 0;
 }
 
+/* Same protection for the other shadow-root widgets; their own rules below set size and colour */
+.lf-trigger-btn,
+.lexiflow-highlight-toolbar-container {
+  font-family: "LexiFlow Bengali", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Kalpurush", "Noto Sans Bengali", "Nirmala UI", sans-serif;
+  font-size: 13.5px;
+  font-style: normal;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  word-spacing: normal;
+  text-align: left;
+  text-transform: none;
+  text-indent: 0;
+  white-space: normal;
+  direction: ltr;
+}
+
 /* Floating Glass Popover (Sheet-Style Clarity) */
 .lexiflow-popup {
+  /* Re-declare every inherited text property here: page CSS that targets the shadow host
+     outranks :host, so the card must not depend on what it inherits (e.g. bbc.com sets serif). */
+  font-family: "LexiFlow Bengali", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", "Nirmala UI", sans-serif;
+  font-size: 13.5px;
+  font-weight: 400;
+  font-style: normal;
+  font-variant: normal;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  word-spacing: normal;
+  text-align: left;
+  text-indent: 0;
+  text-transform: none;
+  text-shadow: none;
+  white-space: normal;
+  direction: ltr;
+  color: var(--lf-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   position: fixed;
   cursor: default;
   width: 410px;
@@ -44,9 +80,9 @@
   /* Ink tokens used by inline styles in popupView (overridden in dark mode) */
   --lf-ink: #1d1d1f;
   --lf-ink-muted: #5b6270;
-  --lf-accent-ink: #0060c7;
+  --lf-accent-ink: #0052ad;
   --lf-purple-ink: #7e22ce;
-  --lf-danger-ink: #c62828;
+  --lf-danger-ink: #b3261e;
   --lf-success-ink: #15803d;
   --lf-warn-ink: #b45309;
   --lf-surface: #ffffff;
@@ -597,7 +633,7 @@
   min-height: 28px;
   font-size: 13px;
   line-height: 1;
-  pointer-events: auto !important;
+  pointer-events: auto;
   user-select: none;
   touch-action: manipulation;
   flex-shrink: 0;
@@ -666,8 +702,8 @@
   font-size: 14px;
   position: relative;
   z-index: 2147483647;
-  cursor: pointer !important;
-  pointer-events: auto !important;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .lf-close-btn:hover {
@@ -814,15 +850,15 @@
   flex: 1 1 auto;
   min-height: 0;
   max-height: min(380px, calc(100vh - 160px));
-  overflow-y: scroll !important;
-  overflow-x: hidden !important;
+  overflow-y: scroll;
+  overflow-x: hidden;
   overscroll-behavior: contain;
   background: transparent;
   overflow-wrap: break-word;
   word-break: break-word;
   scrollbar-gutter: stable;
-  scrollbar-width: thin !important;
-  scrollbar-color: #0071e3 rgba(0, 0, 0, 0.08) !important;
+  scrollbar-width: thin;
+  scrollbar-color: #0071e3 rgba(0, 0, 0, 0.08);
 }
 
 #lf-sentence-expanded-section,
@@ -861,8 +897,8 @@
 }
 
 .lf-bengali-meaning {
-  font-family: "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: var(--lf-font-bengali, 18.5px) !important;
+  font-family: "LexiFlow Bengali", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: var(--lf-font-bengali, 18.5px);
   font-weight: 600;
   color: var(--lf-ink);
   margin-bottom: 3px;
@@ -880,7 +916,7 @@
 }
 
 .lf-def-text {
-  font-size: var(--lf-font-english, 16px) !important;
+  font-size: var(--lf-font-english, 16px);
   color: var(--lf-ink);
   line-height: 1.55;
   margin-bottom: 4px;
@@ -895,15 +931,15 @@
 }
 
 .lf-easy-english-text {
-  font-size: var(--lf-font-english, 16px) !important;
+  font-size: var(--lf-font-english, 16px);
   color: var(--lf-ink);
   line-height: 1.55;
   font-weight: 500;
 }
 
 .lf-easy-bengali-text {
-  font-family: "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: var(--lf-font-bengali, 18.5px) !important;
+  font-family: "LexiFlow Bengali", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: var(--lf-font-bengali, 18.5px);
   font-weight: 600;
   color: var(--lf-ink);
   line-height: 1.6;
@@ -918,7 +954,7 @@
 }
 
 .lf-context-text {
-  font-size: var(--lf-font-context, 15px) !important;
+  font-size: var(--lf-font-context, 15px);
   color: var(--lf-ink);
   line-height: 1.55;
 }
@@ -926,19 +962,19 @@
 .lf-example-box {
   padding-left: 10px;
   border-left: 2.5px solid rgba(0, 113, 227, 0.5);
-  font-size: var(--lf-font-example, 14px) !important;
+  font-size: var(--lf-font-example, 14px);
   color: var(--lf-ink-muted);
   font-style: italic;
   margin-bottom: 10px;
 }
 
 .lf-example-text {
-  font-size: var(--lf-font-example, 14px) !important;
+  font-size: var(--lf-font-example, 14px);
   line-height: 1.55;
 }
 
 .lf-example-bengali {
-  font-family: "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "LexiFlow Bengali", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", -apple-system, BlinkMacSystemFont, sans-serif;
   font-style: normal;
   color: var(--lf-ink-muted);
   font-size: calc(var(--lf-font-example, 14px) + 0.5px) !important;
@@ -1146,7 +1182,7 @@
   flex-shrink: 0;
   font-family: inherit;
   user-select: none;
-  pointer-events: auto !important;
+  pointer-events: auto;
 }
 
 .lf-btn-action:hover {
@@ -1254,8 +1290,8 @@
 }
 
 .lf-skeleton-content {
-  overflow-y: hidden !important;
-  scrollbar-gutter: auto !important;
+  overflow-y: hidden;
+  scrollbar-gutter: auto;
   padding-bottom: 14px !important;
 }
 
@@ -1646,9 +1682,9 @@
 }
 
 .lf-phrase-bengali {
-  font-family: "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "LexiFlow Bengali", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--lf-ink);
-  font-size: var(--lf-font-bengali, 17.5px) !important;
+  font-size: var(--lf-font-bengali, 17.5px);
   font-weight: 600;
   line-height: 1.55;
 }
@@ -2298,8 +2334,8 @@
   color: #0f172a;
 }
 
-.lexiflow-popup.theme-light .lf-btn-icon {
-  color: #64748b;
+.lexiflow-popup.theme-light .lf-btn-icon:not(.lf-reading-mode-btn) {
+  color: #5b6270;
 }
 
 .lexiflow-popup.theme-light .lf-btn-icon:hover {
@@ -2411,7 +2447,7 @@
 }
 
 .lexiflow-popup.theme-light .lf-content {
-  scrollbar-color: #b6c0ce transparent !important;
+  scrollbar-color: #b6c0ce transparent;
 }
 
 /* ============================================================
@@ -2510,9 +2546,9 @@
 
 .lexiflow-popup[data-theme="dark"] .lf-tabs,
 .lexiflow-popup.theme-dark .lf-tabs {
-  background: #161618 !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: none !important;
+  background: #161618;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: none;
 }
 
 .lexiflow-popup[data-theme="dark"] .lf-tab,
@@ -2590,8 +2626,8 @@
 /* Bengali Box & Language Headers in Dark Mode */
 .lexiflow-popup[data-theme="dark"] .lf-bengali-box,
 .lexiflow-popup.theme-dark .lf-bengali-box {
-  background: rgba(138, 180, 248, 0.12) !important;
-  border-left-color: #8ab4f8 !important;
+  background: rgba(138, 180, 248, 0.12);
+  border-left-color: #8ab4f8;
 }
 
 .lexiflow-popup[data-theme="dark"] .lf-bengali-box-header,
@@ -2604,21 +2640,21 @@
 .lexiflow-popup.theme-dark .lf-context-label,
 .lexiflow-popup.theme-dark .lf-vocab-bengali,
 .lexiflow-popup.theme-dark .lf-syntactic-title {
-  color: #8ab4f8 !important;
+  color: #8ab4f8;
 }
 
 .lexiflow-popup[data-theme="dark"] .lf-target-badge,
 .lexiflow-popup[data-theme="dark"] .lf-quick-target-badge,
 .lexiflow-popup.theme-dark .lf-target-badge,
 .lexiflow-popup.theme-dark .lf-quick-target-badge {
-  background: rgba(138, 180, 248, 0.22) !important;
-  color: #8ab4f8 !important;
+  background: rgba(138, 180, 248, 0.22);
+  color: #8ab4f8;
 }
 
 /* Context Box in Dark Mode */
 .lexiflow-popup[data-theme="dark"] .lf-context-box,
 .lexiflow-popup.theme-dark .lf-context-box {
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
@@ -2632,7 +2668,7 @@
 
 .lexiflow-popup[data-theme="dark"] .lf-example-text,
 .lexiflow-popup.theme-dark .lf-example-text {
-  color: #f1f5f9 !important;
+  color: #f1f5f9;
 }
 
 .lexiflow-popup[data-theme="dark"] .lf-example-bengali,
@@ -2641,8 +2677,8 @@
 .lexiflow-popup.theme-dark .lf-example-bengali,
 .lexiflow-popup.theme-dark .lf-bengali-explanation,
 .lexiflow-popup.theme-dark .lf-def-example {
-  color: #cbd5e1 !important;
-  border-left-color: rgba(255, 255, 255, 0.16) !important;
+  color: #cbd5e1;
+  border-left-color: rgba(255, 255, 255, 0.16);
 }
 
 /* Secondary Metadata & Titles in Dark Mode */
@@ -2658,7 +2694,7 @@
 .lexiflow-popup.theme-dark .lf-idioms-title,
 .lexiflow-popup.theme-dark .lf-confusing-title,
 .lexiflow-popup.theme-dark .lf-preview-label {
-  color: #a1a1a6 !important;
+  color: #a1a1a6;
 }
 
 /* Quick AI Chips & Triggers */
@@ -2699,8 +2735,8 @@
 
 .lexiflow-popup[data-theme="dark"] .lf-synonym-tag,
 .lexiflow-popup.theme-dark .lf-synonym-tag {
-  background: rgba(255, 255, 255, 0.1) !important;
-  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
 
 .lexiflow-popup[data-theme="dark"] .lf-synonym-tag:hover,
@@ -3000,8 +3036,8 @@
 .lexiflow-popup[data-theme="dark"] .lf-feedback-note,
 .lexiflow-popup.theme-dark .lf-feedback-reason,
 .lexiflow-popup.theme-dark .lf-feedback-note {
-  background: #111113 !important;
-  color: #ffffff !important;
+  background: #111113;
+  color: #ffffff;
   border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
@@ -3915,7 +3951,7 @@
 }
 
 .lf-stepper-sep {
-  color: #a1a1a6;
+  color: var(--lf-ink-muted);
   font-weight: 500;
 }
 
@@ -4622,3 +4658,47 @@
 .lexiflow-popup .lf-u-w-94pct.lf-u-w-94pct.lf-u-w-94pct { width: 94%; }
 .lexiflow-popup .lf-u-w-95px.lf-u-w-95px.lf-u-w-95px { width: 95px; }
 .lexiflow-popup .lf-u-ws-nowrap.lf-u-ws-nowrap.lf-u-ws-nowrap { white-space: nowrap; }
+
+/* One-time tip shown the first time the card opens */
+.lf-first-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.1);
+  color: var(--lf-ink);
+  font-size: var(--lf-font-sublabel, 12px);
+  line-height: 1.45;
+}
+
+.lf-first-tip-text {
+  flex: 1;
+}
+
+.lf-first-tip-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--lf-ink-muted);
+  cursor: pointer;
+}
+
+.lf-first-tip-close:hover {
+  background: rgba(127, 127, 127, 0.15);
+  color: var(--lf-ink);
+}
+
+/* Elements toggled with the hidden attribute stay hidden whatever their display rule says */
+.lexiflow-popup [hidden] {
+  display: none;
+}
+
+.lexiflow-popup .lf-u-d-block.lf-u-d-block.lf-u-d-block { display: block; }

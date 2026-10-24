@@ -55,7 +55,7 @@ body {
   background: transparent;
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", "Nirmala UI", sans-serif;
+  font-family: "LexiFlow Bengali", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", "Nirmala UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.01em;
 }
@@ -369,7 +369,7 @@ body {
   font-weight: 700;
   color: var(--pop-text);
   line-height: 1.45;
-  font-family: "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", "Nirmala UI", inherit;
+  font-family: "LexiFlow Bengali", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", "Nirmala UI", inherit;
 }
 
 /* Nuance Box */
@@ -476,7 +476,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-family: "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", "Nirmala UI", inherit;
+  font-family: "LexiFlow Bengali", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", "Nirmala UI", inherit;
 }
 
 .lang-tag {
@@ -2405,7 +2405,7 @@ body {
   gap: 14px;
   background-color: var(--hub-bg);
   color: var(--hub-ink);
-  font-family: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Kalpurush", "Noto Sans Bengali", "Nirmala UI", sans-serif;
+  font-family: "LexiFlow Bengali", "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Kalpurush", "Noto Sans Bengali", "Nirmala UI", sans-serif;
   letter-spacing: -0.006em;
 }
 
