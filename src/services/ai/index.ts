@@ -11,7 +11,7 @@ import { TwoStageCacheService } from './cache';
 import { CacheManager } from '../cache';
 import { hashString } from '../cache/normalization';
 import { AIProvider } from './types';
-import { SummaryEvaluation } from '../../types';
+import { SummaryEvaluation, UsageCoachFeedback } from '../../types';
 import { SummaryEvaluationInput, SUMMARY_MAX_ARTICLE_CHARS, SUMMARY_MAX_CHARS } from './prompts';
 import {
   HighlightIntelligenceService,
@@ -266,6 +266,30 @@ export class AIService {
   }
 
   /**
+   * Usage Coach. Judging the learner's sentence needs a real model, so without one this throws a message
+   * the page shows as-is instead of returning a verdict nobody measured.
+   */
+  static async evaluateUsage(targetWord: string, sentence: string): Promise<UsageCoachFeedback> {
+    const word = (targetWord || '').trim();
+    const text = (sentence || '').trim();
+    if (!word || !text) throw new Error('Enter the word and a sentence that uses it.');
+
+    const userSettings = await SettingsService.getSettings();
+    const provider = await this.getProvider(userSettings);
+    if (!this.hasLiveAI(userSettings) || !provider.evaluateUsage) {
+      throw new Error('Checking your sentence needs an AI provider. Set one up in Settings (LexiFlow Cloud, Gemini, OpenAI, Claude or Ollama).');
+    }
+    return provider.evaluateUsage(word, text);
+  }
+
+  /** Whether the settings point at a real model (not the offline mode, and with a key where one is needed). */
+  private static hasLiveAI(settings: UserSettings): boolean {
+    const providerName = settings.aiProvider || 'mock';
+    const hasApiKey = Boolean(settings.apiKey?.trim());
+    return providerName === 'lexiflow' || ((providerName === 'ollama' || hasApiKey) && providerName !== 'mock');
+  }
+
+  /**
    * Summary practice. Marking needs a real model, so there is no offline fallback: without one this
    * throws a message the page shows as-is, rather than inventing a score.
    */
@@ -277,12 +301,9 @@ export class AIService {
     if (summary.length > SUMMARY_MAX_CHARS) throw new Error(`Keep the summary under ${SUMMARY_MAX_CHARS} characters.`);
 
     const userSettings = await SettingsService.getSettings();
-    const providerName = userSettings.aiProvider || 'mock';
-    const hasApiKey = Boolean(userSettings.apiKey?.trim());
-    const isLiveAI = providerName === 'lexiflow' || ((providerName === 'ollama' || hasApiKey) && providerName !== 'mock');
     const provider = await this.getProvider(userSettings);
 
-    if (!isLiveAI || !provider.evaluateSummary) {
+    if (!this.hasLiveAI(userSettings) || !provider.evaluateSummary) {
       throw new Error('Marking a summary needs an AI provider. Set one up in Settings (LexiFlow Cloud, Gemini, OpenAI, Claude or Ollama).');
     }
     return provider.evaluateSummary({ ...input, summary, articleText: articleText.slice(0, SUMMARY_MAX_ARTICLE_CHARS) });

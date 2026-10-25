@@ -1,31 +1,45 @@
 import React, { useState } from 'react';
 import { UsageCoachFeedback } from '../../types';
+import { getLanguageConfig } from '../../config/languages';
 
 interface CoachViewProps {
   initialWord?: string;
+  /** The reader's target language, for labelling the translated feedback. */
+  targetLanguage?: string;
 }
 
-export const CoachView: React.FC<CoachViewProps> = ({ initialWord }) => {
+export const CoachView: React.FC<CoachViewProps> = ({ initialWord, targetLanguage = 'bn' }) => {
   const [targetWord, setTargetWord] = useState(initialWord || 'mitigate');
   const [sentence, setSentence] = useState('We need to take urgent action to mitigate the carbon emissions.');
   const [feedback, setFeedback] = useState<UsageCoachFeedback | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const feedbackLabel = targetLanguage === 'en' ? 'Coaching Feedback' : `${getLanguageConfig(targetLanguage).targetLabel} Coaching Feedback`;
 
   const handleEvaluate = () => {
     if (!targetWord.trim() || !sentence.trim()) return;
-    setLoading(true);
-
-    if (typeof chrome !== 'undefined' && chrome.runtime) {
-      chrome.runtime.sendMessage({
-        type: 'EVALUATE_USAGE',
-        payload: { targetWord, sentence }
-      }, (res) => {
-        setLoading(false);
-        if (res?.success && res.data) {
-          setFeedback(res.data);
-        }
-      });
+    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+      setError('Checking sentences only works inside the LexiFlow extension.');
+      return;
     }
+    setLoading(true);
+    setError(null);
+    setFeedback(null);
+
+    chrome.runtime.sendMessage({
+      type: 'EVALUATE_USAGE',
+      payload: { targetWord, sentence }
+    }, (res) => {
+      setLoading(false);
+      if (chrome.runtime?.lastError) {
+        setError(chrome.runtime.lastError.message || 'Could not reach LexiFlow.');
+      } else if (res?.success && res.data) {
+        setFeedback(res.data);
+      } else {
+        // Never show a verdict that was not actually measured
+        setError(res?.error || 'Could not check this sentence. Please try again.');
+      }
+    });
   };
 
   return (
@@ -80,6 +94,12 @@ export const CoachView: React.FC<CoachViewProps> = ({ initialWord }) => {
             {loading ? 'Evaluating...' : '✍️ Check My Sentence'}
           </button>
         </div>
+
+        {error && (
+          <div role="alert" style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(220, 38, 38, 0.08)', borderLeft: '4px solid var(--danger)', color: 'var(--danger)', fontSize: '13px' }}>
+            {error}
+          </div>
+        )}
       </div>
 
       {feedback && (
@@ -93,12 +113,18 @@ export const CoachView: React.FC<CoachViewProps> = ({ initialWord }) => {
                 fontSize: '13px',
                 padding: '4px 8px'
               }}>
-                {feedback.isGrammaticallyCorrect ? '✓ Grammatically Valid' : '⚠️ Minor Revision Suggested'}
+                {feedback.isGrammaticallyCorrect ? '✓ Grammatically correct' : '⚠️ Needs correction'}
               </span>
               <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
                 Collocation Score: <strong style={{ color: 'var(--accent)' }}>{feedback.collocationScore} / 100</strong>
               </span>
             </div>
+
+            {feedback.grammarCorrectness && (
+              <p style={{ color: 'var(--text-main)', fontSize: '13.5px', marginTop: '4px', lineHeight: 1.5 }}>
+                {feedback.grammarCorrectness}
+              </p>
+            )}
 
             <div style={{ marginTop: '12px' }}>
               <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>More Natural Alternative:</span>
@@ -108,11 +134,22 @@ export const CoachView: React.FC<CoachViewProps> = ({ initialWord }) => {
             </div>
 
             <div style={{ marginTop: '12px', background: 'rgba(0, 113, 227, 0.05)', padding: '10px 14px', borderRadius: '8px', borderLeft: '3px solid var(--accent)' }}>
-              <strong style={{ fontSize: '12px', color: 'var(--accent)' }}>Bengali Coaching Feedback:</strong>
+              <strong style={{ fontSize: '12px', color: 'var(--accent)' }}>{feedbackLabel}:</strong>
               <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '3px', lineHeight: 1.45 }}>
                 {feedback.bengaliFeedback}
               </p>
             </div>
+
+            {feedback.alternativeCollocations && feedback.alternativeCollocations.length > 0 && (
+              <div style={{ marginTop: '12px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Other natural ways to use "{feedback.targetWord}":</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                  {feedback.alternativeCollocations.map((c, i) => (
+                    <span key={i} className="tag-badge">{c}</span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

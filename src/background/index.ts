@@ -314,25 +314,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 
           case 'EVALUATE_USAGE': {
             const { targetWord, sentence } = payload as { targetWord: string; sentence: string };
-            const provider = await AIService.getProvider();
-            if (provider.evaluateUsage) {
-              sendResponse({ success: true, data: await provider.evaluateUsage(targetWord, sentence) });
-              break;
-            }
-            // Providers without an evaluation prompt: rewrite only; the verdict and score below are not measured.
-            const assist = await provider.assistWriting(sentence, 'natural');
-            sendResponse({
-              success: true,
-              data: {
-                targetWord,
-                isGrammaticallyCorrect: true,
-                collocationScore: 92,
-                grammarCorrectness: 'Excellent grammatical structure and natural collocation.',
-                bengaliFeedback: assist.bengaliExplanation || `বাক্যটিতে "${targetWord}" যথাযথ ও স্বাভাবিকভাবে প্রয়োগ করা হয়েছে।`,
-                naturalAlternative: assist.improvedText || sentence,
-                alternativeCollocations: assist.alternatives || []
-              }
-            });
+            sendResponse({ success: true, data: await AIService.evaluateUsage(targetWord, sentence) });
             break;
           }
 

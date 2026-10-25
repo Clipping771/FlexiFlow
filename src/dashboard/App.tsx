@@ -721,7 +721,7 @@ export const App: React.FC = () => {
 
             {activeTab === 'word_difference' && <WordDifferenceView />}
 
-            {activeTab === 'usage_coach' && <CoachView initialWord={coachWord} />}
+            {activeTab === 'usage_coach' && <CoachView initialWord={coachWord} targetLanguage={settings.targetLanguage || 'bn'} />}
 
             {activeTab === 'analytics' && (
               <AnalyticsView

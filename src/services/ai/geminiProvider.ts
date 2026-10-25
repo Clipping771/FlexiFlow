@@ -25,6 +25,9 @@ import { safeParseJSON } from './safeJson';
 import { SummaryEvaluation } from '../../types';
 import { buildSummaryEvaluationPrompt, SummaryEvaluationInput } from './prompts';
 import { parseSummaryEvaluation } from './summarySchema';
+import { UsageCoachFeedback } from '../../types';
+import { buildUsageEvaluationPrompt } from './prompts';
+import { UsageCoachFeedbackSchema } from './usageCoachSchema';
 import {
   buildStageAPrompt,
   buildStageACorrection,
@@ -320,6 +323,12 @@ export class GeminiProvider implements AIProvider {
     const prompt = buildFollowUpPrompt({ text, context, question }, this.targetLang, 'full');
     const raw = await this.callGemini(prompt.system, prompt.user, prompt.maxTokens);
     return FollowUpResponseSchema.parse(safeParseJSON(raw));
+  }
+
+  async evaluateUsage(targetWord: string, sentence: string): Promise<UsageCoachFeedback> {
+    const prompt = buildUsageEvaluationPrompt({ targetWord, sentence }, this.targetLang);
+    const raw = await this.callGemini(prompt.system, prompt.user, prompt.maxTokens);
+    return UsageCoachFeedbackSchema.parse({ ...(safeParseJSON(raw) as Record<string, unknown>), targetWord });
   }
 
   async evaluateSummary(input: SummaryEvaluationInput): Promise<SummaryEvaluation> {
