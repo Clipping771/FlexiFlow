@@ -146,16 +146,17 @@ export const ReadingTab: React.FC<ReadingTabProps> = ({
           aria-pressed={readLater.saved}
           title={readLater.saved ? 'Remove this article from your reading list' : 'Save this article to read later'}
         >
-          {readLater.saved ? <BookmarkCheck size={14} /> : <BookmarkPlus size={14} />}
-          <span>{readLater.saved ? 'Saved for later' : 'Save for later'}</span>
+          {readLater.saved ? <BookmarkCheck size={16} /> : <BookmarkPlus size={16} />}
+          <span>{readLater.saved ? 'Saved' : 'Save for later'}</span>
         </button>
-        <button type="button" className="read-later-link" onClick={onWriteSummary} title="Summarize this article and get it marked">
-          <PenLine size={13} />
-          <span>Write a summary</span>
+        <button type="button" className="read-later-btn" onClick={onWriteSummary} title="Write a summary of this article and get it marked">
+          <PenLine size={16} />
+          <span>Summarize</span>
         </button>
-        <button type="button" className="read-later-link" onClick={onOpenReadingList}>
-          <ListChecks size={13} />
-          <span>Reading list{readLater.unreadCount > 0 ? ` (${readLater.unreadCount})` : ''}</span>
+        <button type="button" className="read-later-btn" onClick={onOpenReadingList} title="Open your reading list">
+          <ListChecks size={16} />
+          <span>Reading list</span>
+          {readLater.unreadCount > 0 && <span className="read-later-count">{readLater.unreadCount}</span>}
         </button>
       </div>
     )}

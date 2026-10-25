@@ -3446,34 +3446,54 @@ html body [lang]:lang(he) {
 
 /* Read Later row under the site card */
 .popup-container .read-later-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin: -4px 0 12px;
 }
 
-.popup-container .read-later-btn,
-.popup-container .read-later-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 8px;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-}
-
 .popup-container .read-later-btn {
-  padding: 6px 11px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 6px 9px;
+  border-radius: 10px;
   border: 1px solid var(--hub-card-border);
   background: var(--hub-card);
+  color: var(--hub-ink-muted);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.popup-container .read-later-btn > span:not(.read-later-count) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popup-container .read-later-btn svg {
   color: var(--hub-ink);
 }
 
-.popup-container .read-later-btn:hover {
+.popup-container .read-later-btn:hover,
+.popup-container .read-later-btn:focus-visible {
   border-color: var(--hub-accent);
+  color: var(--hub-accent);
+  outline: none;
+}
+
+.popup-container .read-later-btn:hover svg,
+.popup-container .read-later-btn:focus-visible svg,
+.popup-container .read-later-btn.saved svg {
   color: var(--hub-accent);
 }
 
@@ -3483,19 +3503,18 @@ html body [lang]:lang(he) {
   color: var(--hub-accent);
 }
 
-.popup-container .read-later-row > .read-later-btn {
-  margin-right: auto;
-}
-
-.popup-container .read-later-link {
-  padding: 6px 4px;
-  border: none;
-  background: transparent;
-  color: var(--hub-ink-muted);
-}
-
-.popup-container .read-later-link:hover {
-  color: var(--hub-accent);
-  text-decoration: underline;
+.popup-container .read-later-count {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--hub-accent);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
 }
 
