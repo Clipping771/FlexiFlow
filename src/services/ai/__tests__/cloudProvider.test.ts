@@ -132,3 +132,29 @@ describe('CloudProvider', () => {
     expect(provider).toBeInstanceOf(CloudProvider);
   });
 });
+
+describe('CloudProvider exam marking', () => {
+  it.each([
+    ['pte-essay', { task: 'pte-essay', prompt: 'Q', text: 'Essay.', taskId: 'pte_write_essay' }, { prompt: 'Q', text: 'Essay.', taskId: 'pte_write_essay' }],
+    ['pte-swt', { task: 'pte-swt', passage: 'P', text: 'One sentence.' }, { passage: 'P', text: 'One sentence.' }],
+    ['pte-read-aloud', { task: 'pte-read-aloud', prompt: 'Read this.', transcript: 'Read this.', durationMs: 4200.4 }, { prompt: 'Read this.', transcript: 'Read this.', durationMs: '4200' }],
+    ['ielts-task', { task: 'ielts-task', taskNumber: 1, prompt: 'Q', text: 'Report.' }, { task: '1', prompt: 'Q', text: 'Report.' }],
+    ['ielts-speaking', { task: 'ielts-speaking', part: 2, prompt: 'Cue', transcript: 'Talk.', durationMs: 95000 }, { part: '2', prompt: 'Cue', transcript: 'Talk.', durationMs: '95000' }]
+  ] as const)('%s posts only the question and answer to its exam route', async (route, req, body) => {
+    authorizedFetch.mockResolvedValue(reply(200, { data: { content: 2 }, usage: { used: 3, limit: 30 }, cached: false }));
+
+    expect(await new CloudProvider('bn').markExam(req)).toEqual({ content: 2 });
+
+    expect(authorizedFetch.mock.calls[0][0]).toBe(`/v1/ai/exam/${route}`);
+    const sent = sentBody();
+    expect(sent).toEqual({ ...body, targetLang: 'bn' });
+    expect(JSON.stringify(sent)).not.toMatch(/systemPrompt|Examiner/);
+  });
+
+  it('surfaces a quota refusal on an exam route as a CloudAIError', async () => {
+    authorizedFetch.mockResolvedValue(reply(402, { error: { code: 'QUOTA_EXCEEDED', limit: 30 } }));
+    const err = (await new CloudProvider().markPteEssay('Q', 'Essay.').catch((e) => e)) as CloudAIError;
+    expect(err).toBeInstanceOf(CloudAIError);
+    expect(err.code).toBe('QUOTA_EXCEEDED');
+  });
+});

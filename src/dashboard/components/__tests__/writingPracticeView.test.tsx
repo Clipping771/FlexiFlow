@@ -142,6 +142,13 @@ describe('WritingPracticeView (Exam Simulator & Editor UI)', () => {
       expect.objectContaining({ type: 'EXAM_AI_COMPLETE' }),
       expect.any(Function)
     );
+    // The same answer goes along as an exam task, which is all LexiFlow Cloud accepts
+    expect(sendMessage.mock.calls[0][0].payload.cloud).toEqual({
+      task: 'pte-essay',
+      prompt: expect.any(String),
+      text: essayContent,
+      taskId: 'pte_write_essay'
+    });
     expect(resultsCard?.textContent).toContain('Marked by test-model');
   });
 
@@ -184,7 +191,7 @@ describe('WritingPracticeView (Exam Simulator & Editor UI)', () => {
   });
 
   it('4. Renders IELTS Academic tasks when learner profile is IELTS, and evaluates Task 2 essay', async () => {
-    mockExamAi(IELTS_ESSAY_REPLY);
+    const sendMessage = mockExamAi(IELTS_ESSAY_REPLY);
     const ieltsProfile: LearnerProfile = {
       userId: 'usr_ielts',
       targetExam: 'ielts_academic',
@@ -223,6 +230,7 @@ describe('WritingPracticeView (Exam Simulator & Editor UI)', () => {
     expect(resultsCard?.textContent).toContain('LexiFlow estimate');
     expect(resultsCard?.textContent).toContain('Task Achievement');
     expect(resultsCard?.textContent).toContain('Coherence Cohesion');
+    expect(sendMessage.mock.calls[0][0].payload.cloud).toMatchObject({ task: 'ielts-task', taskNumber: 2, text: paddedEssay });
   });
 
   it('5. Toggles countdown timer on and off', async () => {

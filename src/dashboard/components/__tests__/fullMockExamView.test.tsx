@@ -157,4 +157,36 @@ describe('FullMockExamView Component', () => {
     expect(text).toContain('No error patterns found in this attempt.');
     expect(localStorage.getItem('lexiflow_mistake_memories') ?? '[]').not.toContain('PTE.ORAL_HESITATION_LONG');
   });
+
+  it('5. Sends the written answer as an exam task so LexiFlow Cloud can mark it', async () => {
+    localStorage.clear();
+    const sendMessage = vi.fn((_m: any, cb: (res: any) => void) =>
+      cb({ success: true, data: { rawText: JSON.stringify({ content: 2, grammar: 2, vocabulary: 1.5, feedback: 'Good.', errors: [] }), model: 'LexiFlow Cloud' } })
+    );
+    (globalThis as any).chrome = { runtime: { sendMessage } };
+    await renderView();
+
+    const clickByText = async (text: string) => {
+      const btn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes(text));
+      await act(async () => {
+        btn?.click();
+      });
+    };
+    const summary = 'Cities that invest in public transport cut traffic and give residents fairer access to jobs.';
+
+    await clickByText('Begin Full Mock Exam');
+    await clickByText('Next Section'); // Speaking: skipped
+    const textarea = container.querySelector('textarea')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(textarea, summary);
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await clickByText('Next Section');
+    await clickByText('Next Section');
+    await clickByText('Submit & Finish Mock Exam');
+
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage.mock.calls[0][0].payload.cloud).toEqual({ task: 'pte-swt', passage: expect.any(String), text: summary, taskId: 'pte_writing' });
+    delete (globalThis as any).chrome;
+  });
 });

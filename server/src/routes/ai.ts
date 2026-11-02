@@ -33,6 +33,7 @@ import {
   runUsageEvaluation
 } from '../lib/tasks';
 import { SUMMARY_MAX_ARTICLE_CHARS, SUMMARY_MAX_CHARS } from '../../../src/services/ai/prompts/summary';
+import { EXAM_TASKS, type ExamTaskSpec, examNeedsModel, runExamTask } from '../lib/examTasks';
 import { dhakaDay, nextDhakaMidnight } from '../lib/time';
 import type { SelectionType, WritingGoal } from '../../../src/types';
 import { loadUser } from '../lib/users';
@@ -92,7 +93,7 @@ interface TaskSpec<K extends string, T> {
   /** Credits for this request when they depend on the input; defaults to CREDIT_COSTS[endpoint]. */
   credits?: (input: Input<K>) => number;
   /** Extra input rules that need several fields or the plan; runs before anything is charged. */
-  check?: (input: Input<K>, limits: PlanLimits) => void;
+  check?: (input: Input<K>, limits: PlanLimits) => void | Promise<void>;
   run: (gemini: GeminiConfig, input: Input<K>) => Promise<TaskResult<T>>;
   /** Adapts a cached answer to this request, e.g. echoing the reader's exact selection. */
   fromCache?: (data: T, input: Input<K>) => T;
@@ -113,7 +114,7 @@ async function metered<K extends string, T>(c: Context<AppEnv>, spec: TaskSpec<K
   if (!user) throw new ApiError(401, 'AUTH_REQUIRED', 'Account not found. Sign in again.');
   const limits = PLAN_LIMITS[user.plan];
   const input = await readBody(c, spec.fields, limits);
-  spec.check?.(input, limits);
+  await spec.check?.(input, limits);
 
   const rate = await hitRateLimit(db, userId, limits.requestsPerMinute, now);
   if (!rate.ok) {
@@ -383,4 +384,84 @@ ai.post('/highlights', (c) =>
     cacheKey: () => null,
     run: (gemini, input) => runHighlights(gemini, { rawText: input.rawText!, pageTitle: input.pageTitle, targetLang: input.targetLang! })
   })
+);
+
+// Exam marking (exams/pte, exams/ielts). The server builds the grading prompt from the engine, so the
+// client sends only the question and the learner's answer, never a prompt.
+const EXAM_PROMPT: Field = { required: true, max: 3000 };
+const EXAM_ANSWER: Field = { required: true, max: 8000 };
+const EXAM_PASSAGE: Field = { required: true, max: 8000 };
+const DURATION_MS: Field = { required: true, max: 7, pattern: /^\d{1,7}$/ };
+const TASK_ID: Field = { max: 80, pattern: /^[\w.:-]+$/ };
+
+function examRoute<K extends string, I>(
+  c: Context<AppEnv>,
+  endpoint: AiEndpoint,
+  spec: ExamTaskSpec<I>,
+  fields: Record<K, Field>,
+  toInput: (input: Input<K>) => I
+) {
+  return metered(c, {
+    endpoint,
+    fields: { ...fields, taskId: TASK_ID },
+    // The learner's answers are private and every attempt is different
+    cacheKey: () => null,
+    check: async (input) => {
+      if (!(await examNeedsModel(spec, toInput(input as Input<K>)))) {
+        throw new ApiError(400, 'INVALID_REQUEST', 'This answer is scored by the exam rules alone, so it needs no AI marking.');
+      }
+    },
+    run: (gemini, input) =>
+      runExamTask(gemini, spec, toInput(input as Input<K>), {
+        db: c.env.DB,
+        userId: c.get('userId'),
+        taskId: (input as Input<'taskId'>).taskId ?? null,
+        costUsd: (tokensIn, tokensOut) => estimateMicroUsd(c.env, tokensIn, tokensOut) / 1_000_000
+      })
+  });
+}
+
+ai.post('/exam/pte-essay', (c) =>
+  examRoute(c, 'exam-pte-essay', EXAM_TASKS['pte-essay'], { prompt: EXAM_PROMPT, text: EXAM_ANSWER }, (input) => ({
+    prompt: input.prompt!,
+    text: input.text!
+  }))
+);
+
+ai.post('/exam/pte-swt', (c) =>
+  examRoute(c, 'exam-pte-swt', EXAM_TASKS['pte-swt'], { passage: EXAM_PASSAGE, text: { required: true, max: 1000 } }, (input) => ({
+    passage: input.passage!,
+    text: input.text!
+  }))
+);
+
+ai.post('/exam/pte-read-aloud', (c) =>
+  examRoute(
+    c,
+    'exam-pte-read-aloud',
+    EXAM_TASKS['pte-read-aloud'],
+    { prompt: EXAM_PROMPT, transcript: { required: true, max: 3000 }, durationMs: DURATION_MS },
+    (input) => ({ prompt: input.prompt!, transcript: input.transcript!, durationMs: Number(input.durationMs) })
+  )
+);
+
+ai.post('/exam/ielts-task', (c) =>
+  examRoute(
+    c,
+    'exam-ielts-task',
+    EXAM_TASKS['ielts-task'],
+    { task: { required: true, max: 1, pattern: /^[12]$/ }, prompt: EXAM_PROMPT, text: EXAM_ANSWER },
+    (input) => ({ task: input.task === '1' ? 1 : 2, prompt: input.prompt!, text: input.text! }) as const
+  )
+);
+
+ai.post('/exam/ielts-speaking', (c) =>
+  examRoute(
+    c,
+    'exam-ielts-speaking',
+    EXAM_TASKS['ielts-speaking'],
+    { part: { required: true, max: 1, pattern: /^[12]$/ }, prompt: EXAM_PROMPT, transcript: EXAM_ANSWER, durationMs: DURATION_MS },
+    (input) =>
+      ({ part: input.part === '1' ? 1 : 2, prompt: input.prompt!, transcript: input.transcript!, durationMs: Number(input.durationMs) }) as const
+  )
 );

@@ -14,6 +14,7 @@ import {
 } from '../../../exams/ielts/speaking/evaluator';
 import { MistakeMemoryClient } from '../../services/mistake/client';
 import { createExamAiCaller, isPlaceholderScore } from '../../services/ai/examCaller';
+import type { CloudExamRequest } from '../../services/ai/cloudProvider';
 import { isSpeechToTextSupported, startSpeechToText, SpeechToTextSession } from '../../services/audio/speechToText';
 import { playNaturalSpeech, stopAllAudio } from '../../services/audio/voiceService';
 import { ExamResultCard } from './ExamResultCard';
@@ -309,7 +310,12 @@ export const SpeakingPracticeView: React.FC<SpeakingPracticeViewProps> = ({
     const effectiveDurationMs =
       recordingSeconds > 0 ? recordingSeconds * 1000 : Math.max(5000, config.recordSeconds * 500);
     const transcript = spokenTranscript.trim();
-    const ai = createExamAiCaller();
+    const speech = { prompt: config.prompt, transcript, durationMs: effectiveDurationMs, taskId: selectedTask };
+    // Repeat Sentence and Answer Short Question are scored by rules alone, so they never reach the AI
+    const cloud: CloudExamRequest =
+      selectedTask === 'pte_read_aloud' ? { task: 'pte-read-aloud', ...speech }
+      : { task: 'ielts-speaking', part: selectedTask === 'ielts_speaking_part_2' ? 2 : 1, ...speech };
+    const ai = createExamAiCaller(cloud);
     const aiOptions = { aiCaller: ai.call };
 
     try {

@@ -96,6 +96,17 @@ function toCloudError(status: number, envelope: ErrorEnvelope): Error {
 }
 
 /**
+ * An exam answer to mark on LexiFlow Cloud. The server builds the grading prompt from the exam engine,
+ * so only the question and the learner's answer travel; `taskId` labels the server's usage record.
+ */
+export type CloudExamRequest =
+  | { task: 'pte-essay'; prompt: string; text: string; taskId?: string }
+  | { task: 'pte-swt'; passage: string; text: string; taskId?: string }
+  | { task: 'pte-read-aloud'; prompt: string; transcript: string; durationMs: number; taskId?: string }
+  | { task: 'ielts-task'; taskNumber: 1 | 2; prompt: string; text: string; taskId?: string }
+  | { task: 'ielts-speaking'; part: 1 | 2; prompt: string; transcript: string; durationMs: number; taskId?: string };
+
+/**
  * AI provider backed by LexiFlow Cloud (server/). Never falls back to offline results:
  * a refusal is surfaced to the reader (CLOUD_BACKEND_DESIGN.md §3.3). Article analysis stays on the
  * extension's built-in pipeline, as for every provider.
@@ -178,5 +189,44 @@ export class CloudProvider implements AIProvider {
 
   evaluateUsage(targetWord: string, sentence: string): Promise<UsageCoachFeedback> {
     return this.post('/v1/ai/evaluate-usage', { targetWord, sentence });
+  }
+
+  /*
+   * Exam marking. Each returns the model's marks, already checked by the server against the engine's
+   * schema; the exam engine validates them again and does the scoring, as it does for every provider.
+   */
+  markPteEssay(prompt: string, text: string, taskId?: string): Promise<unknown> {
+    return this.post('/v1/ai/exam/pte-essay', { prompt, text, taskId });
+  }
+
+  markPteSwt(passage: string, text: string, taskId?: string): Promise<unknown> {
+    return this.post('/v1/ai/exam/pte-swt', { passage, text, taskId });
+  }
+
+  markPteReadAloud(prompt: string, transcript: string, durationMs: number, taskId?: string): Promise<unknown> {
+    return this.post('/v1/ai/exam/pte-read-aloud', { prompt, transcript, durationMs: String(Math.round(durationMs)), taskId });
+  }
+
+  markIeltsTask(taskNumber: 1 | 2, prompt: string, text: string, taskId?: string): Promise<unknown> {
+    return this.post('/v1/ai/exam/ielts-task', { task: String(taskNumber), prompt, text, taskId });
+  }
+
+  markIeltsSpeaking(part: 1 | 2, prompt: string, transcript: string, durationMs: number, taskId?: string): Promise<unknown> {
+    return this.post('/v1/ai/exam/ielts-speaking', { part: String(part), prompt, transcript, durationMs: String(Math.round(durationMs)), taskId });
+  }
+
+  markExam(req: CloudExamRequest): Promise<unknown> {
+    switch (req.task) {
+      case 'pte-essay':
+        return this.markPteEssay(req.prompt, req.text, req.taskId);
+      case 'pte-swt':
+        return this.markPteSwt(req.passage, req.text, req.taskId);
+      case 'pte-read-aloud':
+        return this.markPteReadAloud(req.prompt, req.transcript, req.durationMs, req.taskId);
+      case 'ielts-task':
+        return this.markIeltsTask(req.taskNumber, req.prompt, req.text, req.taskId);
+      case 'ielts-speaking':
+        return this.markIeltsSpeaking(req.part, req.prompt, req.transcript, req.durationMs, req.taskId);
+    }
   }
 }

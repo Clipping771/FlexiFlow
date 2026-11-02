@@ -3,6 +3,7 @@
  * The engines take an `aiCaller` and validate its output themselves; this sends the prompt to the
  * background worker, which owns the API key.
  */
+import type { CloudExamRequest } from './cloudProvider';
 
 export interface ExamAiResponse {
   rawText: string;
@@ -19,7 +20,11 @@ export interface ExamAiCaller {
   lastError: () => string | null;
 }
 
-export function createExamAiCaller(): ExamAiCaller {
+/**
+ * `cloud` describes the same answer as an exam task, for LexiFlow Cloud: it marks the task with the
+ * engine's prompt on the server instead of taking the prompt from here. BYOK providers ignore it.
+ */
+export function createExamAiCaller(cloud?: CloudExamRequest): ExamAiCaller {
   let model: string | undefined;
   let error: string | null = null;
 
@@ -33,7 +38,7 @@ export function createExamAiCaller(): ExamAiCaller {
         fail('AI marking only works inside the LexiFlow extension.');
         return;
       }
-      chrome.runtime.sendMessage({ type: 'EXAM_AI_COMPLETE', payload: { systemPrompt, userPrompt } }, (res) => {
+      chrome.runtime.sendMessage({ type: 'EXAM_AI_COMPLETE', payload: { systemPrompt, userPrompt, cloud } }, (res) => {
         if (chrome.runtime?.lastError) fail(chrome.runtime.lastError.message || 'Could not reach LexiFlow.');
         else if (res?.success && res.data?.rawText) {
           error = null;

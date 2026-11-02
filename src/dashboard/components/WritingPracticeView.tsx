@@ -5,6 +5,7 @@ import { evaluatePteEssay, evaluatePteSwt, PteWritingEvaluationResult } from '..
 import { evaluateIeltsTask1, evaluateIeltsTask2, IeltsWritingEvaluationResult } from '../../../exams/ielts/writing/evaluator';
 import { MistakeMemoryClient } from '../../services/mistake/client';
 import { createExamAiCaller, isPlaceholderScore } from '../../services/ai/examCaller';
+import type { CloudExamRequest } from '../../services/ai/cloudProvider';
 import { ExamResultCard } from './ExamResultCard';
 
 interface WritingPracticeViewProps {
@@ -197,7 +198,12 @@ export const WritingPracticeView: React.FC<WritingPracticeViewProps> = ({
     setIsTimerRunning(false);
 
     try {
-      const ai = createExamAiCaller();
+      const taskId = selectedTask;
+      const cloud: CloudExamRequest =
+        selectedTask === 'pte_write_essay' ? { task: 'pte-essay', prompt: config.prompt, text, taskId }
+        : selectedTask === 'pte_summarize_written_text' ? { task: 'pte-swt', passage: config.passage || '', text, taskId }
+        : { task: 'ielts-task', taskNumber: selectedTask === 'ielts_writing_task_1' ? 1 : 2, prompt: config.prompt, text, taskId };
+      const ai = createExamAiCaller(cloud);
       const options = { aiCaller: ai.call };
       let result: PteWritingEvaluationResult | IeltsWritingEvaluationResult;
       if (selectedTask === 'pte_write_essay') {

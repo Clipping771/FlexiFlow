@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { MistakeMemoryClient } from '../../services/mistake/client';
 import { createExamAiCaller, isPlaceholderScore } from '../../services/ai/examCaller';
+import type { CloudExamRequest } from '../../services/ai/cloudProvider';
 import { isSpeechToTextSupported, startSpeechToText, SpeechToTextSession } from '../../services/audio/speechToText';
 import { playNaturalSpeech, stopAllAudio } from '../../services/audio/voiceService';
 import { evaluateReadAloud } from '../../../exams/pte/speaking/evaluator';
@@ -210,7 +211,19 @@ async function scoreStage(stage: MockStage, answer: StageAnswer | undefined, sca
     return { ...base, score: scale === 'pte' ? 10 : 0, detectedErrors: [], status: 'skipped', detail: 'Not attempted' };
   }
 
-  const ai = createExamAiCaller();
+  // A typed answer has no recording, so it gets a nominal duration instead of a "too short" penalty
+  const durationMs = stage.kind === 'speak' ? (answer?.durationSec ? answer.durationSec * 1000 : stage.recordSeconds * 500) : 0;
+  const cloud: CloudExamRequest | undefined =
+    stage.kind === 'speak'
+      ? scale === 'pte'
+        ? { task: 'pte-read-aloud', prompt: stage.prompt, transcript: text, durationMs, taskId: stage.id }
+        : { task: 'ielts-speaking', part: 2, prompt: stage.prompt, transcript: text, durationMs, taskId: stage.id }
+      : stage.kind === 'write'
+        ? scale === 'pte'
+          ? { task: 'pte-swt', passage: stage.passage || '', text, taskId: stage.id }
+          : { task: 'ielts-task', taskNumber: 2, prompt: stage.prompt, text, taskId: stage.id }
+        : undefined;
+  const ai = createExamAiCaller(cloud);
   const aiResult = (overallScore: string, modelUsed: string, errorCodes: string[]): SectionResult =>
     isPlaceholderScore(modelUsed)
       ? { ...base, score: null, detectedErrors: [], status: 'unmarked', detail: ai.lastError() || 'Needs an AI provider' }
@@ -218,8 +231,6 @@ async function scoreStage(stage: MockStage, answer: StageAnswer | undefined, sca
 
   switch (stage.kind) {
     case 'speak': {
-      // A typed answer has no recording, so it gets a nominal duration instead of a "too short" penalty
-      const durationMs = answer?.durationSec ? answer.durationSec * 1000 : stage.recordSeconds * 500;
       const r = scale === 'pte'
         ? await evaluateReadAloud(stage.prompt, text, { durationMs }, { aiCaller: ai.call })
         : await evaluateIeltsSpeakingPart2(stage.prompt, text, { durationMs }, { aiCaller: ai.call });

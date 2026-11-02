@@ -9,7 +9,7 @@ import { openSavedArticle, captureArticleText } from './openArticle';
 import { setupBadgeListeners, updateAllTabBadges } from './badgeService';
 import { EventLogger, ApprovedEventName } from '../services/logging/eventLogger';
 import { AuthService, CloudAuthError } from '../services/auth/authService';
-import { CloudAIError } from '../services/ai/cloudProvider';
+import { CloudAIError, type CloudExamRequest } from '../services/ai/cloudProvider';
 
 // Immediately ensure Ollama dynamic rules and Badge synchronization are registered
 setupOllamaOriginRules();
@@ -475,8 +475,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
           }
 
           case 'EXAM_AI_COMPLETE': {
-            const { systemPrompt, userPrompt } = payload as { systemPrompt: string; userPrompt: string };
-            const result = await AIService.completeExamJson(systemPrompt, userPrompt);
+            const { systemPrompt, userPrompt, cloud } = payload as { systemPrompt: string; userPrompt: string; cloud?: CloudExamRequest };
+            const result = await AIService.completeExamJson(systemPrompt, userPrompt, cloud);
             sendResponse({ success: true, data: result });
             break;
           }

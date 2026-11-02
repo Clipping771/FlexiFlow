@@ -109,7 +109,7 @@ describe('SpeakingPracticeView (Exam Simulator & Studio UI)', () => {
   });
 
   it('3. Skips prep to record, stops recording, and evaluates PTE Read Aloud', async () => {
-    mockExamAi({ pronunciation: 4, oralFluency: 3.5, contentAnalysis: 'Accurate reading.', strengths: [], weaknesses: [], detectedErrorCodes: [] });
+    const sendMessage = mockExamAi({ pronunciation: 4, oralFluency: 3.5, contentAnalysis: 'Accurate reading.', strengths: [], weaknesses: [], detectedErrorCodes: [] });
     await renderView();
 
     // Start prep
@@ -157,6 +157,13 @@ describe('SpeakingPracticeView (Exam Simulator & Studio UI)', () => {
 
     const score = container.querySelector('[data-testid="speaking-overall-score-display"]');
     expect(score).not.toBeNull();
+    // LexiFlow Cloud marks the exam task, not a prompt
+    expect(sendMessage.mock.calls[0][0].payload.cloud).toMatchObject({
+      task: 'pte-read-aloud',
+      transcript: expect.stringContaining('renewable energy'),
+      durationMs: expect.any(Number),
+      taskId: 'pte_read_aloud'
+    });
   });
 
   it('3b. Recording fills the transcript live from the speech recogniser', async () => {
@@ -201,7 +208,7 @@ describe('SpeakingPracticeView (Exam Simulator & Studio UI)', () => {
   });
 
   it('4. Renders IELTS Speaking tasks when learner profile is IELTS, and evaluates Part 2 Cue Card', async () => {
-    mockExamAi({
+    const sendMessage = mockExamAi({
       fluencyCoherence: 6.5,
       lexicalResource: 6,
       grammaticalAccuracy: 6,
@@ -248,6 +255,7 @@ describe('SpeakingPracticeView (Exam Simulator & Studio UI)', () => {
     expect(resultsCard).not.toBeNull();
     expect(resultsCard?.textContent).toContain('LexiFlow estimate');
     expect(resultsCard?.textContent).toContain('Fluency Coherence');
+    expect(sendMessage.mock.calls[0][0].payload.cloud).toMatchObject({ task: 'ielts-speaking', transcript: extendedSpeech.trim() });
     expect(resultsCard?.textContent).toContain('Pronunciation');
   });
 });

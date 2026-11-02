@@ -6,7 +6,7 @@ import { GeminiProvider } from './geminiProvider';
 import { MockAIProvider } from './mockProvider';
 import { OllamaProvider } from './ollamaProvider';
 import { OpenAIProvider } from './openaiProvider';
-import { CloudProvider } from './cloudProvider';
+import { CloudProvider, type CloudExamRequest } from './cloudProvider';
 import { TwoStageCacheService } from './cache';
 import { CacheManager } from '../cache';
 import { hashString } from '../cache/normalization';
@@ -309,17 +309,25 @@ export class AIService {
     return provider.evaluateSummary({ ...input, summary, articleText: articleText.slice(0, SUMMARY_MAX_ARTICLE_CHARS) });
   }
 
-  /** Exam engines: runs an exam-specific grading prompt and returns the raw JSON text for the engine to validate. */
-  static async completeExamJson(systemPrompt: string, userPrompt: string): Promise<{ rawText: string; model: string }> {
+  /**
+   * Exam engines: runs an exam-specific grading prompt and returns the raw JSON text for the engine to validate.
+   * LexiFlow Cloud never takes a prompt from the client: it marks `cloud`, the exam task itself, with the
+   * engine's prompt on the server.
+   */
+  static async completeExamJson(
+    systemPrompt: string,
+    userPrompt: string,
+    cloud?: CloudExamRequest
+  ): Promise<{ rawText: string; model: string }> {
     const userSettings = await SettingsService.getSettings();
     const provider = await this.getProvider(userSettings);
 
+    if (provider instanceof CloudProvider) {
+      if (!cloud) throw new Error('This exam task cannot be marked on LexiFlow Cloud yet.');
+      return { rawText: JSON.stringify(await provider.markExam(cloud)), model: 'LexiFlow Cloud' };
+    }
     if (!this.hasLiveAI(userSettings) || !provider.completeJson) {
-      throw new Error(
-        userSettings.aiProvider === 'lexiflow'
-          ? 'Exam marking is not available on LexiFlow Cloud yet. Add your own Gemini, OpenAI, Claude or Ollama key in Settings.'
-          : 'Exam marking needs an AI provider. Set one up in Settings (Gemini, OpenAI, Claude or Ollama).'
-      );
+      throw new Error('Exam marking needs an AI provider. Set one up in Settings (LexiFlow Cloud, Gemini, OpenAI, Claude or Ollama).');
     }
     const rawText = await provider.completeJson(systemPrompt, userPrompt);
     return { rawText, model: userSettings.selectedModel || provider.name };
