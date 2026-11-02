@@ -651,3 +651,26 @@ export interface UserSettings {
   // LexiFlow 2.0 Reading Modes
   readingMode?: 'quick' | 'learn';
 }
+
+// Phase 0: Target Exam & Staged Learner Profiles
+export type TargetExam = 'pte_academic' | 'ielts_academic';
+
+export interface LearnerProfile {
+  userId: string;
+  targetExam: TargetExam;
+  targetScore: string;
+  targetExamDate: string | null;
+  motherTongue: string;
+  studyHoursWeekly: number;
+  createdAt: string;
+  updatedAt: string;
+  activeExamProfile?: ExamProfile | null;
+}
+
+export interface ExamProfile {
+  id: string;
+  examType: TargetExam;
+  diagnosticScore: string | null;
+  weakCategories: string[];
+  settings: Record<string, unknown>;
+}

@@ -7,6 +7,9 @@ import { ai } from './routes/ai';
 import { auth } from './routes/auth';
 import { health } from './routes/health';
 import { me } from './routes/me';
+import { onboarding } from './routes/onboarding';
+import { mistakes } from './routes/mistakes';
+import { audio } from './routes/audio';
 
 export const app = new Hono<AppEnv>();
 
@@ -16,6 +19,9 @@ const v1 = new Hono<AppEnv>();
 v1.route('/health', health);
 v1.route('/auth', auth);
 v1.route('/me', me);
+v1.route('/onboarding', onboarding);
+v1.route('/mistakes', mistakes);
+v1.route('/audio', audio);
 v1.route('/ai', ai);
 app.route('/v1', v1);
 

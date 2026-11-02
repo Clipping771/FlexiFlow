@@ -1,0 +1,283 @@
+# PTE Academic — Official Versioned Task Inventory
+# Version: 1.0.0
+# Checked Date: 2026-11-01
+# Source: Pearson PTE Academic Official Test Format Guide (https://www.pearsonpte.com/pte-academic)
+
+metadata:
+  exam: "PTE Academic"
+  version: "1.0.0"
+  total_scored_tasks: 22
+  total_unscored_tasks: 1
+  scoring_scale: "10-90"
+  official_overview_url: "https://www.pearsonpte.com/pte-academic"
+
+tasks:
+  # -------------------------------------------------------------
+  # Part 1: Speaking & Writing (9 Scored + 1 Unscored)
+  # -------------------------------------------------------------
+  - id: "pte_personal_introduction"
+    name: "Personal Introduction"
+    section: "Speaking & Writing"
+    is_scored: false
+    official_source_url: "https://www.pearsonpte.com/pte-academic/speaking-writing"
+    checked_date: "2026-11-01"
+    skill_impact: ["Non-scored familiarization", "Sent to institutions"]
+    timing:
+      preparation_seconds: 25
+      recording_seconds: 30
+    response_format: "Spoken audio recording"
+    scoring_traits: []
+
+  - id: "pte_read_aloud"
+    name: "Read Aloud"
+    section: "Speaking & Writing"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/speaking-writing"
+    checked_date: "2026-11-01"
+    skill_impact: ["Speaking", "Reading"]
+    timing:
+      preparation_seconds: 35
+      recording_seconds: 40
+    response_format: "Spoken audio recording of displayed text (up to 60 words)"
+    scoring_traits: ["Content", "Oral Fluency", "Pronunciation"]
+
+  - id: "pte_repeat_sentence"
+    name: "Repeat Sentence"
+    section: "Speaking & Writing"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/speaking-writing"
+    checked_date: "2026-11-01"
+    skill_impact: ["Speaking", "Listening"]
+    timing:
+      audio_duration_seconds: 9
+      recording_seconds: 15
+    response_format: "Immediate spoken repetition of 3-9 second audio prompt"
+    scoring_traits: ["Content", "Oral Fluency", "Pronunciation"]
+
+  - id: "pte_describe_image"
+    name: "Describe Image"
+    section: "Speaking & Writing"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/speaking-writing"
+    checked_date: "2026-11-01"
+    skill_impact: ["Speaking"]
+    timing:
+      preparation_seconds: 25
+      recording_seconds: 40
+    response_format: "Spoken description of graph, chart, map, or process"
+    scoring_traits: ["Content", "Oral Fluency", "Pronunciation"]
+
+  - id: "pte_retell_lecture"
+    name: "Re-tell Lecture"
+    section: "Speaking & Writing"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/speaking-writing"
+    checked_date: "2026-11-01"
+    skill_impact: ["Speaking", "Listening"]
+    timing:
+      audio_duration_seconds: 90
+      preparation_seconds: 10
+      recording_seconds: 40
+    response_format: "Spoken summary of an audio lecture (up to 90 seconds)"
+    scoring_traits: ["Content", "Oral Fluency", "Pronunciation"]
+
+  - id: "pte_answer_short_question"
+    name: "Answer Short Question"
+    section: "Speaking & Writing"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/speaking-writing"
+    checked_date: "2026-11-01"
+    skill_impact: ["Speaking", "Listening"]
+    timing:
+      audio_duration_seconds: 9
+      recording_seconds: 10
+    response_format: "Single word or brief phrase spoken response"
+    scoring_traits: ["Vocabulary (Appropriate word selection)"]
+
+  - id: "pte_summarize_written_text"
+    name: "Summarize Written Text"
+    section: "Speaking & Writing"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/speaking-writing"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading", "Writing"]
+    timing:
+      allocated_minutes: 10
+    response_format: "Single sentence summary between 5 and 75 words"
+    scoring_traits: ["Content", "Form (Single sentence)", "Grammar", "Vocabulary"]
+
+  - id: "pte_write_essay"
+    name: "Write Essay"
+    section: "Speaking & Writing"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/speaking-writing"
+    checked_date: "2026-11-01"
+    skill_impact: ["Writing"]
+    timing:
+      allocated_minutes: 20
+    response_format: "Argumentative essay between 200 and 300 words"
+    scoring_traits: ["Content", "Form", "Development, Structure & Coherence", "Grammar", "General Linguistic Range", "Vocabulary", "Spelling"]
+
+  - id: "pte_summarize_spoken_text"
+    name: "Summarize Spoken Text"
+    section: "Speaking & Writing"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening", "Writing"]
+    timing:
+      allocated_minutes: 10
+    response_format: "Summary paragraph between 50 and 70 words from 60-90s audio"
+    scoring_traits: ["Content", "Form", "Grammar", "Vocabulary", "Spelling"]
+
+  - id: "pte_write_from_dictation"
+    name: "Write from Dictation"
+    section: "Speaking & Writing"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening", "Writing"]
+    timing:
+      audio_duration_seconds: 5
+      allocated_seconds: 45
+    response_format: "Exact typed transcription of 3-5 second audio sentence"
+    scoring_traits: ["Word-by-word accuracy (Partial credit for each correct word spelled)"]
+
+  # -------------------------------------------------------------
+  # Part 2: Reading (5 Scored)
+  # -------------------------------------------------------------
+  - id: "pte_rw_fill_in_blanks"
+    name: "Reading & Writing: Fill in the Blanks"
+    section: "Reading"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading", "Writing"]
+    timing:
+      suggested_minutes: 2.5
+    response_format: "Drop-down selection for each blank in a passage up to 300 words"
+    scoring_traits: ["Partial credit per correctly selected word"]
+
+  - id: "pte_reading_mcq_multiple"
+    name: "Multiple Choice, Multiple Answer"
+    section: "Reading"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    timing:
+      suggested_minutes: 2
+    response_format: "Checkboxes for multiple correct options (Negative marking for wrong options, minimum 0)"
+    scoring_traits: ["Right-minus-wrong partial credit"]
+
+  - id: "pte_reorder_paragraphs"
+    name: "Re-order Paragraphs"
+    section: "Reading"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    timing:
+      suggested_minutes: 2
+    response_format: "Drag and drop text boxes into correct chronological/logical sequence"
+    scoring_traits: ["1 point for each correctly ordered adjacent pair"]
+
+  - id: "pte_reading_fill_in_blanks"
+    name: "Reading: Fill in the Blanks"
+    section: "Reading"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    timing:
+      suggested_minutes: 2
+    response_format: "Drag-and-drop words from a word pool into blanks in a passage"
+    scoring_traits: ["1 point for each correctly filled blank"]
+
+  - id: "pte_reading_mcq_single"
+    name: "Multiple Choice, Single Answer"
+    section: "Reading"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    timing:
+      suggested_minutes: 1.5
+    response_format: "Radio button single choice selection from a passage up to 300 words"
+    scoring_traits: ["1 point for correct response, 0 for incorrect"]
+
+  # -------------------------------------------------------------
+  # Part 3: Listening (Remaining 6 Scored Types)
+  # (Note: Summarize Spoken Text & Write from Dictation are integrated above)
+  # -------------------------------------------------------------
+  - id: "pte_listening_mcq_multiple"
+    name: "Multiple Choice, Multiple Answer (Listening)"
+    section: "Listening"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening"]
+    timing:
+      audio_duration_seconds: 60
+    response_format: "Checkboxes for multiple options after 40-90s audio recording"
+    scoring_traits: ["Right-minus-wrong partial credit (minimum 0)"]
+
+  - id: "pte_listening_fill_in_blanks"
+    name: "Fill in the Blanks (Listening)"
+    section: "Listening"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening", "Writing"]
+    timing:
+      audio_duration_seconds: 60
+    response_format: "Type missing words into blanks while listening to audio"
+    scoring_traits: ["1 point for each correctly spelled word in blank"]
+
+  - id: "pte_highlight_correct_summary"
+    name: "Highlight Correct Summary"
+    section: "Listening"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening", "Reading"]
+    timing:
+      audio_duration_seconds: 90
+    response_format: "Radio button choice of best written summary of audio"
+    scoring_traits: ["1 point for correct, 0 for incorrect"]
+
+  - id: "pte_listening_mcq_single"
+    name: "Multiple Choice, Single Answer (Listening)"
+    section: "Listening"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening"]
+    timing:
+      audio_duration_seconds: 60
+    response_format: "Radio button single choice after 30-60s audio"
+    scoring_traits: ["1 point for correct, 0 for incorrect"]
+
+  - id: "pte_select_missing_word"
+    name: "Select Missing Word"
+    section: "Listening"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening"]
+    timing:
+      audio_duration_seconds: 50
+    response_format: "Radio button choice to predict the beeped ending word/phrase"
+    scoring_traits: ["1 point for correct, 0 for incorrect"]
+
+  - id: "pte_highlight_incorrect_words"
+    name: "Highlight Incorrect Words"
+    section: "Listening"
+    is_scored: true
+    official_source_url: "https://www.pearsonpte.com/pte-academic/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening", "Reading"]
+    timing:
+      audio_duration_seconds: 50
+    response_format: "Click words in transcript that differ from audio"
+    scoring_traits: ["Right-minus-wrong partial credit (minimum 0)"]

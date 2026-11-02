@@ -309,6 +309,22 @@ export class AIService {
     return provider.evaluateSummary({ ...input, summary, articleText: articleText.slice(0, SUMMARY_MAX_ARTICLE_CHARS) });
   }
 
+  /** Exam engines: runs an exam-specific grading prompt and returns the raw JSON text for the engine to validate. */
+  static async completeExamJson(systemPrompt: string, userPrompt: string): Promise<{ rawText: string; model: string }> {
+    const userSettings = await SettingsService.getSettings();
+    const provider = await this.getProvider(userSettings);
+
+    if (!this.hasLiveAI(userSettings) || !provider.completeJson) {
+      throw new Error(
+        userSettings.aiProvider === 'lexiflow'
+          ? 'Exam marking is not available on LexiFlow Cloud yet. Add your own Gemini, OpenAI, Claude or Ollama key in Settings.'
+          : 'Exam marking needs an AI provider. Set one up in Settings (Gemini, OpenAI, Claude or Ollama).'
+      );
+    }
+    const rawText = await provider.completeJson(systemPrompt, userPrompt);
+    return { rawText, model: userSettings.selectedModel || provider.name };
+  }
+
   static getCacheKey(action: string, args: Record<string, unknown>): string {
     return `${action}:${JSON.stringify(args)}`;
   }

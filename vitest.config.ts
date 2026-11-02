@@ -11,6 +11,6 @@ export default defineConfig({
     testTimeout: 10000,
     // Let `popupStyles.css?raw` resolve to the real stylesheet so style guard tests can inspect it.
     css: { include: [/popupStyles\.css/] },
-    include: ['src/**/*.test.{ts,tsx}']
+    include: ['src/**/*.test.{ts,tsx}', 'exams/**/*.test.{ts,tsx}']
   }
 });

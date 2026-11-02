@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { observeTargetLanguage } from '../shared/targetLang';
-import { VocabularyItem, UserSettings, FSRSRating } from '../types';
+import { VocabularyItem, UserSettings, FSRSRating, LearnerProfile } from '../types';
 import { Navbar, DashboardTab } from './components/Navbar';
 import { VocabularyView } from './components/VocabularyView';
 import { TargetedPracticeView } from './components/TargetedPracticeView';
@@ -12,11 +12,26 @@ import { SettingsView } from './components/SettingsView';
 import { DEFAULT_SETTINGS } from '../services/storage/settings';
 import { WeaknessDetector } from '../services/weakness/detector';
 import { FSRSEngine } from '../services/fsrs/engine';
-import { Menu, X, BookOpen, RotateCw, Settings as SettingsIcon, PanelRight } from 'lucide-react';
+import { Menu, X, BookOpen, RotateCw, Settings as SettingsIcon, PanelRight, GraduationCap } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ReadingListView } from './components/ReadingListView';
 import { SummaryPracticeView } from './components/SummaryPracticeView';
+import { OnboardingWizard } from './components/OnboardingWizard';
+import { WritingPracticeView } from './components/WritingPracticeView';
+import { SpeakingPracticeView } from './components/SpeakingPracticeView';
+import { ReadingPracticeView } from './components/ReadingPracticeView';
+import { ListeningPracticeView } from './components/ListeningPracticeView';
+import { FullMockExamView } from './components/FullMockExamView';
+import { MistakeMemoryView } from './components/MistakeMemoryView';
 import './dashboard.css';
+
+const EXAM_TABS: DashboardTab[] = [
+  'reading_practice',
+  'listening_practice',
+  'writing_practice',
+  'speaking_practice',
+  'full_mock_exam'
+];
 
 const TAB_TITLES: Record<DashboardTab, string> = {
   overview: 'Overview',
@@ -25,6 +40,12 @@ const TAB_TITLES: Record<DashboardTab, string> = {
   review: 'Spaced Review',
   reading_list: 'Reading List',
   summary_practice: 'Summary Practice',
+  reading_practice: 'Reading Engine',
+  listening_practice: 'Listening Engine',
+  writing_practice: 'Writing Engine',
+  speaking_practice: 'Speaking Engine',
+  full_mock_exam: 'Full Mock Exam',
+  mistake_memory: 'Mistake Memory',
   word_difference: 'Word Difference',
   usage_coach: 'Usage Coach',
   analytics: 'Learning Analytics',
@@ -58,7 +79,27 @@ export const App: React.FC = () => {
 
   // Tag translated text with its language and direction as the dashboard re-renders
   useEffect(() => observeTargetLanguage(document.body, () => targetLangRef.current), []);
+  const [learnerProfile, setLearnerProfile] = useState<LearnerProfile | null>(() => {
+    try {
+      const stored = localStorage.getItem('lexiflow_learner_profile');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  // Exam setup is optional: it opens from the exam badge, or once on the first visit to an exam screen
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
   const [coachWord, setCoachWord] = useState<string>('mitigate');
+  const [targetErrorCode, setTargetErrorCode] = useState<string | null>(null);
+
+  const isExamTab = EXAM_TABS.includes(activeTab);
+
+  useEffect(() => {
+    if (learnerProfile || !isExamTab) return;
+    try {
+      if (!localStorage.getItem('lexiflow_exam_setup_dismissed')) setShowOnboarding(true);
+    } catch {}
+  }, [activeTab, learnerProfile]);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [isNarrowScreen, setIsNarrowScreen] = useState(
@@ -578,6 +619,7 @@ export const App: React.FC = () => {
               <span className="drawer-title">LexiFlow Tools</span>
               <button
                 type="button"
+                data-testid="btn-drawer-close"
                 className="btn-drawer-close"
                 onClick={() => setIsSidebarOpen(false)}
                 title="Close Menu"
@@ -612,6 +654,28 @@ export const App: React.FC = () => {
               </div>
 
               <div className="top-bar-stats">
+                {isExamTab && (
+                  <button
+                    type="button"
+                    data-testid="desktop-exam-badge"
+                    className="top-kpi-pill kpi-exam-badge"
+                    title="Change your target exam and score"
+                    onClick={() => setShowOnboarding(true)}
+                  >
+                    <GraduationCap size={14} />
+                    <span className="top-kpi-label">
+                      {learnerProfile?.targetExam === 'ielts_academic' ? 'IELTS Academic' : 'PTE Academic'}:
+                    </span>
+                    <span className="top-kpi-val">
+                      {learnerProfile
+                        ? learnerProfile.targetExam === 'ielts_academic'
+                          ? `Band ${learnerProfile.targetScore}`
+                          : `Target ${learnerProfile.targetScore}`
+                        : 'Set target'}
+                    </span>
+                  </button>
+                )}
+
                 <div className="top-kpi-pill" title="Total captured vocabulary">
                   <span className="top-kpi-dot"></span>
                   <span className="top-kpi-label">Vocabulary:</span>
@@ -661,6 +725,7 @@ export const App: React.FC = () => {
             <header className="narrow-top-bar">
               <button
                 type="button"
+                data-testid="narrow-menu-btn"
                 className="narrow-menu-toggle-btn"
                 onClick={() => setIsSidebarOpen(true)}
                 title="Open Tools Menu"
@@ -670,6 +735,20 @@ export const App: React.FC = () => {
               </button>
 
               <span className="narrow-bar-title">{TAB_TITLES[activeTab]}</span>
+
+              {isExamTab && (
+                <button
+                  type="button"
+                  data-testid="narrow-exam-badge"
+                  onClick={() => setShowOnboarding(true)}
+                  className="narrow-exam-badge"
+                  title="Change your target exam and score"
+                >
+                  {learnerProfile
+                    ? `${learnerProfile.targetExam === 'ielts_academic' ? 'IELTS' : 'PTE'} ${learnerProfile.targetScore}`
+                    : 'Set target'}
+                </button>
+              )}
 
               <button
                 type="button"
@@ -718,6 +797,66 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === 'summary_practice' && <SummaryPracticeView />}
+
+            {activeTab === 'reading_practice' && (
+              <ReadingPracticeView
+                learnerProfile={learnerProfile}
+                onNavigateToMistake={(code) => {
+                  setTargetErrorCode(code);
+                  setActiveTab('mistake_memory');
+                }}
+              />
+            )}
+
+            {activeTab === 'listening_practice' && (
+              <ListeningPracticeView
+                learnerProfile={learnerProfile}
+                onNavigateToMistake={(code) => {
+                  setTargetErrorCode(code);
+                  setActiveTab('mistake_memory');
+                }}
+              />
+            )}
+
+            {activeTab === 'writing_practice' && (
+              <WritingPracticeView
+                learnerProfile={learnerProfile}
+                onOpenSettings={() => setActiveTab('settings')}
+                onNavigateToMistake={(code) => {
+                  setTargetErrorCode(code);
+                  setActiveTab('mistake_memory');
+                }}
+              />
+            )}
+
+            {activeTab === 'speaking_practice' && (
+              <SpeakingPracticeView
+                learnerProfile={learnerProfile}
+                onOpenSettings={() => setActiveTab('settings')}
+                onNavigateToMistake={(code) => {
+                  setTargetErrorCode(code);
+                  setActiveTab('mistake_memory');
+                }}
+              />
+            )}
+
+            {activeTab === 'full_mock_exam' && (
+              <FullMockExamView
+                learnerProfile={learnerProfile}
+                onOpenSettings={() => setActiveTab('settings')}
+                onNavigateToMistake={(code) => {
+                  setTargetErrorCode(code);
+                  setActiveTab('mistake_memory');
+                }}
+              />
+            )}
+
+            {activeTab === 'mistake_memory' && (
+              <MistakeMemoryView
+                initialErrorCode={targetErrorCode}
+                onClearInitialCode={() => setTargetErrorCode(null)}
+              />
+            )}
 
             {activeTab === 'word_difference' && <WordDifferenceView />}
 
@@ -777,6 +916,22 @@ export const App: React.FC = () => {
             </nav>
           )}
         </main>
+      )}
+
+      {showOnboarding && (
+        <OnboardingWizard
+          onComplete={(profile) => {
+            setLearnerProfile(profile);
+            setShowOnboarding(false);
+          }}
+          onDismiss={() => {
+            try {
+              localStorage.setItem('lexiflow_exam_setup_dismissed', '1');
+            } catch {}
+            setShowOnboarding(false);
+          }}
+          initialProfile={learnerProfile}
+        />
       )}
     </div>
   );

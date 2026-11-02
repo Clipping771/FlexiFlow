@@ -274,6 +274,10 @@ export class OpenAIProvider implements AIProvider {
     return parseSummaryEvaluation(safeParseJSON(raw));
   }
 
+  async completeJson(systemPrompt: string, userPrompt: string): Promise<string> {
+    return this.callOpenAI(systemPrompt, userPrompt, 60000);
+  }
+
   async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
     const prompt = buildHighlightsPrompt({ rawText, pageTitle }, this.targetLang, 'full');
     // A whole article takes far longer than a single-word lookup

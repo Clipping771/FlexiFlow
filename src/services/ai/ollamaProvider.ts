@@ -356,6 +356,11 @@ export class OllamaProvider implements AIProvider {
     return parseSummaryEvaluation(safeParseJSON(raw));
   }
 
+  async completeJson(systemPrompt: string, userPrompt: string): Promise<string> {
+    const prompt = toSinglePrompt({ system: systemPrompt, user: userPrompt });
+    return this.callOllama(prompt, ollamaContextFor(prompt, 1500));
+  }
+
   async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
     console.debug(`[LexiFlow Ollama] Extracting highlights using model: "${this.model}" at ${this.endpoint}`);
 

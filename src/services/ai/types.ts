@@ -40,4 +40,6 @@ export interface AIProvider {
   evaluateUsage?(targetWord: string, sentence: string): Promise<UsageCoachFeedback>;
   /** Summary practice: marks the learner's summary of an article. Offline providers do not have it. */
   evaluateSummary?(input: SummaryEvaluationInput): Promise<SummaryEvaluation>;
+  /** Exam engines: one raw JSON completion for an exam-specific prompt. The engine validates the result. */
+  completeJson?(systemPrompt: string, userPrompt: string): Promise<string>;
 }

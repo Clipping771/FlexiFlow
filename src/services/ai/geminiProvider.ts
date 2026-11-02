@@ -337,6 +337,10 @@ export class GeminiProvider implements AIProvider {
     return parseSummaryEvaluation(safeParseJSON(raw));
   }
 
+  async completeJson(systemPrompt: string, userPrompt: string): Promise<string> {
+    return this.callGemini(systemPrompt, userPrompt, 1500);
+  }
+
   async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
     const prompt = buildHighlightsPrompt({ rawText, pageTitle }, this.targetLang, 'full');
     const raw = await this.callGemini(prompt.system, prompt.user, prompt.maxTokens);

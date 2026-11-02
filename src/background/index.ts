@@ -474,6 +474,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             break;
           }
 
+          case 'EXAM_AI_COMPLETE': {
+            const { systemPrompt, userPrompt } = payload as { systemPrompt: string; userPrompt: string };
+            const result = await AIService.completeExamJson(systemPrompt, userPrompt);
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
           case 'CAPTURE_ARTICLE_TEXT': {
             const { url } = payload as { url: string };
             sendResponse({ success: true, data: await captureArticleText(url) });
