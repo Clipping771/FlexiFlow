@@ -52,7 +52,27 @@ export async function runRetention(db: D1Database, now: Date = new Date()): Prom
 /** Everything tied to one account. Shared cache entries and plan-level spend totals hold no user id. */
 export async function deleteAccount(db: D1Database, userId: string): Promise<void> {
   // Explicit deletes instead of relying on ON DELETE CASCADE being enforced.
-  for (const table of ['usage_events', 'usage_daily', 'rate_limits', 'refresh_tokens']) {
+  // Children before parents, so foreign keys never block a delete
+  const tables = [
+    'usage_events',
+    'usage_daily',
+    'rate_limits',
+    'refresh_tokens',
+    'learner_sync',
+    'review_schedules',
+    'error_occurrences',
+    'mistake_memories',
+    'pronunciation_evaluations',
+    'transcripts',
+    'recordings',
+    'evaluations',
+    'responses',
+    'reading_listening_attempts',
+    'usage_records',
+    'exam_profiles',
+    'learner_profiles'
+  ];
+  for (const table of tables) {
     await db.prepare(`DELETE FROM ${table} WHERE user_id = ?1`).bind(userId).run();
   }
   await db.prepare('DELETE FROM users WHERE id = ?1').bind(userId).run();

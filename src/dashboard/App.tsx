@@ -20,6 +20,8 @@ import { MistakeMemoryView } from './components/MistakeMemoryView';
 import { SmartPracticeView } from './components/SmartPracticeView';
 import { TodayView, PracticeSection } from './components/TodayView';
 import { recordActivity } from '../services/learner/activity';
+import { syncLearnerData } from '../services/learner/sync';
+import { AuthService } from '../services/auth/authService';
 import './dashboard.css';
 
 const TAB_TITLES: Record<DashboardTab, string> = {
@@ -91,6 +93,33 @@ export const App: React.FC = () => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // LexiFlow Cloud: keep mistakes, goals and activity in step across devices
+  useEffect(() => {
+    if (settings.aiProvider !== 'lexiflow') return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+    const run = async () => {
+      if (cancelled || !(await AuthService.isSignedIn())) return;
+      await syncLearnerData((path, init) => AuthService.authorizedFetch(path, init));
+    };
+    void run();
+    const schedule = (e: Event) => {
+      if ((e as CustomEvent).detail?.fromSync) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void run(), 5000);
+    };
+    window.addEventListener('lexiflow_mistakes_updated', schedule);
+    window.addEventListener('lexiflow_activity_updated', schedule);
+    window.addEventListener('lexiflow_goals_updated', schedule);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('lexiflow_mistakes_updated', schedule);
+      window.removeEventListener('lexiflow_activity_updated', schedule);
+      window.removeEventListener('lexiflow_goals_updated', schedule);
+    };
+  }, [settings.aiProvider]);
 
   // Real-time synchronization across popup, settings, in-page popups, and other windows
   useEffect(() => {
@@ -759,6 +788,7 @@ export const App: React.FC = () => {
               <MistakeMemoryView
                 initialErrorCode={targetErrorCode}
                 onClearInitialCode={() => setTargetErrorCode(null)}
+                targetLanguage={settings.targetLanguage || 'bn'}
               />
             )}
 

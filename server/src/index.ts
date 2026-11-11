@@ -10,6 +10,7 @@ import { me } from './routes/me';
 import { onboarding } from './routes/onboarding';
 import { mistakes } from './routes/mistakes';
 import { audio } from './routes/audio';
+import { sync } from './routes/sync';
 
 export const app = new Hono<AppEnv>();
 
@@ -22,6 +23,7 @@ v1.route('/me', me);
 v1.route('/onboarding', onboarding);
 v1.route('/mistakes', mistakes);
 v1.route('/audio', audio);
+v1.route('/sync', sync);
 v1.route('/ai', ai);
 app.route('/v1', v1);
 

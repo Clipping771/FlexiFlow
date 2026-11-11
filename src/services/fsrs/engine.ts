@@ -46,7 +46,8 @@ export class FSRSEngine {
                currentState.state === 'learning' ? State.Learning :
                currentState.state === 'review' ? State.Review : State.Relearning,
         last_review: currentState.lastReview ? new Date(currentState.lastReview) : undefined,
-        learning_steps: 0
+        // Where the card is in the short learning steps; without it a card never graduates
+        learning_steps: currentState.learningSteps ?? 0
       };
 
       const schedulingCards = this.f.repeat(card, reviewDate);
@@ -67,7 +68,8 @@ export class FSRSEngine {
         lapses: scheduled.card.lapses,
         state: newState,
         lastReview: reviewDate.toISOString(),
-        nextReview: scheduled.card.due.toISOString()
+        nextReview: scheduled.card.due.toISOString(),
+        learningSteps: scheduled.card.learning_steps
       };
     } catch {
       // Robust mathematical fallback

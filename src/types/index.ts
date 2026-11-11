@@ -481,6 +481,8 @@ export interface FSRSItemState {
   state: LearningState;
   lastReview?: string;
   nextReview: string;
+  /** Position in the FSRS learning steps (ts-fsrs learning_steps) */
+  learningSteps?: number;
 }
 
 export function createInitialFSRSState(): FSRSItemState {

@@ -4812,3 +4812,18 @@ a.exam-article-title:hover {
 }
 
 .drill-summary .drill-actions { justify-content: center; }
+
+.mm-bn {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bengali-bg);
+  border-left: 3px solid var(--bengali-border);
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text-main);
+}
+
+.drill-bn {
+  margin: -6px 0 16px;
+}

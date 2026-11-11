@@ -79,6 +79,12 @@ describe('TICKET LF-013: Mistake Memory & Improvement Lab View', () => {
     expect(container.querySelector('[data-testid="state-card-Reopened"]')).not.toBeNull();
   });
 
+  it('1c. Shows a Bengali explanation, and hides it for other target languages', async () => {
+    recordLearnerMistakes();
+    await renderView();
+    expect(container.querySelector('[data-testid="bn-hint-GRA.SUBJ_VERB_AGR"]')?.textContent).toMatch(/[ঀ-৿]/);
+  });
+
   it('1b. A new learner starts with an empty list, not sample mistakes', async () => {
     await renderView();
 

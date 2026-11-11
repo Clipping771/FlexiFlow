@@ -1,6 +1,8 @@
 import { MistakeStateMachine, MasteryState } from './stateMachine';
 import { TaxonomyService } from '../taxonomy/catalog';
 import { sessionPassed } from './drills';
+import { FSRSEngine } from '../fsrs/engine';
+import type { FSRSItemState, FSRSRating } from '../../types';
 
 export interface ErrorOccurrenceRecord {
   id: string;
@@ -23,6 +25,23 @@ export interface MistakeMemoryItem {
   recentOccurrences: ErrorOccurrenceRecord[];
   /** Drill sessions finished for this mistake (varies the sentences each time) */
   practiceSessions?: number;
+  /** FSRS memory state: sets how long until the next review */
+  fsrs?: FSRSItemState;
+  /** Last change of any kind (used to merge with LexiFlow Cloud) */
+  updatedAt?: string;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** FSRS rating for a drill session: failed = Again, passed with a slip = Hard, all right = Good */
+export function ratingForSession(correct: number, total: number): FSRSRating {
+  if (!sessionPassed(correct, total)) return 1;
+  return correct === total ? 3 : 2;
+}
+
+/** Whole days until an FSRS review date, at least one */
+export function daysUntil(nextReview: string, now: Date): number {
+  return Math.max(1, Math.round((new Date(nextReview).getTime() - now.getTime()) / DAY_MS));
 }
 
 export interface DrillSessionOutcome {
@@ -143,6 +162,10 @@ export class MistakeMemoryClient {
 
       updatedItem = {
         ...existing,
+        // Coming back after mastering is a lapse: FSRS shortens the next intervals
+        ...(transition.isRelapse && existing.fsrs
+          ? { fsrs: FSRSEngine.scheduleNextReview(existing.fsrs, 1, now) }
+          : {}),
         masteryState: transition.nextState,
         totalOccurrences: transition.occurrences,
         successfulCorrections: transition.successfulCorrections,
@@ -184,7 +207,12 @@ export class MistakeMemoryClient {
     return updated;
   }
 
-  static recordPracticeAttempt(errorCode: string, isSuccessful: boolean, now = new Date()): MistakeMemoryItem {
+  static recordPracticeAttempt(
+    errorCode: string,
+    isSuccessful: boolean,
+    now = new Date(),
+    schedule?: { fsrs: FSRSItemState; days: number }
+  ): MistakeMemoryItem {
     const items = this.getMistakes();
     const index = items.findIndex((i) => i.errorCode === errorCode);
     if (index === -1) {
@@ -199,14 +227,17 @@ export class MistakeMemoryClient {
       isSuccessful
     );
 
-    const dueDate = MistakeStateMachine.calculateDueDate(transition.nextReviewDays, now);
+    // FSRS lengthens intervals as memory grows; the mastery steps (3 days, then 21) are the minimum gap
+    const days = schedule ? Math.max(schedule.days, isSuccessful ? transition.nextReviewDays : 1) : transition.nextReviewDays;
+    const dueDate = MistakeStateMachine.calculateDueDate(days, now);
 
     const updated: MistakeMemoryItem = {
       ...current,
+      ...(schedule ? { fsrs: schedule.fsrs } : {}),
       masteryState: transition.nextState,
       successfulCorrections: transition.successfulCorrections,
       nextReviewAt: dueDate,
-      nextReviewDays: transition.nextReviewDays,
+      nextReviewDays: days,
       masteredAt: transition.isNewlyMastered ? now.toISOString() : current.masteredAt
     };
 
@@ -247,10 +278,11 @@ export class MistakeMemoryClient {
 
     let updated: MistakeMemoryItem;
     if (counted) {
-      updated = this.recordPracticeAttempt(errorCode, passed, now);
-      updated = { ...updated, practiceSessions: (current.practiceSessions || 0) + 1 };
+      const fsrs = FSRSEngine.scheduleNextReview(current.fsrs ?? FSRSEngine.createInitialState(), ratingForSession(correct, total), now);
+      updated = this.recordPracticeAttempt(errorCode, passed, now, { fsrs, days: passed ? daysUntil(fsrs.nextReview, now) : 1 });
+      updated = { ...updated, practiceSessions: (current.practiceSessions || 0) + 1, updatedAt: now.toISOString() };
     } else {
-      updated = { ...current, practiceSessions: (current.practiceSessions || 0) + 1 };
+      updated = { ...current, practiceSessions: (current.practiceSessions || 0) + 1, updatedAt: now.toISOString() };
     }
 
     const latest = this.getMistakes();

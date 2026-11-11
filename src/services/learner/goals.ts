@@ -69,5 +69,6 @@ export function saveGoals(goals: Omit<LearnerGoals, 'updatedAt'>): LearnerGoals 
       });
     }
   } catch {}
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('lexiflow_goals_updated'));
   return full;
 }

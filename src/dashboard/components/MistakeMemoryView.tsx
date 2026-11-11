@@ -23,18 +23,23 @@ import {
   isDue
 } from '../../services/mistake/client';
 import { DrillSession, DrillCloseButton } from './DrillSession';
+import { bengaliHint } from '../../services/mistake/bengaliHints';
 import { TaxonomyService, TaxonomyError } from '../../services/taxonomy/catalog';
 import { MasteryState } from '../../services/mistake/stateMachine';
 
 interface MistakeMemoryViewProps {
   initialErrorCode?: string | null;
   onClearInitialCode?: () => void;
+  /** Bengali explanations are shown when the learner's language is Bengali */
+  targetLanguage?: string;
 }
 
 export const MistakeMemoryView: React.FC<MistakeMemoryViewProps> = ({
   initialErrorCode,
-  onClearInitialCode
+  onClearInitialCode,
+  targetLanguage = 'bn'
 }) => {
+  const showBn = targetLanguage === 'bn';
   const [items, setItems] = useState<MistakeMemoryItem[]>([]);
   const [stats, setStats] = useState<MistakeStats>({
     total: 0,
@@ -142,9 +147,13 @@ export const MistakeMemoryView: React.FC<MistakeMemoryViewProps> = ({
     ALL: 'All',
     GRA: 'Grammar',
     VOC: 'Vocabulary',
-    MEC: 'Spelling & punctuation'
+    MEC: 'Spelling & punctuation',
+    PTE: 'PTE skills',
+    IELTS: 'IELTS skills'
   };
-  const categories = Object.keys(CATEGORY_LABELS);
+  // Exam-skill chips only appear when the learner has such mistakes
+  const presentCats = new Set(items.map((i) => i.errorCode.split('.')[0]));
+  const categories = Object.keys(CATEGORY_LABELS).filter((c) => !['PTE', 'IELTS'].includes(c) || presentCats.has(c));
 
   const STATES: { state: MasteryState; label: string; hint: string }[] = [
     { state: 'New', label: 'New', hint: 'Just found in your practice' },
@@ -296,6 +305,11 @@ export const MistakeMemoryView: React.FC<MistakeMemoryViewProps> = ({
                     </div>
 
                     {tax?.definition && <p className="mm-def">{tax.definition}</p>}
+                    {showBn && bengaliHint(item.errorCode) && (
+                      <p className="mm-bn" lang="bn" data-testid={`bn-hint-${item.errorCode}`}>
+                        {bengaliHint(item.errorCode)}
+                      </p>
+                    )}
 
                     {tax && (
                       <div className="mm-examples">
@@ -357,6 +371,11 @@ export const MistakeMemoryView: React.FC<MistakeMemoryViewProps> = ({
             </div>
 
             <p className="drill-def">{activeDrillItem.taxError.definition}</p>
+            {showBn && bengaliHint(activeDrillItem.taxError.code) && (
+              <p className="mm-bn drill-bn" lang="bn">
+                {bengaliHint(activeDrillItem.taxError.code)}
+              </p>
+            )}
 
             <DrillSession
               key={sessionKey}

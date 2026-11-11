@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CANONICAL_ERRORS, TaxonomyService } from '../../taxonomy/catalog';
 import { DRILL_BANK } from '../drillBank';
+import { BENGALI_HINTS } from '../bengaliHints';
 import {
   buildDrillSession,
   gradeChoice,
@@ -11,7 +12,7 @@ import {
   tokenize,
   FixDrill
 } from '../drills';
-import { MistakeMemoryClient, MistakeMemoryItem } from '../client';
+import { MistakeMemoryClient, MistakeMemoryItem, ratingForSession } from '../client';
 
 function fakeItem(code: string, occurrences: { wrong: string; right?: string; taskId?: string }[] = []): MistakeMemoryItem {
   return {
@@ -66,6 +67,15 @@ describe('Drill bank content', () => {
         expect(new Set(c.options).size).toBe(c.options.length);
       }
     }
+  });
+});
+
+describe('Bengali hints', () => {
+  it('every taxonomy code has a Bengali explanation in Bengali script', () => {
+    for (const err of CANONICAL_ERRORS) {
+      expect(BENGALI_HINTS[err.code], err.code).toMatch(/[ঀ-৿]/);
+    }
+    for (const code of Object.keys(BENGALI_HINTS)) expect(TaxonomyService.isValidCode(code), code).toBe(true);
   });
 });
 
@@ -196,6 +206,34 @@ describe('MistakeMemoryClient drill sessions and spacing', () => {
     expect(due.item.masteryState).toBe('Mastered');
     expect(due.item.nextReviewAt).toBe('2026-12-05');
     expect(MistakeMemoryClient.getMistakes()[0].practiceSessions).toBe(3);
+  });
+
+  it('FSRS keeps state and stretches retention checks beyond 21 days for a well-remembered mistake', () => {
+    MistakeMemoryClient.recordOccurrence('GRA.SUBJ_VERB_AGR', 't', 'He go.', 'He goes.');
+    let now = day('2026-01-01');
+    let last = MistakeMemoryClient.recordDrillSession('GRA.SUBJ_VERB_AGR', 4, 4, now);
+    for (let i = 0; i < 4; i++) {
+      now = new Date(`${last.item.nextReviewAt}T09:00:00Z`);
+      last = MistakeMemoryClient.recordDrillSession('GRA.SUBJ_VERB_AGR', 4, 4, now);
+    }
+    expect(last.item.masteryState).toBe('Mastered');
+    expect(last.item.fsrs?.reps).toBe(5);
+    expect(last.item.nextReviewDays).toBeGreaterThan(21);
+  });
+
+  it('a relapse after mastering is recorded as an FSRS lapse', () => {
+    MistakeMemoryClient.recordOccurrence('GRA.SUBJ_VERB_AGR', 't', 'He go.', 'He goes.');
+    MistakeMemoryClient.recordDrillSession('GRA.SUBJ_VERB_AGR', 4, 4, day('2026-11-11'));
+    MistakeMemoryClient.recordDrillSession('GRA.SUBJ_VERB_AGR', 4, 4, day('2026-11-14'));
+    const back = MistakeMemoryClient.recordOccurrence('GRA.SUBJ_VERB_AGR', 't', 'She go.', 'She goes.');
+    expect(back.masteryState).toBe('Reopened');
+    expect(back.fsrs?.lapses).toBe(1);
+  });
+
+  it('rates sessions for FSRS', () => {
+    expect(ratingForSession(1, 4)).toBe(1);
+    expect(ratingForSession(3, 4)).toBe(2);
+    expect(ratingForSession(4, 4)).toBe(3);
   });
 
   it('a failed session always counts and brings the mistake back tomorrow', () => {
