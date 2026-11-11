@@ -48,6 +48,10 @@ import {
   SmartProgress,
   Span,
   speechMetrics,
+  longPauses,
+  pickReadAloudSentence,
+  readAloudScore,
+  type ReadAloudResult,
   SpeechMetrics,
   weakSkills
 } from '../../services/smartPractice/logic';
@@ -851,6 +855,9 @@ const SpeakingSection: React.FC<{
   const [metrics, setMetrics] = useState<SpeechMetrics | null>(null);
   const session = useRef<SpeechToTextSession | null>(null);
   const started = useRef(0);
+  /** When each new word was heard, to find long pauses */
+  const wordTimes = useRef<number[]>([]);
+  const heardCount = useRef(0);
   const feedback = useFeedback(onLevel);
   const supported = isSpeechToTextSupported();
 
@@ -869,9 +876,18 @@ const SpeakingSection: React.FC<{
     setMetrics(null);
     feedback.reset();
     started.current = Date.now();
+    wordTimes.current = [];
+    heardCount.current = 0;
     setElapsed(0);
     session.current = startSpeechToText({
-      onTranscript: setTranscript,
+      onTranscript: (text) => {
+        setTranscript(text);
+        const n = countWords(text);
+        if (n > heardCount.current) {
+          heardCount.current = n;
+          wordTimes.current.push(Date.now());
+        }
+      },
       onStatus: setMicStatus,
       onError: (m) => {
         setMicError(m);
@@ -894,12 +910,19 @@ const SpeakingSection: React.FC<{
     setProblems(found);
     if (found.length) return;
     const ms = durationMs || task.seconds * 1000;
-    const m = speechMetrics(transcript, ms);
+    const m: SpeechMetrics = speechMetrics(transcript, ms);
+    if (wordTimes.current.length > 0) {
+      const p = longPauses(started.current, wordTimes.current);
+      m.longPauses = p.count;
+      m.longestPauseSeconds = p.longestSeconds;
+    }
     setMetrics(m);
     const brief = [
       `TASK (spoken answer, this is a speech-to-text transcript): ${prompt}`,
       `HELPFUL IDEAS:\n${task.ideas.map((c) => `- ${c}`).join('\n')}`,
-      `DELIVERY: ${m.seconds} seconds, ${m.wordsPerMinute} words per minute, ${m.fillers} filler words. Comment briefly on fluency.`
+      `DELIVERY: ${m.seconds} seconds, ${m.wordsPerMinute} words per minute, ${m.fillers} filler words${
+        m.longPauses !== undefined ? `, ${m.longPauses} pauses of 3+ seconds` : ''
+      }. Comment briefly on fluency.`
     ].join('\n');
     feedback.run(brief, article, transcript, 'speaking');
   };
@@ -980,8 +1003,17 @@ const SpeakingSection: React.FC<{
           <Metric label="Speaking time" value={`${metrics.seconds}s`} />
           <Metric label="Pace" value={`${metrics.wordsPerMinute} wpm`} note={metrics.pace === 'good' ? 'Natural' : metrics.pace === 'slow' ? 'A bit slow' : 'A bit fast'} />
           <Metric label="Filler words" value={String(metrics.fillers)} note={metrics.fillers <= 2 ? 'Smooth' : 'Try pausing instead'} />
+          {metrics.longPauses !== undefined && (
+            <Metric
+              label="Long pauses (3s+)"
+              value={String(metrics.longPauses)}
+              note={metrics.longPauses === 0 ? 'Steady' : `Longest ${metrics.longestPauseSeconds}s · keep talking with simpler words`}
+            />
+          )}
         </div>
       )}
+
+      <ReadAloudCard article={article} />
 
       <FeedbackResult feedback={feedback} />
 
@@ -1183,5 +1215,92 @@ const ArticleReader: React.FC<{
         </div>
       </aside>
     </>
+  );
+};
+
+/** Read a sentence aloud; the transcript is compared word by word (no AI) to show words to practise. */
+const ReadAloudCard: React.FC<{ article: string }> = ({ article }) => {
+  const [seed, setSeed] = useState(0);
+  const sentence = useMemo(() => pickReadAloudSentence(article, seed), [article, seed]);
+  const [recording, setRecording] = useState(false);
+  const [heard, setHeard] = useState('');
+  const [result, setResult] = useState<ReadAloudResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const session = useRef<SpeechToTextSession | null>(null);
+  const supported = isSpeechToTextSupported();
+
+  useEffect(() => () => session.current?.stop(), []);
+  if (!sentence || !supported) return null;
+
+  const start = () => {
+    setHeard('');
+    setResult(null);
+    setError(null);
+    session.current = startSpeechToText({
+      onTranscript: setHeard,
+      onError: (m) => {
+        setError(m);
+        setRecording(false);
+      }
+    });
+    if (session.current) setRecording(true);
+  };
+
+  const stop = () => {
+    session.current?.stop();
+    session.current = null;
+    setRecording(false);
+    setResult(heard.trim() ? readAloudScore(sentence, heard) : null);
+  };
+
+  return (
+    <div className="smart-card" data-testid="read-aloud">
+      <span className="smart-tag">Read aloud · pronunciation check</span>
+      <p className="smart-read-sentence" data-testid="read-aloud-sentence">
+        {result
+          ? result.words.map((w, i) => (
+              <span key={i} className={w.ok ? '' : 'smart-missed'}>
+                {w.word}{' '}
+              </span>
+            ))
+          : sentence}
+      </p>
+      <div className="smart-recorder">
+        <button
+          type="button"
+          className={`smart-mic ${recording ? 'live' : ''}`}
+          onClick={recording ? stop : start}
+          data-testid="read-aloud-mic"
+          aria-label={recording ? 'Stop' : 'Read the sentence aloud'}
+        >
+          {recording ? <Square size={18} /> : <Mic size={20} />}
+        </button>
+        <div className="smart-recorder-text">
+          <strong>{recording ? 'Reading…' : 'Press the mic, read the sentence, then stop'}</strong>
+          <span>{recording ? heard || 'Start reading' : 'Words the mic could not match are marked so you can practise them.'}</span>
+        </div>
+      </div>
+      {error && (
+        <p className="smart-inline-error">
+          <AlertTriangle size={13} /> {error}
+        </p>
+      )}
+      {result && (
+        <div className="smart-read-result" data-testid="read-aloud-result">
+          <strong>{result.accuracy}% clear</strong>
+          <span>
+            {result.accuracy >= 90
+              ? 'Very clear. Try the next sentence.'
+              : `Practise the marked word${result.words.filter((w) => !w.ok).length === 1 ? '' : 's'}: say them slowly, then read the whole sentence again.`}
+          </span>
+          <span className="smart-estimate">LexiFlow estimate · based on speech recognition</span>
+        </div>
+      )}
+      <div className="smart-actions">
+        <button type="button" className="btn-secondary" onClick={() => setSeed((n) => n + 1)} disabled={recording} data-testid="read-aloud-next">
+          Another sentence
+        </button>
+      </div>
+    </div>
   );
 };

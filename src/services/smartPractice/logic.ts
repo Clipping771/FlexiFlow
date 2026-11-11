@@ -186,6 +186,9 @@ export interface SpeechMetrics {
   wordsPerMinute: number;
   fillers: number;
   pace: 'slow' | 'good' | 'fast';
+  /** Pauses of 3 seconds or more, when word timing is known */
+  longPauses?: number;
+  longestPauseSeconds?: number;
 }
 
 export function speechMetrics(transcript: string, durationMs: number): SpeechMetrics {
@@ -197,6 +200,81 @@ export function speechMetrics(transcript: string, durationMs: number): SpeechMet
   for (const f of FILLERS) fillers += norm.split(` ${f} `).length - 1;
   const pace = wordsPerMinute < 90 ? 'slow' : wordsPerMinute > 170 ? 'fast' : 'good';
   return { words, seconds, wordsPerMinute, fillers, pace };
+}
+
+/** Pauses of 3 seconds or more between words (PTE closes the mic at about 3 seconds of silence). */
+export const LONG_PAUSE_MS = 3000;
+
+/**
+ * Long pauses from the times new words were heard. `wordTimes` are ms timestamps (one per moment
+ * the word count grew); the gap from the start to the first word counts too.
+ */
+export function longPauses(startMs: number, wordTimes: number[], thresholdMs = LONG_PAUSE_MS): { count: number; longestSeconds: number } {
+  let prev = startMs;
+  let count = 0;
+  let longest = 0;
+  for (const t of [...wordTimes].sort((a, b) => a - b)) {
+    const gap = t - prev;
+    if (gap >= thresholdMs) count++;
+    longest = Math.max(longest, gap);
+    prev = t;
+  }
+  return { count, longestSeconds: Math.round(longest / 100) / 10 };
+}
+
+/** A sentence from the article that is good for reading aloud (10–30 words), chosen by `seed`. */
+export function pickReadAloudSentence(article: string, seed = 0): string | null {
+  const sentences = (article.match(/[^.!?]+[.!?]/g) || [])
+    .map((s) => s.replace(/\s+/g, ' ').trim())
+    .filter((s) => {
+      const n = countWords(s);
+      return n >= 10 && n <= 30 && !/https?:|@|\d{4,}/.test(s);
+    });
+  if (!sentences.length) return null;
+  return sentences[Math.abs(seed) % sentences.length];
+}
+
+export interface ReadAloudResult {
+  /** 0–100: share of the sentence's words that were heard correctly, in order */
+  accuracy: number;
+  words: { word: string; ok: boolean }[];
+  /** Words heard that are not in the sentence */
+  extra: number;
+}
+
+/**
+ * Compares a read-aloud transcript with the sentence (longest common subsequence of words),
+ * deterministically. Missed or misheard words usually point to pronunciation to practise.
+ */
+export function readAloudScore(sentence: string, transcript: string): ReadAloudResult {
+  const ref = sentence.split(/\s+/).filter(Boolean);
+  const norm = (w: string) => normalizeText(w).replace(/\s+/g, '');
+  const a = ref.map(norm);
+  const b = transcript.split(/\s+/).map(norm).filter(Boolean);
+  const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      dp[i][j] = a[i] && a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const ok = new Array(a.length).fill(false);
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] && a[i] === b[j]) {
+      ok[i] = true;
+      i++;
+      j++;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) i++;
+    else j++;
+  }
+  const scored = a.filter(Boolean).length || 1;
+  const matched = ok.filter(Boolean).length;
+  return {
+    accuracy: Math.round((matched / scored) * 100),
+    words: ref.map((word, k) => ({ word, ok: ok[k] || !a[k] })),
+    extra: Math.max(0, b.length - matched)
+  };
 }
 
 /** Problems found without AI; an answer with any of these is not sent for marking. */
