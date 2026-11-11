@@ -704,7 +704,7 @@ const ListeningSection: React.FC<{
               ? 'Preparing a natural voice…'
               : voice === 'ai'
                 ? 'Natural AI voice'
-                : 'Browser voice · add a Gemini or OpenAI key in Settings for a natural AI voice'}
+                : 'Browser voice · use LexiFlow Cloud, Gemini or OpenAI in Settings for a natural AI voice'}
           </span>
         </div>
         <label className="smart-toggle">

@@ -33,6 +33,7 @@ describe('AI voice for listening', () => {
     expect(canUseAiVoice({ aiProvider: 'gemini', apiKey: ' ' })).toBe(false);
     expect(canUseAiVoice({ aiProvider: 'anthropic', apiKey: 'k' })).toBe(false);
     expect(canUseAiVoice({ aiProvider: 'mock' })).toBe(false);
+    expect(canUseAiVoice({ aiProvider: 'lexiflow' })).toBe(true);
     expect(canUseAiVoice({ aiProvider: 'openai', apiKey: 'k', apiEndpoint: 'http://localhost:1234/v1' })).toBe(false);
   });
 
@@ -87,6 +88,12 @@ describe('AI voice for listening', () => {
     expect(v.getUint16(34, true)).toBe(16);
     expect(v.getUint32(40, true)).toBe(4);
     expect(wav.length).toBe(48);
+  });
+});
+
+describe('Cloud voice', () => {
+  it('signed out LexiFlow Cloud users get the browser voice (null)', async () => {
+    expect(await synthesizeAiSpeech('Hello there.', { aiProvider: 'lexiflow' })).toBeNull();
   });
 });
 

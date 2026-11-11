@@ -4,11 +4,13 @@
  * Uses the learner's own provider:
  *  - Gemini → gemini-2.5-flash-preview-tts (returns raw 24 kHz 16-bit PCM)
  *  - OpenAI → gpt-4o-mini-tts (returns MP3)
+ *  - LexiFlow Cloud → POST /v1/ai/speech (the server meters credits and records usage)
  * Other providers return null and the page falls back to the best browser voice.
- * Every call writes a UsageRecord (AGENTS.md rule 5).
+ * Every own-key call writes a UsageRecord (AGENTS.md rule 5).
  */
 import type { UserSettings } from '../../types';
 import { recordUsage } from '../logging/usageRecord';
+import { AuthService } from '../auth/authService';
 
 export const GEMINI_TTS_MODEL = 'gemini-2.5-flash-preview-tts';
 export const OPENAI_TTS_MODEL = 'gpt-4o-mini-tts';
@@ -27,7 +29,7 @@ export interface SpeechAudio {
   format: 'pcm16' | 'mp3';
   base64: string;
   sampleRate: number;
-  provider: 'gemini' | 'openai';
+  provider: 'gemini' | 'openai' | 'lexiflow';
   model: string;
   voice: string;
 }
@@ -112,8 +114,22 @@ async function openaiSpeech(text: string, apiKey: string): Promise<SpeechAudio |
   return { format: 'mp3', base64: arrayBufferToBase64(buffer), sampleRate: 24000, provider: 'openai', model: OPENAI_TTS_MODEL, voice: OPENAI_TTS_VOICE };
 }
 
+async function cloudSpeech(text: string): Promise<SpeechAudio | null> {
+  if (!(await AuthService.isSignedIn())) return null;
+  const res = await AuthService.authorizedFetch('/v1/ai/speech', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text })
+  });
+  if (!res.ok) return null;
+  const data = ((await res.json()) as { data?: Partial<SpeechAudio> })?.data;
+  if (!data?.base64 || data.format !== 'pcm16') return null;
+  return { format: 'pcm16', base64: data.base64, sampleRate: data.sampleRate || 24000, provider: 'lexiflow', model: data.model || GEMINI_TTS_MODEL, voice: data.voice || GEMINI_TTS_VOICE };
+}
+
 /** True when the learner's settings can make a natural AI voice */
 export function canUseAiVoice(settings: Pick<UserSettings, 'aiProvider' | 'apiKey' | 'apiEndpoint'>): boolean {
+  if (settings.aiProvider === 'lexiflow') return true;
   if (!settings.apiKey?.trim()) return false;
   if (settings.aiProvider === 'gemini') return true;
   if (settings.aiProvider === 'openai') return !settings.apiEndpoint || settings.apiEndpoint.includes('api.openai.com');
@@ -137,9 +153,11 @@ export async function synthesizeAiSpeech(
 
   try {
     const audio =
-      settings.aiProvider === 'gemini'
-        ? await geminiSpeech(clean, settings.apiKey!.trim())
-        : await openaiSpeech(clean, settings.apiKey!.trim());
+      settings.aiProvider === 'lexiflow'
+        ? await cloudSpeech(clean)
+        : settings.aiProvider === 'gemini'
+          ? await geminiSpeech(clean, settings.apiKey!.trim())
+          : await openaiSpeech(clean, settings.apiKey!.trim());
     if (audio) remember(key, audio);
     return audio;
   } catch {

@@ -38,6 +38,7 @@ import { EXAM_ITEM_KINDS, EXAM_SOURCE_MAX_CHARS, type ExamItemKind } from '../..
 import { dhakaDay, nextDhakaMidnight } from '../lib/time';
 import type { SelectionType, WritingGoal } from '../../../src/types';
 import { loadUser } from '../lib/users';
+import { runSpeech, SPEECH_MAX_CHARS } from '../lib/speech';
 import { requireAuth } from '../middleware/auth';
 
 /** Longest word or phrase accepted as a Stage A/B target. */
@@ -188,7 +189,7 @@ async function metered<K extends string, T>(c: Context<AppEnv>, spec: TaskSpec<K
     throw new ApiError(503, 'AI_UNAVAILABLE', 'LexiFlow AI is busy right now. Try again in a moment. No credits were used.');
   }
 
-  await addSpend(c.env, day, user.plan, estimateMicroUsd(c.env, result.tokensIn, result.tokensOut));
+  await addSpend(c.env, day, user.plan, result.spendMicroUsd ?? estimateMicroUsd(c.env, result.tokensIn, result.tokensOut));
   if (key !== null) await cachePut(c.env.CACHE, key, result.data);
   await recordUsageEvent(db, {
     userId,
@@ -484,4 +485,14 @@ ai.post('/exam/ielts-speaking', (c) =>
     (input) =>
       ({ part: input.part === '1' ? 1 : 2, prompt: input.prompt!, transcript: input.transcript!, durationMs: Number(input.durationMs) }) as const
   )
+);
+
+/** POST /v1/ai/speech — natural AI voice for listening practice (audio is not cached: briefs are personal) */
+ai.post('/speech', (c) =>
+  metered(c, {
+    endpoint: 'speech',
+    fields: { text: { required: true, max: SPEECH_MAX_CHARS }, targetLang: { max: 16, pattern: /^[a-z]{2,3}$/ } },
+    cacheKey: () => null,
+    run: (gemini, input) => runSpeech(gemini, input.text!.replace(/\s+/g, ' ').trim())
+  })
 );

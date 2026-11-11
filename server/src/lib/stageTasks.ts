@@ -43,6 +43,8 @@ export interface TaskResult<T> {
   data: T;
   tokensIn: number;
   tokensOut: number;
+  /** Cost in micro-USD when this model is priced differently from the text model (e.g. speech) */
+  spendMicroUsd?: number;
 }
 
 export type Validation<T> = { isValid: boolean; data?: T; errors: string[] };
