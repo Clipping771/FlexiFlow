@@ -52,6 +52,7 @@ import {
   weakSkills
 } from '../../services/smartPractice/logic';
 import { MistakeMemoryClient } from '../../services/mistake/client';
+import { recordActivity } from '../../services/learner/activity';
 import { TaxonomyService } from '../../services/taxonomy/catalog';
 import { isSpeechToTextSupported, startSpeechToText, SpeechToTextSession } from '../../services/audio/speechToText';
 import { playListening, prepareListening, stopListening, VoiceKind } from '../../services/audio/listeningPlayer';
@@ -104,13 +105,14 @@ function useSmartItem<K extends SmartKind>(kind: K, source: string | null, cache
   };
 }
 
-export const SmartPracticeView: React.FC<{ vocabItems?: VocabularyItem[]; onOpenSettings?: () => void }> = ({
+export const SmartPracticeView: React.FC<{ vocabItems?: VocabularyItem[]; onOpenSettings?: () => void; initialSection?: Section }> = ({
   vocabItems = [],
-  onOpenSettings
+  onOpenSettings,
+  initialSection
 }) => {
   const { article, loading: articleLoading, key, seed, newQuestions, applyPastedText } = useExamArticle();
   const [progress, setProgress] = useState<SmartProgress>(loadProgress);
-  const [section, setSection] = useState<Section>('reading');
+  const [section, setSection] = useState<Section>(initialSection ?? 'reading');
   const [answers, setAnswers] = useState<Answers>({});
   const [highlight, setHighlight] = useState<Span | null>(null);
   const [roundClosed, setRoundClosed] = useState(false);
@@ -145,6 +147,7 @@ export const SmartPracticeView: React.FC<{ vocabItems?: VocabularyItem[]; onOpen
   const answer = (id: string, skill: PracticeSkill, choice: string | number, correct: boolean, counts = true) => {
     if (answers[id]) return;
     setAnswers((a) => ({ ...a, [id]: { choice, correct } }));
+    recordActivity('practice');
     if (counts) {
       setProgress((p) => {
         const next = recordAnswer(p, skill, correct);

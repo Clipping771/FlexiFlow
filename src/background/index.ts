@@ -1,4 +1,5 @@
 import { synthesizeAiSpeech } from '../services/audio/aiVoice';
+import { registerReminderHandlers, scheduleReminder } from './reminder';
 import { AIService } from '../services/ai';
 import { StorageService } from '../services/storage/db';
 import { SettingsService } from '../services/storage/settings';
@@ -33,6 +34,8 @@ async function injectContentScriptIntoOpenTabs(): Promise<void> {
     // Non-blocking fallback
   }
 }
+
+registerReminderHandlers();
 
 // Setup Context Menu and rules on installation
 if (typeof chrome !== 'undefined' && chrome.runtime) {
@@ -506,6 +509,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             const { jsonString } = payload || {};
             const res = await StorageService.importData(jsonString);
             sendResponse({ success: true, data: res });
+            break;
+          }
+
+          case 'SET_REMINDER': {
+            const { time } = (payload || {}) as { time: string | null };
+            await scheduleReminder(time ?? null);
+            sendResponse({ success: true });
             break;
           }
 

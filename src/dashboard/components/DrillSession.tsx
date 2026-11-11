@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { AlertCircle, ArrowRight, CheckCircle2, X } from 'lucide-react';
 import type { TaxonomyError } from '../../services/taxonomy/catalog';
 import { MistakeMemoryClient, MistakeMemoryItem, DrillSessionOutcome } from '../../services/mistake/client';
+import { recordActivity } from '../../services/learner/activity';
 import { buildDrillSession, gradeChoice, gradeFix, Drill, PASS_RATIO } from '../../services/mistake/drills';
 
 interface DrillSessionProps {
@@ -59,6 +60,7 @@ export const DrillSession: React.FC<DrillSessionProps> = ({ item, taxError, onCl
       return;
     }
     setOutcome(MistakeMemoryClient.recordDrillSession(item.errorCode, correctCount, drills.length));
+    recordActivity('drill', drills.length);
   };
 
   if (drills.length === 0) {

@@ -11,7 +11,8 @@ import {
   BookmarkCheck,
   PenLine,
   BrainCircuit,
-  Sparkles
+  Sparkles,
+  Home
 } from 'lucide-react';
 
 export type DashboardTab =
@@ -66,6 +67,20 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Navigation Sections */}
       <nav className="nav-menu">
         {/* Section: Study & Memory */}
+        <div className="nav-section">
+          <button
+            type="button"
+            data-testid="nav-today"
+            className={`nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => onTabChange('overview')}
+          >
+            <span className="nav-item-icon">
+              <Home size={16} />
+            </span>
+            <span className="nav-item-label">Today</span>
+          </button>
+        </div>
+
         <div className="nav-section">
           <div className="nav-section-title">Study &amp; Memory</div>
 

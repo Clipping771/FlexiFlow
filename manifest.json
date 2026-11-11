@@ -11,7 +11,9 @@
     "scripting",
     "sidePanel",
     "declarativeNetRequest",
-    "identity"
+    "identity",
+    "alarms",
+    "notifications"
   ],
   "side_panel": {
     "default_path": "dashboard.html"

@@ -184,7 +184,7 @@ describe('Mobile End-to-End Flow & Responsive Verification (LF-004)', () => {
     // Verify bottom nav is present
     const bottomNav = container.querySelector('.narrow-bottom-nav');
     expect(bottomNav).not.toBeNull();
-    expect(bottomNav?.textContent).toContain('Vocab');
+    expect(bottomNav?.textContent).toContain('Today');
     expect(bottomNav?.textContent).toContain('Review');
     expect(bottomNav?.textContent).toContain('Settings');
     expect(bottomNav?.textContent).toContain('Tools');

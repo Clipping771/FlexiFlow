@@ -12,16 +12,18 @@ import { SettingsView } from './components/SettingsView';
 import { DEFAULT_SETTINGS } from '../services/storage/settings';
 import { WeaknessDetector } from '../services/weakness/detector';
 import { FSRSEngine } from '../services/fsrs/engine';
-import { Menu, X, BookOpen, RotateCw, Settings as SettingsIcon, PanelRight, Sparkles } from 'lucide-react';
+import { Menu, X, BookOpen, Home, RotateCw, Settings as SettingsIcon, PanelRight, Sparkles } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ReadingListView } from './components/ReadingListView';
 import { SummaryPracticeView } from './components/SummaryPracticeView';
 import { MistakeMemoryView } from './components/MistakeMemoryView';
 import { SmartPracticeView } from './components/SmartPracticeView';
+import { TodayView, PracticeSection } from './components/TodayView';
+import { recordActivity } from '../services/learner/activity';
 import './dashboard.css';
 
 const TAB_TITLES: Record<DashboardTab, string> = {
-  overview: 'Overview',
+  overview: 'Today',
   vocabulary: 'Vocabulary Library',
   targeted_practice: 'Targeted Practice',
   review: 'Spaced Review',
@@ -54,8 +56,11 @@ export const App: React.FC = () => {
         ? 'summary_practice'
         : window.location.hash === '#exam'
           ? 'smart_practice'
-          : 'vocabulary'
+          : window.location.hash === '#vocabulary'
+            ? 'vocabulary'
+            : 'overview'
   );
+  const [practiceSection, setPracticeSection] = useState<PracticeSection | undefined>(undefined);
   const [items, setItems] = useState<VocabularyItem[]>([]);
   const [dueItems, setDueItems] = useState<VocabularyItem[]>([]);
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
@@ -440,6 +445,7 @@ export const App: React.FC = () => {
   };
 
   const handleReviewSubmit = async (id: string, rating: FSRSRating) => {
+    recordActivity('review');
     if (typeof chrome !== 'undefined' && chrome.runtime) {
       chrome.runtime.sendMessage({
         type: 'SCHEDULE_REVIEW',
@@ -693,6 +699,17 @@ export const App: React.FC = () => {
           )}
 
           <ErrorBoundary fallbackTitle="View Encountered an Error">
+            {activeTab === 'overview' && (
+              <TodayView
+                dueVocabCount={dueItems.length}
+                onNavigate={(tab) => setActiveTab(tab)}
+                onPractice={(section) => {
+                  setPracticeSection(section);
+                  setActiveTab('smart_practice');
+                }}
+              />
+            )}
+
             {activeTab === 'vocabulary' && (
               <VocabularyView
                 items={items}
@@ -730,7 +747,12 @@ export const App: React.FC = () => {
             {activeTab === 'summary_practice' && <SummaryPracticeView />}
 
             {activeTab === 'smart_practice' && (
-              <SmartPracticeView vocabItems={items} onOpenSettings={() => setActiveTab('settings')} />
+              <SmartPracticeView
+                key={practiceSection || 'default'}
+                vocabItems={items}
+                initialSection={practiceSection}
+                onOpenSettings={() => setActiveTab('settings')}
+              />
             )}
 
             {activeTab === 'mistake_memory' && (
@@ -764,11 +786,12 @@ export const App: React.FC = () => {
             <nav className="narrow-bottom-nav">
               <button
                 type="button"
-                className={`bottom-nav-item ${activeTab === 'vocabulary' ? 'active' : ''}`}
-                onClick={() => handleTabSelect('vocabulary')}
+                className={`bottom-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+                onClick={() => handleTabSelect('overview')}
+                data-testid="bottom-nav-today"
               >
-                <BookOpen size={16} />
-                <span>Vocab</span>
+                <Home size={16} />
+                <span>Today</span>
               </button>
               <button
                 type="button"
