@@ -19,12 +19,14 @@ beforeEach(() => {
   (globalThis as any).chrome = {
     storage: {
       sync: {
-        get: vi.fn((_keys, cb) => cb({})),
-        set: vi.fn((_data, cb) => cb && cb())
+        // Chrome supports both callback and promise forms
+        get: vi.fn((_keys, cb) => (cb ? cb({}) : Promise.resolve({}))),
+        set: vi.fn((_data, cb) => (cb ? cb() : Promise.resolve()))
       },
       local: {
-        get: vi.fn((_keys, cb) => cb({})),
-        set: vi.fn((_data, cb) => cb && cb())
+        // Chrome supports both callback and promise forms
+        get: vi.fn((_keys, cb) => (cb ? cb({}) : Promise.resolve({}))),
+        set: vi.fn((_data, cb) => (cb ? cb() : Promise.resolve()))
       },
       onChanged: {
         addListener: vi.fn(),

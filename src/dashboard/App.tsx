@@ -100,8 +100,12 @@ export const App: React.FC = () => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
     const run = async () => {
-      if (cancelled || !(await AuthService.isSignedIn())) return;
-      await syncLearnerData((path, init) => AuthService.authorizedFetch(path, init));
+      try {
+        if (cancelled || !(await AuthService.isSignedIn())) return;
+        await syncLearnerData((path, init) => AuthService.authorizedFetch(path, init));
+      } catch {
+        // Sync is best effort: local data stays as it is and the next change retries
+      }
     };
     void run();
     const schedule = (e: Event) => {
