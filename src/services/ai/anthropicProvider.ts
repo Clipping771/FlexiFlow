@@ -1,3 +1,4 @@
+import { recordUsageFromResponse } from '../logging/usageRecord';
 import {
   SelectionType,
   LinguisticAnalysisResult,
@@ -90,6 +91,8 @@ export class AnthropicProvider implements AIProvider {
       clearTimeout(timeoutId);
       throw err;
     }
+
+    recordUsageFromResponse('anthropic', this.model, res, systemPrompt, userPrompt);
 
     if (!res.ok) {
       const err = await res.text();

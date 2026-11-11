@@ -83,6 +83,8 @@ describe('SummaryPracticeView', () => {
     );
     expect(container.textContent).toContain('8.5');
     expect(container.textContent).toContain('/ 10');
+    // AGENTS.md rule 8: an AI score is always labelled as an estimate
+    expect(container.querySelector('[data-testid="summary-estimate-label"]')?.textContent).toContain('LexiFlow estimate');
     expect(container.textContent).toContain('Main idea');
     expect(container.textContent).toContain('Cross-border lines');
     expect(container.textContent).toContain('grids need');

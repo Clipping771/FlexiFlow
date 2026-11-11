@@ -19,8 +19,10 @@ import {
 import {
   MistakeMemoryClient,
   MistakeMemoryItem,
-  MistakeStats
+  MistakeStats,
+  isDue
 } from '../../services/mistake/client';
+import { DrillSession, DrillCloseButton } from './DrillSession';
 import { TaxonomyService, TaxonomyError } from '../../services/taxonomy/catalog';
 import { MasteryState } from '../../services/mistake/stateMachine';
 
@@ -49,18 +51,15 @@ export const MistakeMemoryView: React.FC<MistakeMemoryViewProps> = ({
     taxError: TaxonomyError;
   } | null>(null);
 
-  // Drill state
-  const [drillInput, setDrillInput] = useState('');
-  const [drillResult, setDrillResult] = useState<{
-    submitted: boolean;
-    isCorrect: boolean;
-    feedback: string;
-  } | null>(null);
+  // Each opened session gets a fresh key so the drills are rebuilt
+  const [sessionKey, setSessionKey] = useState(0);
+  const [dueItems, setDueItems] = useState<MistakeMemoryItem[]>([]);
 
   const loadData = () => {
     const loaded = MistakeMemoryClient.getMistakes();
     setItems(loaded);
     setStats(MistakeMemoryClient.getStats());
+    setDueItems(MistakeMemoryClient.getDueMistakes());
   };
 
   useEffect(() => {
@@ -88,50 +87,33 @@ export const MistakeMemoryView: React.FC<MistakeMemoryViewProps> = ({
   }, [initialErrorCode, items]);
 
   const openDrill = (item: MistakeMemoryItem, taxError: TaxonomyError) => {
-    MistakeMemoryClient.startPractice(item.errorCode);
-    setActiveDrillItem({ item, taxError });
-    setDrillInput('');
-    setDrillResult(null);
+    // Opening a drill only moves new or returning mistakes to Practising; progress is kept otherwise
+    const opened =
+      item.masteryState === 'New' || item.masteryState === 'Reopened'
+        ? MistakeMemoryClient.startPractice(item.errorCode)
+        : item;
+    setActiveDrillItem({ item: opened, taxError });
+    setSessionKey((k) => k + 1);
   };
 
   const closeDrill = () => {
     setActiveDrillItem(null);
-    setDrillInput('');
-    setDrillResult(null);
     loadData();
   };
 
-  const handleDrillSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeDrillItem) return;
+  /** The next due mistake after the one being practised, if any */
+  const nextDue = (() => {
+    if (!activeDrillItem) return null;
+    const fresh = MistakeMemoryClient.getDueMistakes();
+    const candidate = fresh.find((i) => i.errorCode !== activeDrillItem.item.errorCode);
+    const tax = candidate ? TaxonomyService.getError(candidate.errorCode) : undefined;
+    return candidate && tax ? { item: candidate, tax } : null;
+  })();
 
-    // The learner rewrites the incorrect example; it counts when it matches the corrected sentence,
-    // ignoring case, punctuation and spacing
-    const normalise = (text: string) =>
-      text
-        .toLowerCase()
-        .replace(/[’‘]/g, "'")
-        .replace(/[^\w\s']/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-    const isCorrect =
-      normalise(drillInput).length > 0 && normalise(drillInput) === normalise(activeDrillItem.taxError.correct_example);
-
-    const updated = MistakeMemoryClient.recordPracticeAttempt(
-      activeDrillItem.item.errorCode,
-      isCorrect
-    );
-
-    setDrillResult({
-      submitted: true,
-      isCorrect,
-      feedback: isCorrect
-        ? `Great job! Error state progressed to ${updated.masteryState}. Next FSRS spaced review scheduled in ${updated.nextReviewDays} day(s).`
-        : `Not quite. Expected: "${activeDrillItem.taxError.correct_example}". Keep practicing to build permanent muscle memory!`
-    });
-
-    setActiveDrillItem((prev) => (prev ? { ...prev, item: updated } : null));
-    loadData();
+  const startDueReview = () => {
+    const first = dueItems[0];
+    const tax = first ? TaxonomyService.getError(first.errorCode) : undefined;
+    if (first && tax) openDrill(first, tax);
   };
 
   // Filter items
@@ -156,300 +138,193 @@ export const MistakeMemoryView: React.FC<MistakeMemoryViewProps> = ({
     return matchesSearch && matchesCat && matchesState;
   });
 
-  const categories = ['ALL', 'GRA', 'VOC', 'MEC', 'PTE', 'IELTS'];
-
-  const getBadgeStyle = (state: MasteryState) => {
-    switch (state) {
-      case 'New':
-        return { background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.3)' };
-      case 'Practising':
-        return { background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)' };
-      case 'Improving':
-        return { background: 'rgba(168, 85, 247, 0.15)', color: '#a855f7', border: '1px solid rgba(168, 85, 247, 0.3)' };
-      case 'Mastered':
-        return { background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' };
-      case 'Reopened':
-        return { background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.3)' };
-    }
+  const CATEGORY_LABELS: Record<string, string> = {
+    ALL: 'All',
+    GRA: 'Grammar',
+    VOC: 'Vocabulary',
+    MEC: 'Spelling & punctuation'
   };
+  const categories = Object.keys(CATEGORY_LABELS);
 
-  const getSeverityStyle = (severity: string) => {
-    switch (severity) {
-      case 'critical':
-        return { background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' };
-      case 'high':
-        return { background: 'rgba(249, 115, 22, 0.15)', color: '#f97316' };
-      case 'medium':
-        return { background: 'rgba(234, 179, 8, 0.15)', color: '#eab308' };
-      default:
-        return { background: 'var(--fill)', color: 'var(--text-muted)' };
-    }
-  };
+  const STATES: { state: MasteryState; label: string; hint: string }[] = [
+    { state: 'New', label: 'New', hint: 'Just found in your practice' },
+    { state: 'Practising', label: 'Practising', hint: 'You are working on it' },
+    { state: 'Improving', label: 'Improving', hint: 'Passed one review' },
+    { state: 'Mastered', label: 'Mastered', hint: 'Passed two spaced reviews' },
+    { state: 'Reopened', label: 'Came back', hint: 'Showed up again after mastering' }
+  ];
+
+  const hasMistakes = stats.total > 0 || items.length > 0;
 
   return (
-    <div className="mistake-memory-view" style={{ maxWidth: '1100px', margin: '0 auto', color: 'var(--text-main)' }}>
-      {/* Top Banner & Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
+    <div className="view-container mm-view">
+      <div className="view-header">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <span style={{ fontSize: '11px', background: 'rgba(168, 85, 247, 0.15)', color: 'var(--purple)', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(168, 85, 247, 0.3)' }}>
-              Pedagogical Core
+          <h2 className="view-title">Mistakes</h2>
+          <p className="view-desc">Errors from your writing and speaking practice. Pass two spaced reviews and it's mastered.</p>
+        </div>
+        {hasMistakes && (
+          <div className="mm-progress" title="Share of your mistakes you have mastered">
+            <strong>{stats.masteredPercentage}%</strong>
+            <span>
+              mastered · {stats.byState.Mastered} of {stats.total}
             </span>
-            <span
-              data-testid="mistake-estimate-label"
-              style={{ fontSize: '11px', background: 'var(--fill)', border: '1px solid var(--line)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: '4px' }}
-            >
+            <span className="mm-estimate" data-testid="mistake-estimate-label">
               LexiFlow estimate
             </span>
           </div>
-          <h2 style={{ fontSize: '24px', fontWeight: 800, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <BrainCircuit size={26} style={{ color: 'var(--purple)' }} />
-            Mistake Memory &amp; Improvement Lab
-          </h2>
-          <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: 'var(--text-muted)' }}>
-            Track recurring errors, practice targeted retrieval drills, and graduate mistakes to Mastered.
-          </p>
-        </div>
-
-        {/* Overall Mastery Pill */}
-        <div style={{ background: 'var(--card)', border: '1px solid var(--card-border)', padding: '12px 18px', borderRadius: '12px', textAlign: 'right', boxShadow: 'var(--shadow-card)' }}>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>
-            Mastery Progress
-          </span>
-          <span style={{ fontSize: '22px', fontWeight: 800, color: 'var(--green)' }}>
-            {stats.masteredPercentage}%
-          </span>
-          <span style={{ fontSize: '12px', color: 'var(--text-subtle)', marginLeft: '6px' }}>
-            ({stats.byState.Mastered} / {stats.total} Mastered)
-          </span>
-        </div>
-      </div>
-
-      {/* 5-State Life-Cycle Metric Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-        {[
-          { state: 'New', count: stats.byState.New, color: '#3b82f6', desc: 'Detected in tasks' },
-          { state: 'Practising', count: stats.byState.Practising, color: '#f59e0b', desc: 'In active drills' },
-          { state: 'Improving', count: stats.byState.Improving, color: '#a855f7', desc: '1 correction verified' },
-          { state: 'Mastered', count: stats.byState.Mastered, color: '#10b981', desc: 'Streak 2+ & FSRS' },
-          { state: 'Reopened', count: stats.byState.Reopened, color: '#f43f5e', desc: 'Relapsed in task' }
-        ].map((s) => (
-          <div
-            key={s.state}
-            data-testid={`state-card-${s.state}`}
-            onClick={() => setSelectedStateFilter(s.state)}
-            style={{
-              background: 'var(--card)',
-              border: selectedStateFilter === s.state ? `2px solid ${s.color}` : '1px solid var(--card-border)',
-              borderRadius: '10px',
-              padding: '14px',
-              cursor: 'pointer',
-              boxShadow: 'var(--shadow-card)',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: s.color }}>{s.state}</span>
-              <span style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-main)' }}>{s.count}</span>
-            </div>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{s.desc}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Filter Toolbar */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '16px', marginBottom: '24px', boxShadow: 'var(--shadow-card)' }}>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* Search Box */}
-          <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '220px' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-subtle)' }} />
-            <input
-              data-testid="mistake-search-input"
-              type="text"
-              placeholder="Search error codes or grammar rules..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                background: 'var(--input-bg)',
-                border: '1px solid var(--input-border)',
-                borderRadius: '8px',
-                padding: '9px 12px 9px 36px',
-                color: 'var(--text-main)',
-                fontSize: '13px',
-                outline: 'none',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          {/* Category Tabs */}
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                data-testid={`cat-pill-${cat}`}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: selectedCategory === cat ? 'var(--blue-grad)' : 'var(--fill)',
-                  color: selectedCategory === cat ? '#ffffff' : 'var(--text-muted)',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {cat === 'ALL' ? 'All Categories' : cat}
-              </button>
-            ))}
-          </div>
-
-          {/* State Filter */}
-          <div style={{ display: 'flex', background: 'var(--fill)', padding: '3px', borderRadius: '8px', border: '1px solid var(--line)' }}>
-            {['ALL', 'ACTIVE', 'Mastered'].map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setSelectedStateFilter(f)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: selectedStateFilter === f ? 'var(--card)' : 'transparent',
-                  color: selectedStateFilter === f ? 'var(--text-main)' : 'var(--text-muted)',
-                  boxShadow: selectedStateFilter === f ? 'var(--shadow-card)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {f === 'ACTIVE' ? 'Active In-Progress' : f}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Mistake Items List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        {filteredItems.length === 0 ? (
-          <div style={{ background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '40px', textAlign: 'center', color: 'var(--text-muted)', boxShadow: 'var(--shadow-card)' }}>
-            <Sparkles size={36} style={{ margin: '0 auto 12px auto', color: 'var(--blue)', opacity: 0.8 }} />
-            <h3 style={{ fontSize: '16px', color: 'var(--text-main)', margin: '0 0 6px 0' }}>No mistakes match your filter</h3>
-            <p style={{ fontSize: '13px', margin: 0, color: 'var(--text-muted)' }}>
-              Try clearing your search query or practice more Writing and Speaking tasks!
-            </p>
-          </div>
-        ) : (
-          filteredItems.map((item) => {
-            const tax = TaxonomyService.getError(item.errorCode);
-            const stateStyle = getBadgeStyle(item.masteryState);
-            const sevStyle = getSeverityStyle(tax?.severity || 'medium');
-
-            return (
-              <div
-                key={item.id}
-                data-testid={`mistake-card-${item.errorCode}`}
-                style={{
-                  background: 'var(--card)',
-                  border: '1px solid var(--card-border)',
-                  borderRadius: '12px',
-                  padding: '18px 20px',
-                  transition: 'border 0.2s ease, box-shadow 0.2s ease',
-                  position: 'relative',
-                  boxShadow: 'var(--shadow-card)'
-                }}
-              >
-                {/* Header row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--blue)', fontFamily: 'monospace', background: 'var(--fill)', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--line)' }}>
-                      {item.errorCode}
-                    </span>
-                    <span style={{ ...sevStyle, fontSize: '11px', padding: '2px 8px', borderRadius: '4px', fontWeight: 700, textTransform: 'uppercase' }}>
-                      {tax?.severity || 'medium'}
-                    </span>
-                    <span style={{ ...stateStyle, fontSize: '11px', padding: '2px 10px', borderRadius: '12px', fontWeight: 700 }}>
-                      {item.masteryState}
-                    </span>
-                  </div>
-
-                  {/* Action button */}
-                  {tax && (
-                    <button
-                      data-testid={`practice-btn-${item.errorCode}`}
-                      type="button"
-                      onClick={() => openDrill(item, tax)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: 'var(--blue-grad)',
-                        border: 'none',
-                        color: '#ffffff',
-                        padding: '7px 14px',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        transition: 'opacity 0.2s ease'
-                      }}
-                    >
-                      <Sparkles size={14} />
-                      Improvement Lab Drill
-                    </button>
-                  )}
-                </div>
-
-                {/* Name & Definition */}
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-main)', margin: '0 0 6px 0' }}>
-                  {tax?.name || item.errorCode}
-                </h3>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '0 0 14px 0', lineHeight: 1.5 }}>
-                  {tax?.definition}
-                </p>
-
-                {/* Examples */}
-                {tax && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px', marginBottom: '14px' }}>
-                    <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', padding: '10px 12px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--danger)', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                        ❌ Common Mistake:
-                      </span>
-                      <span style={{ fontSize: '12px', color: 'var(--text-main)' }}>
-                        {tax.incorrect_example}
-                      </span>
-                    </div>
-                    <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '8px', padding: '10px 12px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--green)', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
-                        ✓ Corrected Pattern:
-                      </span>
-                      <span style={{ fontSize: '12px', color: 'var(--text-main)' }}>
-                        {tax.correct_example}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Footer metadata */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-subtle)', borderTop: '1px solid var(--line)', paddingTop: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ display: 'flex', gap: '14px' }}>
-                    <span>Occurrences: <strong style={{ color: 'var(--text-main)' }}>{item.totalOccurrences}</strong></span>
-                    <span>Correction Streak: <strong style={{ color: 'var(--green)' }}>{item.successfulCorrections}/2</strong></span>
-                    <span>Next Spaced Review: <strong style={{ color: 'var(--text-main)' }}>In {item.nextReviewDays}d</strong></span>
-                  </div>
-                  <span>Last Seen: {new Date(item.lastSeenAt).toLocaleDateString()}</span>
-                </div>
-              </div>
-            );
-          })
         )}
       </div>
+
+      {hasMistakes && dueItems.length > 0 && (
+        <div className="mm-due" data-testid="mm-due-banner">
+          <div>
+            <strong>
+              {dueItems.length} mistake{dueItems.length === 1 ? '' : 's'} to review today
+            </strong>
+            <span>Short drills with new sentences each time, including your own.</span>
+          </div>
+          <button type="button" className="btn-primary" data-testid="mm-start-review" onClick={startDueReview}>
+            <Sparkles size={14} /> Start review
+          </button>
+        </div>
+      )}
+
+      {!hasMistakes ? (
+        <div className="mm-empty" data-testid="mistake-empty">
+          <div className="mm-empty-icon">
+            <BrainCircuit size={26} />
+          </div>
+          <h3>No mistakes yet</h3>
+          <p>
+            When Smart Practice marks your writing or speaking, the errors it finds are saved here. Each one comes with a short
+            drill so you can fix it for good.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="mm-states" role="tablist" aria-label="Filter by progress">
+            {STATES.map((s) => (
+              <button
+                key={s.state}
+                type="button"
+                role="tab"
+                aria-selected={selectedStateFilter === s.state}
+                data-testid={`state-card-${s.state}`}
+                className={`mm-state state-${s.state.toLowerCase()} ${selectedStateFilter === s.state ? 'active' : ''}`}
+                onClick={() => setSelectedStateFilter(selectedStateFilter === s.state ? 'ALL' : s.state)}
+                title={s.hint}
+              >
+                <span className="mm-state-dot" />
+                <span className="mm-state-label">{s.label}</span>
+                <span className="mm-state-count">{stats.byState[s.state]}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="mm-toolbar">
+            <div className="search-input-wrapper mm-search">
+              <Search size={15} className="search-icon" />
+              <input
+                data-testid="mistake-search-input"
+                className="input-search"
+                type="text"
+                placeholder="Search mistakes or rules…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="mm-chips">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  data-testid={`cat-pill-${cat}`}
+                  type="button"
+                  className={`mm-chip ${selectedCategory === cat ? 'active' : ''}`}
+                  onClick={() => setSelectedCategory(cat)}
+                >
+                  {CATEGORY_LABELS[cat]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mm-list">
+            {filteredItems.length === 0 ? (
+              <div className="mm-empty small">
+                <h3>Nothing matches</h3>
+                <p>Try another search or filter.</p>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedCategory('ALL');
+                    setSelectedStateFilter('ALL');
+                  }}
+                >
+                  Clear filters
+                </button>
+              </div>
+            ) : (
+              filteredItems.map((item) => {
+                const tax = TaxonomyService.getError(item.errorCode);
+                return (
+                  <div key={item.id} data-testid={`mistake-card-${item.errorCode}`} className="mm-card">
+                    <div className="mm-card-head">
+                      <div className="mm-card-title">
+                        <h3>{tax?.name || item.errorCode}</h3>
+                        <span className={`mm-badge state-${item.masteryState.toLowerCase()}`}>
+                          {item.masteryState === 'Reopened' ? 'Came back' : item.masteryState}
+                        </span>
+                        {isDue(item) && (
+                          <span className="mm-badge mm-due-badge" data-testid={`due-badge-${item.errorCode}`}>
+                            Due today
+                          </span>
+                        )}
+                      </div>
+                      {tax && (
+                        <button
+                          data-testid={`practice-btn-${item.errorCode}`}
+                          type="button"
+                          className="btn-primary mm-practice"
+                          onClick={() => openDrill(item, tax)}
+                        >
+                          <Sparkles size={14} /> Practise
+                        </button>
+                      )}
+                    </div>
+
+                    {tax?.definition && <p className="mm-def">{tax.definition}</p>}
+
+                    {tax && (
+                      <div className="mm-examples">
+                        <div className="mm-example wrong">
+                          <X size={14} />
+                          <span>{tax.incorrect_example}</span>
+                        </div>
+                        <div className="mm-example right">
+                          <Check size={14} />
+                          <span>{tax.correct_example}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mm-meta">
+                      <span>Seen {item.totalOccurrences}×</span>
+                      <span>Fixed {item.successfulCorrections} of 2</span>
+                      <span>Review in {item.nextReviewDays} day{item.nextReviewDays === 1 ? '' : 's'}</span>
+                      <span className="mm-meta-right">
+                        {CATEGORY_LABELS[item.errorCode.split('.')[0]] || item.errorCode.split('.')[0]} · {item.errorCode}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </>
+      )}
 
       {/* Improvement Lab Drill Modal */}
       {activeDrillItem && (
@@ -468,7 +343,7 @@ export const MistakeMemoryView: React.FC<MistakeMemoryViewProps> = ({
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                   <span style={{ fontSize: '11px', background: 'rgba(168, 85, 247, 0.15)', color: 'var(--purple)', padding: '2px 8px', borderRadius: '4px', fontWeight: 700, border: '1px solid rgba(168, 85, 247, 0.3)' }}>
-                    Improvement Lab Drill
+                    Practise this mistake
                   </span>
                   <span style={{ fontSize: '11px', background: 'var(--fill)', color: 'var(--text-muted)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--line)' }}>
                     LexiFlow estimate
@@ -478,100 +353,19 @@ export const MistakeMemoryView: React.FC<MistakeMemoryViewProps> = ({
                   Fix: {activeDrillItem.taxError.name}
                 </h3>
               </div>
-              <button
-                data-testid="close-drill-btn"
-                type="button"
-                onClick={closeDrill}
-                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
-              >
-                <X size={20} />
-              </button>
+              <DrillCloseButton onClick={closeDrill} />
             </div>
 
-            {/* Drill Instructions */}
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5, margin: '0 0 16px 0' }}>
-              {activeDrillItem.taxError.definition}
-            </p>
+            <p className="drill-def">{activeDrillItem.taxError.definition}</p>
 
-            {/* The Incorrect Challenge Sentence */}
-            <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '10px', padding: '14px', marginBottom: '18px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--danger)', fontWeight: 700, display: 'block', marginBottom: '4px' }}>
-                Sentence with error:
-              </span>
-              <p style={{ fontSize: '14px', color: 'var(--text-main)', margin: 0, fontWeight: 500 }}>
-                "{activeDrillItem.taxError.incorrect_example}"
-              </p>
-            </div>
-
-            {/* Active Drill Form */}
-            <form onSubmit={handleDrillSubmit}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }}>
-                Type the fully corrected sentence:
-              </label>
-              <textarea
-                data-testid="drill-input"
-                rows={3}
-                placeholder="Rewrite the sentence with the error fixed..."
-                value={drillInput}
-                onChange={(e) => setDrillInput(e.target.value)}
-                style={{
-                  width: '100%',
-                  background: 'var(--input-bg)',
-                  border: '1px solid var(--input-border)',
-                  borderRadius: '10px',
-                  padding: '12px',
-                  color: 'var(--text-main)',
-                  fontSize: '13px',
-                  lineHeight: 1.5,
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  marginBottom: '14px'
-                }}
-              />
-
-              {drillResult && (
-                <div
-                  data-testid="drill-result-banner"
-                  style={{
-                    background: drillResult.isCorrect ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                    border: drillResult.isCorrect ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
-                    borderRadius: '8px',
-                    padding: '12px',
-                    marginBottom: '14px',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '10px'
-                  }}
-                >
-                  {drillResult.isCorrect ? (
-                    <CheckCircle2 size={18} style={{ color: 'var(--green)', flexShrink: 0, marginTop: '2px' }} />
-                  ) : (
-                    <AlertCircle size={18} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: '2px' }} />
-                  )}
-                  <div style={{ fontSize: '13px', color: 'var(--text-main)', lineHeight: 1.4 }}>
-                    {drillResult.feedback}
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button
-                  type="button"
-                  onClick={closeDrill}
-                  className="btn-secondary"
-                >
-                  Done
-                </button>
-                <button
-                  data-testid="submit-drill-btn"
-                  type="submit"
-                  disabled={!drillInput.trim()}
-                  className="btn-primary"
-                >
-                  Submit Correction
-                </button>
-              </div>
-            </form>
+            <DrillSession
+              key={sessionKey}
+              item={activeDrillItem.item}
+              taxError={activeDrillItem.taxError}
+              onClose={closeDrill}
+              nextDueLabel={nextDue ? nextDue.tax.name : null}
+              onNextDue={nextDue ? () => openDrill(nextDue.item, nextDue.tax) : undefined}
+            />
           </div>
         </div>
       )}

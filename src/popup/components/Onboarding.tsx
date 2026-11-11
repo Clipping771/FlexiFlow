@@ -18,14 +18,21 @@ export const Onboarding: React.FC<OnboardingProps> = ({ textSize, onChooseSize, 
     <ol className="onboarding-steps">
       <li>
         <span className="onboarding-num">1</span>
-        <span><strong>Select</strong> any word or sentence on a web page.</span>
+        <span>
+          <strong>Turn it on</strong> for a site with the switch above. LexiFlow stays off on every site until you
+          choose.
+        </span>
       </li>
       <li>
         <span className="onboarding-num">2</span>
-        <span><strong>Read</strong> the easy English and Bengali meaning in the card.</span>
+        <span><strong>Select</strong> any word or sentence on that page.</span>
       </li>
       <li>
         <span className="onboarding-num">3</span>
+        <span><strong>Read</strong> the easy English and Bengali meaning in the card.</span>
+      </li>
+      <li>
+        <span className="onboarding-num">4</span>
         <span><strong>Save</strong> new words and review them in the Library.</span>
       </li>
     </ol>

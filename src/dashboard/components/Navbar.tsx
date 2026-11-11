@@ -10,10 +10,8 @@ import {
   PanelRight,
   BookmarkCheck,
   PenLine,
-  Mic,
   BrainCircuit,
-  Headphones,
-  GraduationCap
+  Sparkles
 } from 'lucide-react';
 
 export type DashboardTab =
@@ -23,11 +21,7 @@ export type DashboardTab =
   | 'review'
   | 'reading_list'
   | 'summary_practice'
-  | 'reading_practice'
-  | 'listening_practice'
-  | 'writing_practice'
-  | 'speaking_practice'
-  | 'full_mock_exam'
+  | 'smart_practice'
   | 'mistake_memory'
   | 'word_difference'
   | 'usage_coach'
@@ -129,63 +123,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* Section: Exam Prep */}
+        {/* Section: Practice */}
         <div className="nav-section">
-          <div className="nav-section-title">Exam Prep</div>
+          <div className="nav-section-title">Practice</div>
 
           <button
-            data-testid="nav-reading-practice"
-            className={`nav-item ${activeTab === 'reading_practice' ? 'active' : ''}`}
-            onClick={() => onTabChange('reading_practice')}
+            data-testid="nav-smart-practice"
+            className={`nav-item ${activeTab === 'smart_practice' ? 'active' : ''}`}
+            onClick={() => onTabChange('smart_practice')}
           >
             <span className="nav-icon-box">
-              <BookOpen size={16} strokeWidth={2} />
+              <Sparkles size={16} strokeWidth={2} />
             </span>
-            <span className="nav-item-label">Reading</span>
-          </button>
-
-          <button
-            data-testid="nav-listening-practice"
-            className={`nav-item ${activeTab === 'listening_practice' ? 'active' : ''}`}
-            onClick={() => onTabChange('listening_practice')}
-          >
-            <span className="nav-icon-box">
-              <Headphones size={16} strokeWidth={2} />
-            </span>
-            <span className="nav-item-label">Listening</span>
-          </button>
-
-          <button
-            data-testid="nav-writing-practice"
-            className={`nav-item ${activeTab === 'writing_practice' ? 'active' : ''}`}
-            onClick={() => onTabChange('writing_practice')}
-          >
-            <span className="nav-icon-box">
-              <PenTool size={16} strokeWidth={2} />
-            </span>
-            <span className="nav-item-label">Writing</span>
-          </button>
-
-          <button
-            data-testid="nav-speaking-practice"
-            className={`nav-item ${activeTab === 'speaking_practice' ? 'active' : ''}`}
-            onClick={() => onTabChange('speaking_practice')}
-          >
-            <span className="nav-icon-box">
-              <Mic size={16} strokeWidth={2} />
-            </span>
-            <span className="nav-item-label">Speaking</span>
-          </button>
-
-          <button
-            data-testid="nav-full-mock-exam"
-            className={`nav-item ${activeTab === 'full_mock_exam' ? 'active' : ''}`}
-            onClick={() => onTabChange('full_mock_exam')}
-          >
-            <span className="nav-icon-box">
-              <GraduationCap size={16} strokeWidth={2} />
-            </span>
-            <span className="nav-item-label">Full Mock Exam</span>
+            <span className="nav-item-label">Smart Practice</span>
           </button>
 
           <button

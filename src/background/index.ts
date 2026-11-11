@@ -1,3 +1,4 @@
+import { synthesizeAiSpeech } from '../services/audio/aiVoice';
 import { AIService } from '../services/ai';
 import { StorageService } from '../services/storage/db';
 import { SettingsService } from '../services/storage/settings';
@@ -10,6 +11,7 @@ import { setupBadgeListeners, updateAllTabBadges } from './badgeService';
 import { EventLogger, ApprovedEventName } from '../services/logging/eventLogger';
 import { AuthService, CloudAuthError } from '../services/auth/authService';
 import { CloudAIError, type CloudExamRequest } from '../services/ai/cloudProvider';
+import type { ExamItemKind } from '../services/examContent/aiItems';
 
 // Immediately ensure Ollama dynamic rules and Badge synchronization are registered
 setupOllamaOriginRules();
@@ -481,6 +483,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             break;
           }
 
+          case 'EXAM_GENERATE': {
+            const { kind, source, answer } = payload as { kind: ExamItemKind; source: string; answer?: string };
+            const result = await AIService.generateExamItem(kind, source, answer);
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
           case 'CAPTURE_ARTICLE_TEXT': {
             const { url } = payload as { url: string };
             sendResponse({ success: true, data: await captureArticleText(url) });
@@ -497,6 +506,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             const { jsonString } = payload || {};
             const res = await StorageService.importData(jsonString);
             sendResponse({ success: true, data: res });
+            break;
+          }
+
+          case 'SYNTHESIZE_SPEECH': {
+            const { text } = payload as { text: string };
+            const audio = await synthesizeAiSpeech(text, await SettingsService.getSettings());
+            sendResponse({ success: Boolean(audio), data: audio });
             break;
           }
 

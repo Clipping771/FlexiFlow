@@ -1,3 +1,4 @@
+import { siteLabel } from '../../shared/siteAccess';
 import React, { useState, useEffect } from 'react';
 import { UserSettings, CustomLanguageConfig } from '../../types';
 import { fetchProviderModels, AvailableModel } from '../../services/ai/modelFetcher';
@@ -28,7 +29,10 @@ import {
   Trash2,
   Download,
   FileText,
-  Type
+  Type,
+  Languages,
+  Globe,
+  ShieldCheck
 } from 'lucide-react';
 import { playPronunciation } from '../../services/audio/voiceService';
 
@@ -45,6 +49,17 @@ const TEXT_SIZE_OPTIONS: Array<{
   { value: 'medium', label: 'Medium', short: 'Medium', glyph: 13, english: 16, bengali: 18.5 },
   { value: 'large', label: 'Large', short: 'Large', glyph: 15, english: 18, bengali: 21 },
   { value: 'xlarge', label: 'Extra Large', short: 'XL', glyph: 17, english: 20, bengali: 23.5 }
+];
+
+type SettingsSection = 'reading' | 'language' | 'websites' | 'ai' | 'review' | 'account';
+
+const SETTINGS_SECTIONS: { id: SettingsSection; label: string; hint: string; icon: React.ReactNode }[] = [
+  { id: 'reading', label: 'Reading', hint: 'Popups, theme, text size', icon: <BookOpen size={16} /> },
+  { id: 'language', label: 'Language', hint: 'What you read and learn in', icon: <Languages size={16} /> },
+  { id: 'websites', label: 'Websites', hint: 'Where LexiFlow runs', icon: <Globe size={16} /> },
+  { id: 'ai', label: 'AI', hint: 'Provider, key and model', icon: <Sparkles size={16} /> },
+  { id: 'review', label: 'Review', hint: 'Daily limits', icon: <RotateCw size={16} /> },
+  { id: 'account', label: 'Account & privacy', hint: 'Sign-in and your data', icon: <ShieldCheck size={16} /> }
 ];
 
 interface SettingsViewProps {
@@ -88,6 +103,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [form, setForm] = useState<UserSettings>({ ...settings });
   const [status, setStatus] = useState<string | null>(null);
+  const [section, setSection] = useState<SettingsSection>('reading');
 
   useEffect(() => {
     setForm({ ...settings });
@@ -450,10 +466,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <div className="settings-container">
       <div className="view-header" style={{ marginBottom: '20px' }}>
         <div>
-          <h2 className="view-title">Settings &amp; AI Configuration</h2>
-          <p className="view-desc">
-            Configure reading interaction triggers, translation languages, and AI model parameters
-          </p>
+          <h2 className="view-title">Settings</h2>
+          <p className="view-desc">Choose how LexiFlow reads, translates and teaches.</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span className="top-kpi-pill" style={{ padding: '6px 12px', fontSize: '12px' }}>
@@ -476,20 +490,40 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      <div style={{ marginBottom: '20px' }}>
-        <AccountSection />
-      </div>
+      <div className="settings-layout">
+        <nav className="settings-nav" aria-label="Settings sections">
+          {SETTINGS_SECTIONS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`settings-nav-item ${section === item.id ? 'active' : ''}`}
+              onClick={() => setSection(item.id)}
+              aria-current={section === item.id ? 'page' : undefined}
+              data-testid={`settings-nav-${item.id}`}
+            >
+              {item.icon}
+              <span className="settings-nav-text">
+                <span className="settings-nav-label">{item.label}</span>
+                <span className="settings-nav-hint">{item.hint}</span>
+              </span>
+            </button>
+          ))}
+        </nav>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {/* Card 1: Reading Interaction & Triggers */}
+        <div className="settings-content">
+      {section === 'account' && <AccountSection />}
+
+      <form onSubmit={handleSubmit} className="settings-form">
+        {/* Reading */}
+        {section === 'reading' && (
         <div className="card">
           <div className="settings-section-header">
             <div className="settings-section-icon">
               <BookOpen size={18} />
             </div>
             <div>
-              <h4 className="settings-section-title">Reading Interaction &amp; Triggers</h4>
-              <p className="settings-section-subtitle">Control how LexiFlow highlights text and invokes the definition card</p>
+              <h4 className="settings-section-title">Reading</h4>
+              <p className="settings-section-subtitle">How the word card opens and looks while you read</p>
             </div>
           </div>
 
@@ -750,9 +784,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
+        </div>
+        )}
 
-          {/* Language Pair: Source & Target Language Options */}
-          <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--line)' }}>
+        {/* Language */}
+        {section === 'language' && (
+        <div className="card">
+          <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
               <div>
                 <label style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-main)' }}>
@@ -959,70 +997,86 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             )}
 
-            {/* Excluded Websites (Blacklist) */}
-            <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: '1px solid var(--line)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <div>
-                  <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)' }}>
-                    Excluded Websites:
-                  </label>
-                  <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    Websites where LexiFlow automatic popup and reading companion are paused
-                  </div>
-                </div>
-              </div>
-
-              {form.disabledSites && form.disabledSites.length > 0 ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
-                  {form.disabledSites.map((site) => (
-                    <span
-                      key={site}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '4px 10px',
-                        background: 'var(--fill)',
-                        border: '1px solid var(--line)',
-                        borderRadius: 'var(--r-pill)',
-                        fontSize: '12px',
-                        color: 'var(--text-main)',
-                        fontWeight: 500
-                      }}
-                    >
-                      🌐 {site}
-                      <button
-                        type="button"
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--text-muted)',
-                          padding: '0 2px',
-                          fontSize: '12px',
-                          lineHeight: 1
-                        }}
-                        onClick={() => {
-                          const updated = form.disabledSites!.filter((s) => s !== site);
-                          setForm({ ...form, disabledSites: updated });
-                        }}
-                        title={`Re-enable LexiFlow on ${site}`}
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
-                  No websites are currently excluded. You can toggle LexiFlow on/off for any site anytime using the slider in the extension popup.
-                </div>
-              )}
-            </div>
           </div>
         </div>
+        )}
 
-        {/* Card 2: AI Provider & Linguistic Intelligence */}
+        {/* Websites */}
+        {section === 'websites' && (
+        <div className="card settings-websites">
+          <div className="settings-section-header">
+            <div className="settings-section-icon">
+              <Globe size={18} />
+            </div>
+            <div>
+              <h4 className="settings-section-title">Websites</h4>
+              <p className="settings-section-subtitle">Choose where word popups and article highlighting run</p>
+            </div>
+          </div>
+          <div>
+            {/* Where LexiFlow works: off everywhere by default, or on everywhere */}
+            {(() => {
+              const on = form.siteMode === 'on';
+              const key = on ? 'disabledSites' : 'enabledSites';
+              const list = (on ? form.disabledSites : form.enabledSites) || [];
+              // Like the other switches here, this saves at once (no need to press Save at the bottom)
+              const saveNow = async (updates: Partial<UserSettings>) => {
+                setForm({ ...form, ...updates });
+                await onSaveSettings(updates);
+              };
+              return (
+                <div className="site-access" data-testid="site-access-setting">
+                  <div className="site-access-row">
+                    <div className="site-access-head">
+                      <label id="site-access-label">On web pages</label>
+                      <p>
+                        {on
+                          ? 'Runs on every site. Pause a site from the popup.'
+                          : 'Off until you turn it on for a site from the popup.'}
+                      </p>
+                    </div>
+                    <div className="site-access-switch" role="radiogroup" aria-labelledby="site-access-label">
+                      {(['off', 'on'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          role="radio"
+                          aria-checked={(on ? 'on' : 'off') === mode}
+                          className={(on ? 'on' : 'off') === mode ? 'selected' : ''}
+                          onClick={() => saveNow({ siteMode: mode })}
+                          data-testid={`site-mode-${mode}`}
+                        >
+                          {mode === 'off' ? 'Off by default' : 'On everywhere'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {list.length > 0 && (
+                    <div className="site-access-chips">
+                      <span className="site-access-list-title">{on ? 'Paused:' : 'On for:'}</span>
+                      {list.map((site) => (
+                        <span key={site} className="site-access-chip">
+                          {siteLabel(site)}
+                          <button
+                            type="button"
+                            onClick={() => saveNow({ [key]: list.filter((x) => x !== site) })}
+                            aria-label={`Remove ${siteLabel(site)}`}
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+        )}
+
+        {/* AI */}
+        {section === 'ai' && (
         <div className="card">
           <div className="settings-section-header">
             <div className="settings-section-icon" style={{ color: 'var(--purple)', background: 'rgba(192, 132, 252, 0.12)' }}>
@@ -1409,8 +1463,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             )}
           </div>
         </div>
+        )}
 
-        {/* Card 3: Daily Spaced Repetition Limits */}
+        {/* Review */}
+        {section === 'review' && (
         <div className="card">
           <div className="settings-section-header">
             <div className="settings-section-icon" style={{ color: 'var(--warning)', background: 'rgba(251, 191, 36, 0.12)' }}>
@@ -1460,9 +1516,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
         </div>
+        )}
 
-        {/* Minimal Event Telemetry & Privacy Card */}
-        <div className="card" style={{ marginTop: '20px' }}>
+        {/* Privacy (shown with the account) */}
+        {section === 'account' && (
+        <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
             <div>
               <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-main)' }}>
@@ -1518,6 +1576,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </span>
           </div>
         </div>
+        )}
 
         {/* Floating / Sticky Save Bar */}
         <div className="sticky-save-bar">
@@ -1536,6 +1595,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </span>
         </div>
       </form>
+        </div>
+      </div>
 
       {/* Add / Edit Custom Language Modal */}
       {customModalOpen && (

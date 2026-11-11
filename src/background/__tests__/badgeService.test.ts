@@ -48,6 +48,7 @@ describe('badgeService: Extension action OFF badge management', () => {
       };
 
       await updateBadgeForTab(101, 'https://paused-site.com', {
+        siteMode: 'on',
         disabledSites: ['paused-site.com']
       } as any);
 
@@ -66,10 +67,24 @@ describe('badgeService: Extension action OFF badge management', () => {
       };
 
       await updateBadgeForTab(102, 'https://active-site.com', {
+        siteMode: 'on',
         disabledSites: ['other-site.com']
       } as any);
 
       expect(setBadgeTextMock).toHaveBeenCalledWith({ tabId: 102, text: '' });
+    });
+
+    it('when off by default, marks only the sites the learner turned on with ON', async () => {
+      const setBadgeTextMock = vi.fn().mockResolvedValue(undefined);
+      const setBadgeBgMock = vi.fn().mockResolvedValue(undefined);
+      (global as any).chrome = { action: { setBadgeText: setBadgeTextMock, setBadgeBackgroundColor: setBadgeBgMock } };
+
+      await updateBadgeForTab(103, 'https://www.bbc.com/news', { siteMode: 'off', enabledSites: ['bbc.com'] } as any);
+      expect(setBadgeTextMock).toHaveBeenCalledWith({ tabId: 103, text: 'ON' });
+      expect(setBadgeBgMock).toHaveBeenCalledWith({ tabId: 103, color: '#1E40AF' });
+
+      await updateBadgeForTab(104, 'https://example.com', { siteMode: 'off', enabledSites: ['bbc.com'] } as any);
+      expect(setBadgeTextMock).toHaveBeenCalledWith({ tabId: 104, text: '' });
     });
   });
 
@@ -92,6 +107,7 @@ describe('badgeService: Extension action OFF badge management', () => {
       };
 
       await updateAllTabBadges({
+        siteMode: 'on',
         disabledSites: ['sitea.com']
       } as any);
 

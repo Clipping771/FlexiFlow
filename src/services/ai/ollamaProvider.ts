@@ -1,3 +1,4 @@
+import { recordUsage } from '../logging/usageRecord';
 import {
   SelectionType,
   LinguisticAnalysisResult,
@@ -119,6 +120,7 @@ export class OllamaProvider implements AIProvider {
         if (chatRes.ok) {
           this.endpoint = ep; // lock on working endpoint
           const data = await chatRes.json();
+          void recordUsage({ provider: 'ollama', model: this.model, systemPrompt: prompt, userPrompt: '', body: data });
           const content = data?.message?.content || data?.response;
           if (content) return content;
         }
@@ -139,6 +141,7 @@ export class OllamaProvider implements AIProvider {
         if (genRes.ok) {
           this.endpoint = ep;
           const data = await genRes.json();
+          void recordUsage({ provider: 'ollama', model: this.model, systemPrompt: prompt, userPrompt: '', body: data });
           return data.response;
         }
 

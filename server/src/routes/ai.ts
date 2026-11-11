@@ -33,7 +33,8 @@ import {
   runUsageEvaluation
 } from '../lib/tasks';
 import { SUMMARY_MAX_ARTICLE_CHARS, SUMMARY_MAX_CHARS } from '../../../src/services/ai/prompts/summary';
-import { EXAM_TASKS, type ExamTaskSpec, examNeedsModel, runExamTask } from '../lib/examTasks';
+import { EXAM_TASKS, type ExamTaskSpec, examItemTask, examNeedsModel, runExamTask } from '../lib/examTasks';
+import { EXAM_ITEM_KINDS, EXAM_SOURCE_MAX_CHARS, type ExamItemKind } from '../../../src/services/examContent/aiItems';
 import { dhakaDay, nextDhakaMidnight } from '../lib/time';
 import type { SelectionType, WritingGoal } from '../../../src/types';
 import { loadUser } from '../lib/users';
@@ -454,6 +455,25 @@ ai.post('/exam/ielts-task', (c) =>
     (input) => ({ task: input.task === '1' ? 1 : 2, prompt: input.prompt!, text: input.text! }) as const
   )
 );
+
+// Exam items written from the article the learner is reading. `kind` picks one of the shared item
+// definitions, so the prompt is always the server's.
+ai.post('/exam/generate', async (c) => {
+  const body = (await c.req.raw.clone().json().catch(() => ({}))) as { kind?: unknown };
+  const kind = (EXAM_ITEM_KINDS as string[]).includes(String(body.kind)) ? (body.kind as ExamItemKind) : null;
+  if (!kind) throw new ApiError(400, 'INVALID_REQUEST', 'Unknown exam item kind.');
+  return examRoute(
+    c,
+    'exam-generate',
+    examItemTask(kind),
+    {
+      kind: { required: true, max: 20, pattern: /^[a-z0-9_]+$/ },
+      source: { required: true, max: EXAM_SOURCE_MAX_CHARS + 2000 },
+      answer: { max: 1000 }
+    },
+    (input) => ({ kind, source: input.source!, answer: input.answer })
+  );
+});
 
 ai.post('/exam/ielts-speaking', (c) =>
   examRoute(

@@ -36,7 +36,7 @@ export const WordDifferenceView: React.FC = () => {
       </div>
 
       <div className="card" style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '12px', alignItems: 'flex-end' }}>
+        <div className="wd-form">
           <div>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>
               Word 1:
@@ -104,7 +104,7 @@ export const WordDifferenceView: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {result.minimalPairs.map((pair, i) => (
                 <div key={i} style={{ background: 'rgba(0, 0, 0, 0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '8px' }}>
+                  <div className="wd-two-col" style={{ marginBottom: '8px' }}>
                     <div style={{ borderLeft: '2px solid var(--accent)', paddingLeft: '8px' }}>
                       <strong style={{ color: 'var(--accent)', fontSize: '12px' }}>{result.wordA}:</strong>
                       <p style={{ color: 'var(--text-main)', fontSize: '13.5px', marginTop: '2px' }}>"{pair.sentenceA}"</p>
@@ -122,7 +122,7 @@ export const WordDifferenceView: React.FC = () => {
             </div>
           </div>
 
-          <div className="card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="card wd-two-col wide-gap">
             <div>
               <h5 style={{ color: 'var(--accent)', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>
                 Collocations with "{result.wordA}":

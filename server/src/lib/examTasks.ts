@@ -10,6 +10,14 @@ import { safeParseJSON } from '../../../src/services/ai/safeJson';
 import { generateGeminiJson } from './gemini';
 import { type GeminiConfig, type TaskResult, TaskFailedError } from './stageTasks';
 
+import {
+  buildExamItemPrompt,
+  examItemSchema,
+  parseExamItem,
+  EXAM_ITEM_PROMPT_VERSION,
+  type ExamItemKind
+} from '../../../src/services/examContent/aiItems';
+
 /** Matches metadata.version in taxonomy/errors.yaml (a test keeps them in step). */
 export const TAXONOMY_VERSION = '1.0.0';
 
@@ -143,6 +151,43 @@ function validate(spec: { schema: SafeParser }, raw: unknown): { data?: Record<s
   }
   const errors = boundErrors(data);
   return errors.length ? { errors } : { data, errors };
+}
+
+export interface ExamItemInput {
+  kind: ExamItemKind;
+  source: string;
+  answer?: string;
+}
+
+/**
+ * Writes an exam item from the article the learner is reading (or marks a Summarize Spoken Text
+ * answer). The prompt comes from the shared item definitions, never from the client.
+ */
+export function examItemTask(kind: ExamItemKind): ExamTaskSpec<ExamItemInput> {
+  return {
+    promptVersion: `${EXAM_ITEM_PROMPT_VERSION}_${kind}`,
+    rubricVersion: kind === 'pte_sst_marks' ? 'pte_pearson_v1' : 'none',
+    schema: {
+      safeParse: (raw: unknown) => {
+        const shape = examItemSchema(kind).safeParse(raw);
+        if (!shape.success) return shape;
+        try {
+          return { success: true, data: parseExamItem(kind, raw) };
+        } catch (err) {
+          return { success: false, error: { issues: [{ path: [], message: (err as Error).message }] } };
+        }
+      }
+    } as SafeParser,
+    evaluate: async (input, aiCaller) => {
+      const prompt = buildExamItemPrompt(input.kind, input.source, input.answer);
+      // Like the engines' evaluators, absorb the caller's failure: runExamTask records and rethrows it
+      try {
+        return await aiCaller(prompt.system, prompt.user);
+      } catch {
+        return null;
+      }
+    }
+  };
 }
 
 export interface UsageRecordInput {

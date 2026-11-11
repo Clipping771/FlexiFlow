@@ -1,3 +1,4 @@
+import { recordUsageFromResponse } from '../logging/usageRecord';
 import {
   SelectionType,
   LinguisticAnalysisResult,
@@ -95,6 +96,8 @@ export class OpenAIProvider implements AIProvider {
       clearTimeout(timeoutId);
       throw err;
     }
+
+    recordUsageFromResponse('openai', this.model, res, systemPrompt, userPrompt);
 
     if (!res.ok) {
       const err = await res.text();

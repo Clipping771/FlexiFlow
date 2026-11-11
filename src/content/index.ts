@@ -1,3 +1,5 @@
+import { isSiteActive, siteModeOf } from '../shared/siteAccess';
+import { maybeShowOffHint } from './offHint';
 import { calculatePopupPosition, clampPositionToViewport } from './positioning';
 import { getSelectionData, isEditableElement, detectSelectionType } from './selection';
 import { POPUP_STYLES } from './styles';
@@ -301,20 +303,9 @@ class ContentScriptManager {
     }
   }
 
+  /** Off unless the settings allow this site (LexiFlow is off on every site by default). */
   private isSiteDisabled(): boolean {
-    if (this.userSettings?.isGloballyPaused) {
-      return true;
-    }
-    if (!this.userSettings?.disabledSites || !Array.isArray(this.userSettings.disabledSites)) {
-      return false;
-    }
-    const host = window.location.hostname.toLowerCase();
-    if (!host) return false;
-    return this.userSettings.disabledSites.some((site) => {
-      const s = site.toLowerCase().trim();
-      if (!s) return false;
-      return host === s || host.endsWith('.' + s);
-    });
+    return !isSiteActive(window.location.href, this.userSettings);
   }
 
   private setupEventListeners(): void {
@@ -535,7 +526,14 @@ class ContentScriptManager {
 
   private processCurrentSelection(): void {
     if (this.isMouseDown) return;
-    if (this.isSiteDisabled()) return;
+    if (this.isSiteDisabled()) {
+      // Off by default: once in a while, tell the reader how to turn LexiFlow on for this site
+      if (siteModeOf(this.userSettings) === 'off' && !this.userSettings?.isGloballyPaused) {
+        const picked = getSelectionData(this.lastPointerTarget)?.cleanText || '';
+        if (picked.length >= 2 && picked.length <= 300) void maybeShowOffHint();
+      }
+      return;
+    }
 
     const data = getSelectionData(this.lastPointerTarget);
     if (!data || !data.cleanText) return;

@@ -23,6 +23,8 @@ import { SettingsService } from '../services/storage/settings';
 import { FSRSEngine } from '../services/fsrs/engine';
 import { getLanguageConfig } from '../config/languages';
 import { ReadingListService, ReadingListItem } from '../services/storage/readingList';
+import { isSiteActive, siteModeOf, toggleSite, LOCAL_FILES } from '../shared/siteAccess';
+import { setExamArticle } from '../services/examContent/articleSource';
 import { SummaryPracticeService } from '../services/storage/summaryPractice';
 import { detectSelectionType } from '../content/selection';
 import {
@@ -289,7 +291,11 @@ export const App: React.FC = () => {
   // Site domain & whitelist/blacklist toggle (eJOY-style)
   const [currentDomain, setCurrentDomain] = useState<string>('');
   const [currentFavicon, setCurrentFavicon] = useState<string>('');
-  const [disabledSites, setDisabledSites] = useState<string[]>([]);
+  const [siteAccess, setSiteAccess] = useState<Pick<UserSettings, 'siteMode' | 'enabledSites' | 'disabledSites'>>({
+    siteMode: 'off',
+    enabledSites: [],
+    disabledSites: []
+  });
 
   // Text size: small, medium, large, xlarge
   const [textSize, setTextSize] = useState<'small' | 'medium' | 'large' | 'xlarge'>('medium');
@@ -397,6 +403,28 @@ export const App: React.FC = () => {
     });
   };
 
+  /** Captures this article for the exam screens, which build their questions from it. */
+  const startExamPractice = () => {
+    if (!activeTabId || typeof chrome === 'undefined' || !chrome.tabs?.sendMessage) return;
+    chrome.tabs.sendMessage(activeTabId, { type: 'EXTRACT_ARTICLE_TEXT' }, async (res) => {
+      if (chrome.runtime?.lastError || !res?.success || !res.data?.text) {
+        setHighlightFeedback({
+          message: chrome.runtime?.lastError
+            ? 'Could not read this page. Refresh the tab and try again.'
+            : 'No article text found on this page to build questions from.',
+          type: 'error'
+        });
+        return;
+      }
+      await setExamArticle({
+        url: res.data.url,
+        title: highlightState?.articleTitle || res.data.title || currentPage?.title || 'Article',
+        text: res.data.text
+      });
+      chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html#exam') });
+    });
+  };
+
   const openReadingList = () => {
     const url = 'dashboard.html#reading_list';
     if (typeof chrome !== 'undefined' && chrome.tabs?.create && chrome.runtime?.getURL) {
@@ -416,8 +444,9 @@ export const App: React.FC = () => {
           if (tabs[0].url) {
             try {
               const parsed = new URL(tabs[0].url);
-              if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-                const host = parsed.hostname.replace(/^www\./, '');
+              if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'file:') {
+                // Files opened from the computer count as one site, so they can be switched on too
+                const host = parsed.protocol === 'file:' ? LOCAL_FILES : parsed.hostname.replace(/^www\./, '');
                 setCurrentDomain(host);
                 // The browser already loaded this icon for the tab, so showing it costs no extra lookup
                 const icon = tabs[0].favIconUrl || '';
@@ -473,9 +502,7 @@ export const App: React.FC = () => {
           if (s.targetLanguage) setTargetLang(s.targetLanguage);
           if (s.customLanguages) setCustomLanguages(s.customLanguages);
           if (s.popupSize) setTextSize(s.popupSize);
-          if (s.disabledSites && Array.isArray(s.disabledSites)) {
-            setDisabledSites(s.disabledSites);
-          }
+          setSiteAccess({ siteMode: s.siteMode, enabledSites: s.enabledSites || [], disabledSites: s.disabledSites || [] });
         }
       });
 
@@ -502,9 +529,11 @@ export const App: React.FC = () => {
             setTheme(effective);
             document.documentElement.setAttribute('data-theme', effective);
           }
-          if (newSettings.disabledSites && Array.isArray(newSettings.disabledSites)) {
-            setDisabledSites(newSettings.disabledSites);
-          }
+          setSiteAccess({
+            siteMode: newSettings.siteMode,
+            enabledSites: newSettings.enabledSites || [],
+            disabledSites: newSettings.disabledSites || []
+          });
         }
         if (changes.lexiflow_vocab_updated_at) {
           if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -527,57 +556,35 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  const isCurrentSiteEnabled = currentDomain
-    ? !disabledSites.some((site) => {
-        const s = site.toLowerCase().trim();
-        const host = currentDomain.toLowerCase();
-        return host === s || host.endsWith('.' + s);
-      })
-    : true;
+  const isCurrentSiteEnabled = currentDomain ? isSiteActive(currentDomain, siteAccess) : false;
 
   const toggleCurrentSite = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!currentDomain) return;
 
-    const host = currentDomain.toLowerCase();
-    let updatedList: string[];
+    const change = toggleSite(currentDomain, siteAccess);
+    const turningOn = !isCurrentSiteEnabled;
+    setSiteAccess({ ...siteAccess, ...change });
 
-    if (isCurrentSiteEnabled) {
-      updatedList = [...disabledSites.filter((s) => s.toLowerCase() !== host), host];
-    } else {
-      updatedList = disabledSites.filter((s) => {
-        const sLower = s.toLowerCase().trim();
-        return sLower !== host && !host.endsWith('.' + sLower);
-      });
-    }
-
-    setDisabledSites(updatedList);
-
-    // Immediately update active tab action badge to 'OFF' or empty
+    // Badge: "ON" marks the chosen sites when LexiFlow is off by default; "OFF" marks paused ones otherwise
     if (typeof chrome !== 'undefined' && chrome.action && chrome.tabs?.query) {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const activeTabId = tabs[0]?.id;
-        if (typeof activeTabId === 'number') {
-          if (isCurrentSiteEnabled) {
-            // Toggling from enabled -> paused
-            chrome.action.setBadgeText({ tabId: activeTabId, text: 'OFF' });
-            chrome.action.setBadgeBackgroundColor({ tabId: activeTabId, color: '#EF4444' });
-            if ((chrome.action as any).setBadgeTextColor) {
-              (chrome.action as any).setBadgeTextColor({ tabId: activeTabId, color: '#FFFFFF' });
-            }
-          } else {
-            // Toggling from paused -> enabled
-            chrome.action.setBadgeText({ tabId: activeTabId, text: '' });
+        if (typeof activeTabId !== 'number') return;
+        const offByDefault = siteModeOf(siteAccess) === 'off';
+        const text = offByDefault ? (turningOn ? 'ON' : '') : turningOn ? '' : 'OFF';
+        chrome.action.setBadgeText({ tabId: activeTabId, text });
+        if (text) {
+          chrome.action.setBadgeBackgroundColor({ tabId: activeTabId, color: text === 'ON' ? '#1E40AF' : '#EF4444' });
+          if ((chrome.action as any).setBadgeTextColor) {
+            (chrome.action as any).setBadgeTextColor({ tabId: activeTabId, color: '#FFFFFF' });
           }
         }
       });
     }
 
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      chrome.runtime.sendMessage({
-        type: 'UPDATE_SETTINGS',
-        payload: { disabledSites: updatedList }
-      });
+      chrome.runtime.sendMessage({ type: 'UPDATE_SETTINGS', payload: change });
     }
   };
 
@@ -1103,6 +1110,7 @@ export const App: React.FC = () => {
             onToggleReadLater={toggleReadLater}
             onOpenReadingList={openReadingList}
             onWriteSummary={writeSummary}
+            onExamPractice={startExamPractice}
             textSize={textSize}
             showOnboarding={showOnboarding}
             dismissOnboarding={dismissOnboarding}

@@ -215,6 +215,11 @@ export class CloudProvider implements AIProvider {
     return this.post('/v1/ai/exam/ielts-speaking', { part: String(part), prompt, transcript, durationMs: String(Math.round(durationMs)), taskId });
   }
 
+  /** An exam item written from the article (or marks for a Summarize Spoken Text answer). */
+  generateExamItem(kind: string, source: string, answer?: string): Promise<unknown> {
+    return this.post('/v1/ai/exam/generate', { kind, source, ...(answer ? { answer } : {}) });
+  }
+
   markExam(req: CloudExamRequest): Promise<unknown> {
     switch (req.task) {
       case 'pte-essay':

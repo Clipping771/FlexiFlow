@@ -4,19 +4,19 @@
 
 :root,
 [data-theme="dark"] {
-  --pop-bg: #0c1017;
-  --pop-surface: #151b26;
-  --pop-text: #f8fafc;
-  --pop-text-muted: #94a3b8;
-  --pop-text-subtle: #64748b;
+  --pop-bg: #0e0f12;
+  --pop-surface: #17181c;
+  --pop-text: #ededf0;
+  --pop-text-muted: #a7abb5;
+  --pop-text-subtle: #868b96;
   --pop-border: rgba(255, 255, 255, 0.08);
   --pop-card-bg: rgba(255, 255, 255, 0.035);
   --pop-card-border: rgba(255, 255, 255, 0.07);
   --pop-card-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --pop-blue: #8ab4f8;
-  --pop-blue-gradient: #8ab4f8;
-  --pop-blue-soft: rgba(138, 180, 248, 0.1);
-  --pop-blue-border: rgba(138, 180, 248, 0.25);
+  --pop-blue: #5cc8fa;
+  --pop-blue-gradient: #5cc8fa;
+  --pop-blue-soft: rgba(92, 200, 250, 0.1);
+  --pop-blue-border: rgba(92, 200, 250, 0.25);
   --pop-tab-bg: rgba(255, 255, 255, 0.05);
   --pop-tab-active-bg: rgba(255, 255, 255, 0.1);
   --pop-tab-active-text: #f8fafc;
@@ -34,13 +34,13 @@
   --pop-card-bg: #ffffff;
   --pop-card-border: rgba(15, 23, 42, 0.08);
   --pop-card-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.03);
-  --pop-blue: #2563eb;
-  --pop-blue-gradient: #2563eb;
-  --pop-blue-soft: rgba(37, 99, 235, 0.07);
-  --pop-blue-border: rgba(37, 99, 235, 0.2);
+  --pop-blue: #1e40af;
+  --pop-blue-gradient: #1e40af;
+  --pop-blue-soft: rgba(30, 64, 175, 0.07);
+  --pop-blue-border: rgba(30, 64, 175, 0.2);
   --pop-tab-bg: rgba(15, 23, 42, 0.04);
   --pop-tab-active-bg: #ffffff;
-  --pop-tab-active-text: #2563eb;
+  --pop-tab-active-text: #1e40af;
   --pop-tab-active-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   --pop-shadow: 0 20px 45px rgba(15, 23, 42, 0.1);
 }
@@ -55,7 +55,7 @@ body {
   background: transparent;
   margin: 0;
   padding: 0;
-  font-family: "LexiFlow Bengali", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", "Nirmala UI", sans-serif;
+  font-family: "Inter", "LexiFlow Bengali", -apple-system, BlinkMacSystemFont, "Segoe UI", "Kalpurush", "SolaimanLipi", "Noto Sans Bengali", "Nirmala UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.01em;
 }
@@ -903,7 +903,7 @@ body {
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(79, 70, 229, 0.15));
+  background: linear-gradient(135deg, rgba(30, 64, 175, 0.12), rgba(30, 64, 175, 0.15));
   border: 1px solid var(--pop-blue-border);
   padding: 2px;
   display: flex;
@@ -1081,7 +1081,7 @@ body {
 }
 
 [data-theme="dark"] .hub-tab-item.active {
-  color: #8ab4f8;
+  color: #5cc8fa;
   background: #1c2433;
 }
 
@@ -1181,7 +1181,7 @@ body {
 
 .reading-toggle-switch.active {
   background: var(--pop-blue-gradient);
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 2px 6px rgba(30, 64, 175, 0.3);
 }
 
 .reading-toggle-thumb {
@@ -1236,7 +1236,7 @@ body {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.25);
 }
 
 .reading-scanning-card {
@@ -1353,14 +1353,14 @@ body {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 3px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 3px 12px rgba(30, 64, 175, 0.3);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   font-family: inherit;
 }
 
 .btn-hero-highlight:hover {
   transform: translateY(-1px);
-  box-shadow: 0 5px 18px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 5px 18px rgba(30, 64, 175, 0.4);
   filter: brightness(1.06);
 }
 
@@ -1780,14 +1780,14 @@ body {
   justify-content: center;
   gap: 5px;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.25);
   transition: all 0.18s ease;
   font-family: inherit;
 }
 
 .btn-lookup-analyze:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.35);
   filter: brightness(1.06);
 }
 
@@ -1871,7 +1871,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(99, 102, 241, 0.06));
+  background: linear-gradient(135deg, rgba(30, 64, 175, 0.08), rgba(99, 102, 241, 0.06));
   padding: 7px 11px;
   border-radius: 7px;
   font-size: 13.5px;
@@ -1905,12 +1905,12 @@ body {
   transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   background: var(--pop-blue-gradient);
   color: #ffffff;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 2px 6px rgba(30, 64, 175, 0.25);
 }
 
 .btn-save-term:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.35);
 }
 
 .btn-save-term.saved {
@@ -2352,14 +2352,14 @@ body {
 }
 
 .popup-interactive-word:hover {
-  background: rgba(0, 113, 227, 0.15);
+  background: rgba(30, 64, 175, 0.15);
   color: #0071e3;
   text-decoration: underline;
 }
 
 [data-theme="dark"] .popup-interactive-word:hover {
-  background: rgba(138, 180, 248, 0.2);
-  color: #8ab4f8;
+  background: rgba(92, 200, 250, 0.2);
+  color: #5cc8fa;
 }
 
 /* ============================================================
@@ -2374,9 +2374,9 @@ body {
   --hub-tab-active: #2b2d33;
   --hub-ink: #ececf1;
   --hub-ink-muted: #a3a8b3;
-  --hub-accent: #8ab4f8;
-  --hub-accent-ink: #0b1a33;
-  --hub-accent-soft: rgba(138, 180, 248, 0.12);
+  --hub-accent: #5cc8fa;
+  --hub-accent-ink: #062a3d;
+  --hub-accent-soft: rgba(92, 200, 250, 0.12);
   --hub-ok: #81c995;
   --hub-ok-soft: rgba(129, 201, 149, 0.14);
   --hub-warn: #f2c46b;
@@ -2384,16 +2384,16 @@ body {
 }
 
 [data-theme="light"] {
-  --hub-bg: #f5f6f9;
+  --hub-bg: #f7f7f9;
   --hub-card: #ffffff;
-  --hub-card-border: #e4e7ed;
+  --hub-card-border: #e6e7eb;
   --hub-track: #e9ecf1;
   --hub-tab-active: #ffffff;
   --hub-ink: #14161a;
   --hub-ink-muted: #5d6470;
-  --hub-accent: #2563eb;
+  --hub-accent: #1e40af;
   --hub-accent-ink: #ffffff;
-  --hub-accent-soft: rgba(37, 99, 235, 0.08);
+  --hub-accent-soft: rgba(30, 64, 175, 0.08);
   --hub-ok: #15803d;
   --hub-ok-soft: rgba(21, 128, 61, 0.1);
   --hub-warn: #b45309;
@@ -3447,7 +3447,8 @@ html body [lang]:lang(he) {
 /* Read Later row under the site card */
 .popup-container .read-later-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Four equal tiles: two by two keeps every label readable at popup width */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: -4px 0 12px;
 }

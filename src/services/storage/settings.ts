@@ -14,6 +14,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   sourceLanguage: 'en',
   targetLanguage: 'bn',
   customLanguages: [],
+  siteMode: 'off',
+  enabledSites: [],
   disabledSites: [],
   isGloballyPaused: false,
   highlightModeEnabled: true,
@@ -55,6 +57,8 @@ export class SettingsService {
             }
             raw.customLanguages = Array.isArray(raw.customLanguages) ? raw.customLanguages : [];
             raw.disabledSites = Array.isArray(raw.disabledSites) ? raw.disabledSites : [];
+            raw.enabledSites = Array.isArray(raw.enabledSites) ? raw.enabledSites : [];
+            raw.siteMode = raw.siteMode === 'on' ? 'on' : 'off';
             raw.readingMode = raw.readingMode === 'learn' ? 'learn' : 'quick';
             resolve(raw);
           } else {
@@ -79,6 +83,8 @@ export class SettingsService {
         }
         raw.customLanguages = Array.isArray(raw.customLanguages) ? raw.customLanguages : [];
         raw.disabledSites = Array.isArray(raw.disabledSites) ? raw.disabledSites : [];
+            raw.enabledSites = Array.isArray(raw.enabledSites) ? raw.enabledSites : [];
+            raw.siteMode = raw.siteMode === 'on' ? 'on' : 'off';
         raw.readingMode = raw.readingMode === 'learn' ? 'learn' : 'quick';
         return raw;
       }

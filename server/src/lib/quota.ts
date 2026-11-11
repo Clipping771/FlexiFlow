@@ -13,7 +13,8 @@ export const CREDIT_COSTS = {
   'exam-pte-swt': 2,
   'exam-pte-read-aloud': 2,
   'exam-ielts-task': 3,
-  'exam-ielts-speaking': 3
+  'exam-ielts-speaking': 3,
+  'exam-generate': 2
 } as const;
 
 /** /analyze costs more for longer selections: Sentence X-Ray and paragraphs produce far larger outputs. */

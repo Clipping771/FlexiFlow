@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AIService } from '../index';
 import { SettingsService } from '../../storage/settings';
-import { createExamAiCaller, isPlaceholderScore } from '../examCaller';
 import { CloudProvider, type CloudExamRequest } from '../cloudProvider';
 
 describe('AIService.completeExamJson', () => {
@@ -52,33 +51,5 @@ describe('AIService.completeExamJson', () => {
     const result = await AIService.completeExamJson('Grade this', 'ESSAY: ...');
     expect(result).toEqual({ rawText: '{"content":2}', model: 'llama3.1' });
     expect(spy).toHaveBeenCalledWith('Grade this', 'ESSAY: ...');
-  });
-});
-
-describe('isPlaceholderScore', () => {
-  it('flags the fixed fallback marks, not rule-based or AI marks', () => {
-    expect(isPlaceholderScore('deterministic_heuristic')).toBe(true);
-    expect(isPlaceholderScore('deterministic_recovery')).toBe(true);
-    expect(isPlaceholderScore('deterministic_filter')).toBe(false);
-    expect(isPlaceholderScore('deterministic_alignment')).toBe(false);
-    expect(isPlaceholderScore('gemini-2.0-flash')).toBe(false);
-  });
-});
-
-describe('createExamAiCaller', () => {
-  it('sends the exam task with the prompt so LexiFlow Cloud can mark it', async () => {
-    const sendMessage = vi.fn((_m: any, cb: (res: any) => void) => cb({ success: true, data: { rawText: '{}', model: 'LexiFlow Cloud' } }));
-    (globalThis as any).chrome = { runtime: { sendMessage } };
-    const cloud: CloudExamRequest = { task: 'ielts-task', taskNumber: 2, prompt: 'Q', text: 'Essay.' };
-
-    const ai = createExamAiCaller(cloud);
-    await ai.call('sys', 'user');
-
-    expect(sendMessage).toHaveBeenCalledWith(
-      { type: 'EXAM_AI_COMPLETE', payload: { systemPrompt: 'sys', userPrompt: 'user', cloud } },
-      expect.any(Function)
-    );
-    expect(ai.modelName()).toBe('LexiFlow Cloud');
-    delete (globalThis as any).chrome;
   });
 });

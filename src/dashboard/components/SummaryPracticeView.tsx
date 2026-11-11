@@ -51,6 +51,9 @@ const EvaluationReport: React.FC<{ attempt: SummaryAttempt; previous?: SummaryAt
           <span className="sp-score-max">/ 10</span>
         </div>
         <div className="sp-score-text">
+          <span className="sp-estimate" data-testid="summary-estimate-label">
+            LexiFlow estimate
+          </span>
           <p>{e.overallFeedback}</p>
           {change !== null && (
             <span className={`tag-badge sp-change ${change > 0 ? 'up' : change < 0 ? 'down' : ''}`}>

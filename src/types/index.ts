@@ -642,6 +642,9 @@ export interface UserSettings {
   sourceLanguage?: string;
   targetLanguage?: string;
   customLanguages?: CustomLanguageConfig[];
+  /** 'off' (default): LexiFlow runs only on enabledSites. 'on': everywhere except disabledSites. */
+  siteMode?: 'off' | 'on';
+  enabledSites?: string[];
   disabledSites?: string[];
   isGloballyPaused?: boolean;
   // Feature A: AI Highlight Mode

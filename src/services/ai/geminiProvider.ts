@@ -1,3 +1,4 @@
+import { recordUsageFromResponse } from '../logging/usageRecord';
 import {
   SelectionType,
   LinguisticAnalysisResult,
@@ -119,6 +120,7 @@ export class GeminiProvider implements AIProvider {
         signal: controller.signal
       });
       clearTimeout(timeoutId);
+      recordUsageFromResponse('gemini', modelName, res, systemPrompt, userPrompt);
       return res;
     } catch (err) {
       clearTimeout(timeoutId);

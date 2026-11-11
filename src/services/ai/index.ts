@@ -11,6 +11,8 @@ import { TwoStageCacheService } from './cache';
 import { CacheManager } from '../cache';
 import { hashString } from '../cache/normalization';
 import { AIProvider } from './types';
+import { buildExamItemPrompt, parseExamItem, EXAM_ITEM_KINDS, type ExamItemKind } from '../examContent/aiItems';
+import { safeParseJSON } from './safeJson';
 import { SummaryEvaluation, UsageCoachFeedback } from '../../types';
 import { SummaryEvaluationInput, SUMMARY_MAX_ARTICLE_CHARS, SUMMARY_MAX_CHARS } from './prompts';
 import {
@@ -331,6 +333,38 @@ export class AIService {
     }
     const rawText = await provider.completeJson(systemPrompt, userPrompt);
     return { rawText, model: userSettings.selectedModel || provider.name };
+  }
+
+  /**
+   * Writes one exam item from the article (or marks a Summarize Spoken Text answer). The reply is
+   * validated here; one retry carries the validation error back to the model.
+   */
+  static async generateExamItem(kind: ExamItemKind, source: string, answer?: string): Promise<unknown> {
+    if (!EXAM_ITEM_KINDS.includes(kind)) throw new Error('Unknown exam item.');
+    if ((source || '').trim().split(/\s+/).length < 40) throw new Error('This article is too short to build exam questions from.');
+
+    const userSettings = await SettingsService.getSettings();
+    const provider = await this.getProvider(userSettings);
+
+    if (provider instanceof CloudProvider) {
+      return parseExamItem(kind, await provider.generateExamItem(kind, source, answer));
+    }
+    if (!this.hasLiveAI(userSettings) || !provider.completeJson) {
+      throw new Error('Writing these questions needs an AI provider. Set one up in Settings (LexiFlow Cloud, Gemini, OpenAI, Claude or Ollama).');
+    }
+    const prompt = buildExamItemPrompt(kind, source, answer);
+    let lastError = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const user = attempt === 0 ? prompt.user : `${prompt.user}
+
+Your previous reply was not valid (${lastError}). Reply again with only the JSON object.`;
+      try {
+        return parseExamItem(kind, safeParseJSON(await provider.completeJson(prompt.system, user)));
+      } catch (err) {
+        lastError = ((err as Error).message || 'invalid JSON').slice(0, 300);
+      }
+    }
+    throw new Error('The AI did not return usable questions. Try "New questions".');
   }
 
   static getCacheKey(action: string, args: Record<string, unknown>): string {

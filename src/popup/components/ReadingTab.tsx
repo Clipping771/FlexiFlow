@@ -1,5 +1,6 @@
+import { siteLabel } from '../../shared/siteAccess';
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, PenLine, BookmarkCheck, BookmarkPlus, BookOpen, Check, ChevronDown, ChevronUp, FileText, Globe, Info, ListChecks, RotateCcw, Sparkles, X } from 'lucide-react';
+import { AlertCircle, PenLine, BookmarkCheck, BookmarkPlus, BookOpen, Check, ChevronDown, ChevronUp, FileText, Globe, Info, ListChecks, RotateCcw, Sparkles, Target, X } from 'lucide-react';
 import { Onboarding, PopupTextSize } from './Onboarding';
 
 /** What the content script reports about highlights on the active page. */
@@ -36,6 +37,7 @@ interface ReadingTabProps {
   onToggleReadLater: () => void;
   onOpenReadingList: () => void;
   onWriteSummary: () => void;
+  onExamPractice: () => void;
   textSize: PopupTextSize;
   showOnboarding: boolean;
   dismissOnboarding: () => void;
@@ -87,6 +89,7 @@ export const ReadingTab: React.FC<ReadingTabProps> = ({
   onToggleReadLater,
   onOpenReadingList,
   onWriteSummary,
+  onExamPractice,
   textSize,
   showOnboarding,
   dismissOnboarding,
@@ -118,10 +121,10 @@ export const ReadingTab: React.FC<ReadingTabProps> = ({
           <SiteIcon src={currentFavicon} />
         </span>
         <div className="site-banner-info">
-          <span className="site-banner-domain">{currentDomain || 'Current web page'}</span>
+          <span className="site-banner-domain">{currentDomain ? siteLabel(currentDomain) : 'Current web page'}</span>
           <span className={`site-banner-label ${isCurrentSiteEnabled ? 'on' : 'off'}`}>
             <span className={`domain-dot ${isCurrentSiteEnabled ? 'active' : ''}`} />
-            {isCurrentSiteEnabled ? 'Active on this site' : 'Paused on this site'}
+            {isCurrentSiteEnabled ? 'On for this site' : 'Off for this site'}
           </span>
         </div>
       </div>
@@ -153,6 +156,10 @@ export const ReadingTab: React.FC<ReadingTabProps> = ({
           <PenLine size={16} />
           <span>Summarize</span>
         </button>
+        <button type="button" className="read-later-btn" onClick={onExamPractice} title="Smart practice: reading, vocabulary, listening, writing and speaking built from this article">
+          <Target size={16} />
+          <span>Smart practice</span>
+        </button>
         <button type="button" className="read-later-btn" onClick={onOpenReadingList} title="Open your reading list">
           <ListChecks size={16} />
           <span>Reading list</span>
@@ -165,11 +172,11 @@ export const ReadingTab: React.FC<ReadingTabProps> = ({
       <div className="reading-paused-card">
         <Info size={16} className="paused-icon" />
         <div className="paused-text-wrap">
-          <div className="paused-title">LexiFlow is paused on {currentDomain || 'this site'}</div>
-          <div className="paused-desc">Enable to access inline word popups, paragraph explanations, and article vocabulary discovery.</div>
+          <div className="paused-title">LexiFlow is off on {currentDomain ? siteLabel(currentDomain) : 'this site'}</div>
+          <div className="paused-desc">LexiFlow stays off until you turn it on for a site. Turn it on here to get word popups, explanations and article vocabulary.</div>
         </div>
         <button type="button" className="btn-enable-site" onClick={toggleCurrentSite}>
-          Re-enable on this site
+          Turn on for this site
         </button>
       </div>
     ) : highlightLoading ? (

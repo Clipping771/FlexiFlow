@@ -1,5 +1,6 @@
 import { MistakeStateMachine, MasteryState } from './stateMachine';
 import { TaxonomyService } from '../taxonomy/catalog';
+import { sessionPassed } from './drills';
 
 export interface ErrorOccurrenceRecord {
   id: string;
@@ -20,6 +21,25 @@ export interface MistakeMemoryItem {
   nextReviewAt: string;
   nextReviewDays: number;
   recentOccurrences: ErrorOccurrenceRecord[];
+  /** Drill sessions finished for this mistake (varies the sentences each time) */
+  practiceSessions?: number;
+}
+
+export interface DrillSessionOutcome {
+  item: MistakeMemoryItem;
+  passed: boolean;
+  /** False when the session passed before the review date, so it did not move the mistake forward */
+  counted: boolean;
+}
+
+/** YYYY-MM-DD in UTC, the same format as `nextReviewAt` */
+export function isoDay(date = new Date()): string {
+  return date.toISOString().split('T')[0];
+}
+
+/** A mistake is due when its review date has arrived */
+export function isDue(item: MistakeMemoryItem, now = new Date()): boolean {
+  return !!item.nextReviewAt && item.nextReviewAt <= isoDay(now);
 }
 
 export interface MistakeStats {
@@ -164,7 +184,7 @@ export class MistakeMemoryClient {
     return updated;
   }
 
-  static recordPracticeAttempt(errorCode: string, isSuccessful: boolean): MistakeMemoryItem {
+  static recordPracticeAttempt(errorCode: string, isSuccessful: boolean, now = new Date()): MistakeMemoryItem {
     const items = this.getMistakes();
     const index = items.findIndex((i) => i.errorCode === errorCode);
     if (index === -1) {
@@ -179,7 +199,6 @@ export class MistakeMemoryClient {
       isSuccessful
     );
 
-    const now = new Date();
     const dueDate = MistakeStateMachine.calculateDueDate(transition.nextReviewDays, now);
 
     const updated: MistakeMemoryItem = {
@@ -195,5 +214,50 @@ export class MistakeMemoryClient {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     this.notifyChange();
     return updated;
+  }
+
+  /** Mistakes whose review date has arrived, most urgent first (came back, then oldest due date) */
+  static getDueMistakes(now = new Date()): MistakeMemoryItem[] {
+    const rank = (i: MistakeMemoryItem) => (i.masteryState === 'Reopened' ? 0 : i.masteryState === 'Mastered' ? 2 : 1);
+    return this.getMistakes()
+      .filter((i) => isDue(i, now))
+      .sort((a, b) => rank(a) - rank(b) || a.nextReviewAt.localeCompare(b.nextReviewAt));
+  }
+
+  /**
+   * Records a finished drill session.
+   * A session passes with 75% or more right. Spacing is enforced: a pass only moves the mistake towards
+   * Mastered when it is due for review (or has never been fixed yet); an early pass is good practice
+   * but does not count. A failed session always counts, so the mistake comes back tomorrow.
+   */
+  static recordDrillSession(
+    errorCode: string,
+    correct: number,
+    total: number,
+    now = new Date()
+  ): DrillSessionOutcome {
+    const items = this.getMistakes();
+    const index = items.findIndex((i) => i.errorCode === errorCode);
+    if (index === -1) {
+      throw new Error(`Mistake memory item not found for error code: ${errorCode}`);
+    }
+    const current = items[index];
+    const passed = sessionPassed(correct, total);
+    const counted = !passed || current.successfulCorrections === 0 || isDue(current, now);
+
+    let updated: MistakeMemoryItem;
+    if (counted) {
+      updated = this.recordPracticeAttempt(errorCode, passed, now);
+      updated = { ...updated, practiceSessions: (current.practiceSessions || 0) + 1 };
+    } else {
+      updated = { ...current, practiceSessions: (current.practiceSessions || 0) + 1 };
+    }
+
+    const latest = this.getMistakes();
+    const at = latest.findIndex((i) => i.errorCode === errorCode);
+    if (at !== -1) latest[at] = updated;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(latest));
+    this.notifyChange();
+    return { item: updated, passed, counted };
   }
 }
