@@ -102,7 +102,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="nav-icon-box">
               <RotateCw size={16} strokeWidth={2} />
             </span>
-            <span className="nav-item-label">Spaced Review</span>
+            <span className="nav-item-label">Review</span>
             {dueCount > 0 && <span className="badge-count">{dueCount}</span>}
           </button>
 
