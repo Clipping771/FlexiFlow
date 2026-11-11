@@ -1,5 +1,6 @@
 import { UserSettings } from '../types';
 import { SettingsService } from '../services/storage/settings';
+import { isSiteActive, siteModeOf } from '../shared/siteAccess';
 
 /**
  * Checks if a given URL is considered paused/disabled based on disabledSites or global pause.
@@ -46,10 +47,19 @@ export async function updateBadgeForTab(
   if (typeof chrome === 'undefined' || !chrome.action) return;
 
   const currentSettings = settings || (await SettingsService.getSettings());
-  const disabled = isUrlDisabled(url, currentSettings.disabledSites, currentSettings.isGloballyPaused);
+  // Off-by-default mode marks the few sites where LexiFlow is on; on-everywhere mode marks the paused ones
+  const offByDefault = siteModeOf(currentSettings) === 'off' && !currentSettings.isGloballyPaused;
+  const active = isSiteActive(url, currentSettings);
+  const disabled = !offByDefault && !active && (currentSettings.isGloballyPaused || /^(https?|file):/.test(url || ''));
 
   try {
-    if (disabled) {
+    if (offByDefault && active) {
+      await chrome.action.setBadgeText({ tabId, text: 'ON' });
+      await chrome.action.setBadgeBackgroundColor({ tabId, color: '#1E40AF' });
+      if ((chrome.action as any).setBadgeTextColor) {
+        await (chrome.action as any).setBadgeTextColor({ tabId, color: '#FFFFFF' });
+      }
+    } else if (disabled) {
       await chrome.action.setBadgeText({ tabId, text: 'OFF' });
       await chrome.action.setBadgeBackgroundColor({ tabId, color: '#EF4444' });
       if ((chrome.action as any).setBadgeTextColor) {

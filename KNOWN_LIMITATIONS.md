@@ -2,7 +2,7 @@
 
 ## 1. AI-Native Architectural Foundation
 LexiFlow AI is built as a pure **AI-native language engine**. It does not rely on or query conventional third-party dictionary APIs for semantic parsing, lexical breakdown, or contextual interpretation:
-- All contextual semantics, phrasal breakdowns, syntactic clause deconstructions (Sentence X-Ray), rhetorical connector analyses, and Bengali translations are generated dynamically through configured Large Language Models (LLMs) or deterministic offline fallbacks.
+- All contextual semantics, phrasal breakdowns, syntactic clause deconstructions (sentence analysis), rhetorical connector analyses, and Bengali translations are generated dynamically through configured Large Language Models (LLMs) or deterministic offline fallbacks.
 - Deterministic operations—including FSRS spaced repetition scheduling, personal weakness scoring, library filtering, multi-field search, starred bookmarks, and JSON backups—execute 100% locally on the user's machine without external network calls.
 
 ## 2. Configured AI Providers & Credentials
@@ -19,11 +19,6 @@ LexiFlow supports multi-provider LLM integrations configured directly in user se
 
 ## 3. Quotas, Rate Limits & Token Limits
 - Cloud LLM providers apply tier-based rate limits (e.g., Gemini Free tier: 15 RPM; OpenAI pay-as-you-go). When rate limits occur, LexiFlow presents actionable error indicators and utilizes in-memory LRU caching to eliminate redundant API requests for identical text selections.
-- **Article Reader Context Limits & Auto-Chunking**:
-  - Articles under 1,200 words (~7,000 characters) are analyzed in a single unified prompt.
-  - Long documents exceeding 1,200 words automatically trigger ordered paragraph chunking. Chunking preserves paragraph numbering and discourse continuity across sections without silently dropping text.
-  - Character and token counts are estimated client-side prior to submission.
-  - Active analysis requests can be cancelled at any time via the UI without leaving orphaned background tasks.
 
 ## 4. Personal Weakness Scoring Engine
 The Personal Weakness Detector operates deterministically using the user's actual historical learning data:
@@ -45,7 +40,7 @@ LexiFlow implements the modern Free Spaced Repetition Scheduler (FSRS v5):
 ## 6. Chrome Side Panel Integration
 - Manifest V3 native Side Panel (`sidePanel` permission) is configured via `dashboard.html`.
 - Users can launch the side panel directly from the extension popup, dashboard navigation bar, or Chrome action bar.
-- Allows reading long-form web articles and using the Article Reader side-by-side with active browser tabs.
+- Allows reading long-form web articles with the dashboard side-by-side with active browser tabs.
 - Backward compatibility: On Chromium environments where `chrome.sidePanel` is disabled or unsupported, LexiFlow automatically falls back to opening the full dashboard tab in the browser window.
 - The floating contextual popup and selection trigger continue to operate uninterrupted on all standard web pages.
 
@@ -58,7 +53,7 @@ LexiFlow implements the modern Free Spaced Repetition Scheduler (FSRS v5):
 
 ## 8. Browser Sandbox & Restricted Pages
 - **Chrome Internal Pages**: Content scripts cannot run on `chrome://*`, `chrome-extension://*`, or Chrome Web Store pages due to native browser security policies.
-- **Embedded PDF Viewer**: Built-in Chrome PDF viewer (`chrome-extension://mhjfb...`) restricts arbitrary DOM script injection. Users should copy and paste PDF passages into the Article Reader or dashboard.
+- **Embedded PDF Viewer**: Built-in Chrome PDF viewer (`chrome-extension://mhjfb...`) restricts arbitrary DOM script injection. Users should copy PDF passages into a regular web page or the dashboard tools.
 - **Cross-Origin iframes**: Double-click detection inside sandboxed cross-origin iframes without script access is restricted by standard browser security models.
 - **Audio Pronunciation**: LexiFlow utilizes the browser's native `window.speechSynthesis` API labeled as "Machine voice", eliminating dependencies on external pronunciation audio CDNs. AI-generated IPA transcriptions are omitted unless explicitly confirmed by a verified phonetic dictionary source.
 
@@ -109,3 +104,11 @@ To preserve reading flow without overwhelming users with dictionary-length dumps
 - **Live AI Evaluation Suite**: Run with `npm run eval:live` (or `npx vite-node scripts/evaluate-live.mjs [--provider=gemini] [--apiKey=KEY]`).
   - Benchmarks 10 canonical linguistic cases: `run`, `set`, `light`, `bank` (financial), `break the ice`, `give up`, `look up`, `fast`, `bank` (geographical context), and `thingamajig` (low-information sentence).
 
+## 13. LexiFlow 2.0 Limitations (2026-11-11)
+- **Read-aloud check is not a pronunciation score.** It compares what the browser's speech recognition heard with the sentence. A word it could not match may be a pronunciation problem, a recognition error or background noise. It is labelled "LexiFlow estimate".
+- **Long-pause detection** uses the times new words appear in the live transcript, so it is approximate (within about half a second) and only works when the answer was spoken, not typed.
+- **Natural AI voice** needs LexiFlow Cloud (signed in), or a Gemini or OpenAI key. Claude, Ollama and offline mode use the best natural browser voice. Gemini's free tier has a low daily limit for the speech model; when it is reached the browser voice is used.
+- **Cloud sync** runs only for signed-in LexiFlow Cloud users. Saved words (vocabulary) are not part of this sync yet. If the same mistake changes on two devices before they sync, the most recent change wins.
+- **Reminders** depend on Chrome running; a reminder missed while Chrome is closed is not shown later.
+- **Bundle size**: the content script (about 470 KB) is injected on every page and the popup is about 650 KB. Most of this is real code (AI providers, grammar, Bengali, React). Loading the content script only on enabled sites, and moving AI providers to the background worker, would reduce it (proposed follow-up).
+- **Exam engines**: `exams/pte/` and `exams/ielts/` writing and speaking engines and the `/v1/ai/exam/*` endpoints still exist on the server, but no screen in the extension uses them since the PTE/IELTS practice screens were removed.

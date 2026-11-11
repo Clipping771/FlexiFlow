@@ -1,0 +1,160 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const flags = vi.hoisted(() => ({ monetization: false }));
+vi.mock('../../../config/features', () => ({
+  get MONETIZATION_ENABLED() {
+    return flags.monetization;
+  }
+}));
+
+const authorizedFetch = vi.fn();
+vi.mock('../../auth/authService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../auth/authService')>();
+  return { ...actual, AuthService: { ...actual.AuthService, authorizedFetch: (...args: unknown[]) => authorizedFetch(...args) } };
+});
+
+import { CloudProvider, CloudAIError } from '../cloudProvider';
+import { CloudAuthError } from '../../auth/authService';
+import { AIService } from '../index';
+
+function reply(status: number, body: unknown) {
+  return new Response(typeof body === 'string' ? body : JSON.stringify(body), { status });
+}
+
+function sentBody(call = 0) {
+  return JSON.parse(authorizedFetch.mock.calls[call][1].body);
+}
+
+beforeEach(() => {
+  authorizedFetch.mockReset();
+  flags.monetization = false;
+});
+
+describe('CloudProvider', () => {
+  it('posts Stage A with a plain language code and returns the data', async () => {
+    const data = { selectedText: 'resilient', easyBengali: 'দ্রুত সামলে ওঠা' };
+    authorizedFetch.mockResolvedValue(reply(200, { data, usage: { used: 1, limit: 30 }, cached: false }));
+
+    const result = await new CloudProvider('en-bn').analyzeStageA('resilient', 'They remained resilient.', 'para');
+
+    expect(result).toEqual(data);
+    expect(authorizedFetch.mock.calls[0][0]).toBe('/v1/ai/stage-a');
+    expect(authorizedFetch.mock.calls[0][1].method).toBe('POST');
+    expect(sentBody()).toEqual({ text: 'resilient', contextSentence: 'They remained resilient.', paragraphContext: 'para', targetLang: 'bn' });
+  });
+
+  it('posts Stage B', async () => {
+    authorizedFetch.mockResolvedValue(reply(200, { data: { lemma: 'bank', senses: [] } }));
+    await new CloudProvider('bn').analyzeStageB('bank', 'noun', 'sense_2');
+    expect(authorizedFetch.mock.calls[0][0]).toBe('/v1/ai/stage-b');
+    expect(sentBody()).toEqual({ lemma: 'bank', partOfSpeech: 'noun', contextualSenseId: 'sense_2', targetLang: 'bn' });
+  });
+
+  it('turns QUOTA_EXCEEDED into a plain daily-limit message while monetization is off', async () => {
+    authorizedFetch.mockResolvedValue(reply(402, {
+      error: { code: 'QUOTA_EXCEEDED', message: 'quota', used: 30, limit: 30, resetAt: '2026-10-24T00:00:00+06:00' }
+    }));
+
+    const err = await new CloudProvider().analyzeStageA('resilient').catch((e) => e);
+
+    expect(err).toBeInstanceOf(CloudAIError);
+    expect(err.code).toBe('QUOTA_EXCEEDED');
+    expect(err.message).toMatch(/^You've reached today's LexiFlow limit of 30 AI uses\. It resets at .+\.$/);
+    expect(err.message).not.toMatch(/credit|Pro/);
+  });
+
+  it('never upsells while the build flag is off, even if the server sends an upgrade link', async () => {
+    authorizedFetch.mockResolvedValue(reply(402, { error: { code: 'QUOTA_EXCEEDED', limit: 30, upgradeUrl: 'https://x/pro' } }));
+    const err = await new CloudProvider().analyzeStageA('x').catch((e) => e);
+    expect(err.message).not.toContain('Upgrade');
+  });
+
+  it('offers the upgrade once monetization is on and the server sends a link', async () => {
+    flags.monetization = true;
+    authorizedFetch.mockResolvedValue(reply(402, {
+      error: { code: 'QUOTA_EXCEEDED', limit: 30, resetAt: '2026-10-24T00:00:00+06:00', upgradeUrl: 'https://x/pro' }
+    }));
+
+    const err = await new CloudProvider().analyzeStageA('resilient').catch((e) => e);
+
+    expect(err.message).toMatch(/^You've used all 30 of today's LexiFlow credits\. They reset at .+\. Upgrade to Pro for more\.$/);
+    expect(err.details).toMatchObject({ upgradeUrl: 'https://x/pro' });
+  });
+
+  it.each([
+    [429, { error: { code: 'RATE_LIMITED', retryAfterSeconds: 12 } }, 'RATE_LIMITED', 'Try again in 12 seconds.'],
+    [413, { error: { code: 'INPUT_TOO_LONG', maxChars: 600 } }, 'INPUT_TOO_LONG', 'Select a shorter piece of text.'],
+    [400, { error: { code: 'INVALID_REQUEST', message: 'This target language is not available on LexiFlow Cloud yet.' } }, 'INVALID_REQUEST', 'not available on LexiFlow Cloud'],
+    [503, { error: { code: 'AI_UNAVAILABLE', message: 'LexiFlow AI is busy right now.' } }, 'AI_UNAVAILABLE', 'busy right now'],
+    [503, { error: { code: 'AI_PAUSED', message: 'Pausing new Free lookups for today.', resetAt: '2026-10-24T00:00:00+06:00' } }, 'AI_PAUSED', 'New lookups resume at'],
+    [502, '<html>Bad gateway</html>', 'AI_UNAVAILABLE', 'unavailable right now (502)']
+  ])('maps HTTP %s to %s', async (status, body, code, text) => {
+    authorizedFetch.mockResolvedValue(reply(status, body));
+    const err = await new CloudProvider().analyzeStageA('x').catch((e) => e);
+    expect(err).toBeInstanceOf(CloudAIError);
+    expect(err.code).toBe(code);
+    expect(err.message).toContain(text);
+  });
+
+  it('asks the reader to sign in when there is no session or the server rejects it', async () => {
+    authorizedFetch.mockRejectedValueOnce(new CloudAuthError('AUTH_REQUIRED', 'internal'));
+    const signedOut = await new CloudProvider().analyzeStageA('x').catch((e) => e);
+    expect(signedOut).toBeInstanceOf(CloudAuthError);
+    expect(signedOut.message).toBe('Sign in to LexiFlow Cloud in Settings to look up words.');
+
+    authorizedFetch.mockResolvedValueOnce(reply(401, { error: { code: 'AUTH_REQUIRED' } }));
+    const rejected = await new CloudProvider().analyzeStageA('x').catch((e) => e);
+    expect(rejected).toBeInstanceOf(CloudAuthError);
+  });
+
+  it('passes network errors through', async () => {
+    authorizedFetch.mockRejectedValue(new CloudAuthError('NETWORK', 'offline'));
+    await expect(new CloudProvider().analyzeStageA('x')).rejects.toMatchObject({ code: 'NETWORK' });
+  });
+
+  it.each([
+    ['analyze', (p: CloudProvider) => p.analyze('A sentence.', 'sentence', 'ctx', 'para'), '/v1/ai/analyze',
+      { text: 'A sentence.', selectionType: 'sentence', contextSentence: 'ctx', paragraphContext: 'para' }],
+    ['assistWriting', (p: CloudProvider) => p.assistWriting('me go', 'natural'), '/v1/ai/assist-writing', { text: 'me go', goal: 'natural' }],
+    ['askFollowUp', (p: CloudProvider) => p.askFollowUp('word', 'ctx', 'Why?'), '/v1/ai/follow-up', { text: 'word', context: 'ctx', question: 'Why?' }],
+    ['extractHighlights', (p: CloudProvider) => p.extractHighlights('Page text.', 'Title'), '/v1/ai/highlights', { rawText: 'Page text.', pageTitle: 'Title' }],
+    ['compareWords', (p: CloudProvider) => p.compareWords('mitigate', 'alleviate'), '/v1/ai/compare-words', { wordA: 'mitigate', wordB: 'alleviate' }],
+    ['evaluateUsage', (p: CloudProvider) => p.evaluateUsage('mitigate', 'We mitigate.'), '/v1/ai/evaluate-usage', { targetWord: 'mitigate', sentence: 'We mitigate.' }]
+  ])('%s posts to its endpoint and returns the data', async (_name, invoke, path, body) => {
+    authorizedFetch.mockResolvedValue(reply(200, { data: { ok: true }, usage: { used: 1, limit: 30 }, cached: false }));
+    expect(await invoke(new CloudProvider('bn'))).toEqual({ ok: true });
+    expect(authorizedFetch.mock.calls[0][0]).toBe(path);
+    expect(sentBody()).toEqual({ ...body, targetLang: 'bn' });
+  });
+
+  it('is what AIService picks for the lexiflow provider, even with a stored API key', async () => {
+    const provider = await AIService.getProvider({ aiProvider: 'lexiflow', apiKey: 'leftover-key', targetLanguage: 'bn' } as any);
+    expect(provider).toBeInstanceOf(CloudProvider);
+  });
+});
+
+describe('CloudProvider exam marking', () => {
+  it.each([
+    ['pte-essay', { task: 'pte-essay', prompt: 'Q', text: 'Essay.', taskId: 'pte_write_essay' }, { prompt: 'Q', text: 'Essay.', taskId: 'pte_write_essay' }],
+    ['pte-swt', { task: 'pte-swt', passage: 'P', text: 'One sentence.' }, { passage: 'P', text: 'One sentence.' }],
+    ['pte-read-aloud', { task: 'pte-read-aloud', prompt: 'Read this.', transcript: 'Read this.', durationMs: 4200.4 }, { prompt: 'Read this.', transcript: 'Read this.', durationMs: '4200' }],
+    ['ielts-task', { task: 'ielts-task', taskNumber: 1, prompt: 'Q', text: 'Report.' }, { task: '1', prompt: 'Q', text: 'Report.' }],
+    ['ielts-speaking', { task: 'ielts-speaking', part: 2, prompt: 'Cue', transcript: 'Talk.', durationMs: 95000 }, { part: '2', prompt: 'Cue', transcript: 'Talk.', durationMs: '95000' }]
+  ] as const)('%s posts only the question and answer to its exam route', async (route, req, body) => {
+    authorizedFetch.mockResolvedValue(reply(200, { data: { content: 2 }, usage: { used: 3, limit: 30 }, cached: false }));
+
+    expect(await new CloudProvider('bn').markExam(req)).toEqual({ content: 2 });
+
+    expect(authorizedFetch.mock.calls[0][0]).toBe(`/v1/ai/exam/${route}`);
+    const sent = sentBody();
+    expect(sent).toEqual({ ...body, targetLang: 'bn' });
+    expect(JSON.stringify(sent)).not.toMatch(/systemPrompt|Examiner/);
+  });
+
+  it('surfaces a quota refusal on an exam route as a CloudAIError', async () => {
+    authorizedFetch.mockResolvedValue(reply(402, { error: { code: 'QUOTA_EXCEEDED', limit: 30 } }));
+    const err = (await new CloudProvider().markPteEssay('Q', 'Essay.').catch((e) => e)) as CloudAIError;
+    expect(err).toBeInstanceOf(CloudAIError);
+    expect(err.code).toBe('QUOTA_EXCEEDED');
+  });
+});

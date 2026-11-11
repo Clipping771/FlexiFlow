@@ -21,6 +21,7 @@ export interface WordAnalysisResult extends BaseAIAnalysis {
   wordForms?: string[];
   collocations: string[];
   examples: string[];
+  exampleBengali?: string;
   synonyms?: string[];
   antonyms?: string[];
   registerAndTone?: string;
@@ -58,13 +59,104 @@ export interface SyntacticClause {
   text: string;
   type: 'main' | 'subordinate' | 'relative' | 'participial' | 'conditional' | 'noun' | 'adverbial' | string;
   typeExplanation?: string;
+  category?: string;
+  subordinator?: string;
   subjectAndVerb?: string;
+  subject?: string;
+  subjectExplanation?: string;
+  subjectExplanationBengali?: string;
+  verb?: string;
+  verbPhrase?: string;
+  tenseAspect?: string;
+  coordinatedVerbs?: string[];
+  verbExplanation?: string;
+  verbExplanationBengali?: string;
+  directObject?: string;
+  directObjectExplanation?: string;
+  directObjectExplanationBengali?: string;
+  indirectObject?: string;
+  indirectObjectExplanation?: string;
+  indirectObjectExplanationBengali?: string;
+  complement?: string;
+  complementType?: 'subject_complement' | 'object_complement' | string;
+  complementExplanation?: string;
+  complementExplanationBengali?: string;
+  adverbials?: Array<{
+    text: string;
+    type?: string;
+    explanation: string;
+    explanationBengali?: string;
+  }>;
+  clausePattern?: string;
+  adverbialPhrase?: string;
+  functionDescription?: string;
   role: string;
   questionAnswered?: string;
   dependsOn?: string;
   standalone?: string | boolean;
+  canStandAlone?: boolean;
   example?: string;
+  examplePattern?: string;
   explanationBengali: string;
+  whyItMatters?: string;
+}
+
+export interface ClauseRelationshipInfo {
+  formula: string;
+  explanation: string;
+  explanationBengali?: string;
+}
+
+export interface RelevantGrammarFeature {
+  feature: string;
+  text?: string;
+  explanation?: string;
+  explanationBengali?: string;
+  detail: string;
+  detailBengali?: string;
+}
+
+
+export interface PhraseComponent {
+  text: string;
+  role: string;
+  roleLabel: string;
+  roleBengali: string;
+  explanation: string;
+  explanationBengali?: string;
+}
+
+export interface PhraseConstituent {
+  phrase: string;
+  phraseType: 'noun_phrase' | 'verb_phrase' | 'prepositional_phrase' | 'adverbial_phrase' | 'adjective_phrase' | string;
+  phraseTypeLabel: string;
+  headWord?: string;
+  roleInClause?: string;
+  components: PhraseComponent[];
+  explanation: string;
+  explanationBengali?: string;
+}
+
+export interface ConversationalElement {
+  text: string;
+  type: 'self_correction' | 'parenthetical' | 'discourse_marker' | 'interruption' | string;
+  typeLabel: string;
+  targetOriginal?: string;
+  correctedTo?: string;
+  explanation: string;
+  explanationBengali: string;
+}
+
+export interface GrammaticalPatternSummary {
+  formula: string;
+  explanation: string;
+  explanationBengali: string;
+}
+
+export interface SentenceStructureMapBranch {
+  clauseText: string;
+  relationType: string;
+  roleInSentence: string;
 }
 
 export interface SentenceStructureMapNode {
@@ -77,6 +169,8 @@ export interface SentenceStructureMapNode {
 
 export interface SentenceStructureMap {
   mainClause: string;
+  rootMainClause?: string;
+  branches?: SentenceStructureMapBranch[];
   nodes: SentenceStructureMapNode[];
 }
 
@@ -87,6 +181,7 @@ export interface GrammarRuleDetail {
   whyUsed: string;
   howItWorks: string;
   reusablePattern: string;
+  targetWords?: string;
   example: {
     english: string;
     easyEnglish: string;
@@ -99,9 +194,12 @@ export interface ConnectorRelationship {
   connector: string;
   meaning: string;
   grammaticalPattern: string;
+  pattern?: string;
   logicalRelationship: string;
+  logicalRelation?: string;
   whyAppropriate: string;
   contrastWithSimilar?: string;
+  contrastWith?: string;
 }
 
 export interface WordLevelGrammarDetail {
@@ -114,7 +212,9 @@ export interface WordLevelGrammarDetail {
 
 export interface MistakeAndAlternative {
   commonMistake?: string;
+  studentMisconception?: string;
   correctedExample?: string;
+  correctedSentence?: string;
   naturalAlternative: string;
   nuanceDifference?: string;
 }
@@ -122,9 +222,12 @@ export interface MistakeAndAlternative {
 export interface GrammarPractice {
   reusablePattern: string;
   practiceQuestion: string;
+  question?: string;
   options?: string[];
   answer: string;
+  correctAnswer?: string;
   explanation: string;
+  whyCorrect?: string;
 }
 
 export interface SentenceAnalysisResult extends BaseAIAnalysis {
@@ -146,8 +249,33 @@ export interface SentenceAnalysisResult extends BaseAIAnalysis {
     word: string;
     meaningInContext: string;
     bengali: string;
+    partOfSpeech?: string;
+    grammaticalRole?: string;
   }>;
+  phraseConstituents?: PhraseConstituent[];
+  conversationalElements?: ConversationalElement[];
+  patternSummary?: GrammaticalPatternSummary;
+  clauseRelationship?: ClauseRelationshipInfo;
+  relevantGrammarFeatures?: RelevantGrammarFeature[];
   toneAndRegister: string;
+}
+
+export interface ParagraphSentenceItem {
+  sentenceIndex: number;
+  sentenceText: string;
+  bengaliTranslation: string;
+  phraseBreakdown: PhraseExplanation[];
+  grammaticalStructure?: string;
+  toneOrRole?: string;
+}
+
+export interface ParagraphBlockItem {
+  paragraphIndex: number;
+  paragraphText: string;
+  mainIdea?: string;
+  summary?: string;
+  bengaliTranslation?: string;
+  sentences: ParagraphSentenceItem[];
 }
 
 export interface ParagraphAnalysisResult extends BaseAIAnalysis {
@@ -163,6 +291,9 @@ export interface ParagraphAnalysisResult extends BaseAIAnalysis {
   }>;
   argumentStructure: string;
   toneAndRegister: string;
+  // Hierarchical Smart Breakdown
+  paragraphs?: ParagraphBlockItem[];
+  sentences?: ParagraphSentenceItem[];
 }
 
 export type LinguisticAnalysisResult =
@@ -191,6 +322,8 @@ export interface StageAExplanation {
   transitivityOrPattern?: string;
   wordForms?: string[];
   literalVsFigurative?: string;
+  whyItMatters?: string;
+  discourseRole?: string;
 }
 
 export interface SenseSynonym {
@@ -240,31 +373,6 @@ export interface WrongMeaningReport {
   model?: string;
 }
 
-// Syntactic & Sentence X-Ray
-export interface SentenceXRayResult {
-  sentence: string;
-  bengaliTranslation: string;
-  paraphrase: string;
-  mainMessage?: string;
-  sentenceStructure?: SentenceStructureOverview;
-  clauses: SyntacticClause[];
-  structureMap?: SentenceStructureMap;
-  grammarRules?: GrammarRuleDetail[];
-  connectors?: ConnectorRelationship[];
-  wordLevelGrammar?: WordLevelGrammarDetail[];
-  commonMistakesAndAlternatives?: MistakeAndAlternative;
-  practice?: GrammarPractice;
-  grammaticalFeatures: string[];
-  grammaticalHighlights?: string[];
-  phraseBreakdown?: PhraseExplanation[];
-  difficultVocabulary?: Array<{
-    word: string;
-    meaningInContext: string;
-    bengali: string;
-  }>;
-  toneAndRegister: string;
-}
-
 // Word Comparison / Nuance
 export interface MinimalPairComparison {
   sentenceA: string;
@@ -304,6 +412,51 @@ export interface UsageCoachFeedback {
   alternativeCollocations?: string[];
 }
 
+// Summary practice: the reader summarizes an article and AI marks how well they understood it
+export type SummaryCriterionId = 'main_idea' | 'key_points' | 'accuracy' | 'expression';
+
+export interface SummaryCriterion {
+  id: SummaryCriterionId;
+  label: string;
+  score: number;
+  maxScore: number;
+  comment: string;
+}
+
+export interface SummaryLanguageCorrection {
+  original: string;
+  corrected: string;
+  explanation: string;
+}
+
+export interface SummaryEvaluation {
+  /** Out of 10: always the sum of the criteria scores. */
+  totalScore: number;
+  criteria: SummaryCriterion[];
+  /** ISO 639-1 code of the language the summary was written in. */
+  summaryLanguage: string;
+  overallFeedback: string;
+  strengths: string[];
+  missedPoints: string[];
+  misunderstandings: string[];
+  /** A short summary of the article, in the learner's language, to compare against. */
+  modelSummary: string;
+  /** Grammar and wording notes; only for summaries written in English. Not part of the score. */
+  languageFeedback?: {
+    comment: string;
+    corrections: SummaryLanguageCorrection[];
+  };
+}
+
+export interface SummaryAttempt {
+  id: string;
+  articleUrl: string;
+  articleTitle: string;
+  summary: string;
+  createdAt: string;
+  evaluation: SummaryEvaluation;
+}
+
 // Follow-up Q&A
 export interface FollowUpResponse {
   question: string;
@@ -328,6 +481,8 @@ export interface FSRSItemState {
   state: LearningState;
   lastReview?: string;
   nextReview: string;
+  /** Position in the FSRS learning steps (ts-fsrs learning_steps) */
+  learningSteps?: number;
 }
 
 export function createInitialFSRSState(): FSRSItemState {
@@ -397,87 +552,6 @@ export interface TargetedPracticeItem {
   isDismissed?: boolean;
 }
 
-// Article Reader & Reading Intelligence
-export interface ArticleSummarySection {
-  mainIdea: string;
-  conciseSummary: string;
-  keyTakeaways: string[];
-  centralArgument: string;
-}
-
-export interface ArticleParagraphItem {
-  paragraphIndex: number;
-  originalText: string;
-  explanation: string;
-  sentenceClarifications: Array<{
-    sentence: string;
-    clarification: string;
-  }>;
-  difficultVocabulary: Array<{
-    word: string;
-    meaningInContext: string;
-    bengali: string;
-  }>;
-  bengaliExplanation?: string;
-}
-
-export interface ArticleConnectorItem {
-  expression: string;
-  type: 'contrast' | 'cause_effect' | 'concession' | 'addition' | 'example' | 'conclusion' | 'transition';
-  functionInContext: string;
-  paragraphIndex: number;
-}
-
-export interface ArticleClaimItem {
-  claim: string;
-  paragraphIndex: number;
-  evidenceProvided?: string;
-  isAssertedWithoutEvidence: boolean;
-  excerpt: string;
-  aiInference?: string;
-  examples?: string[];
-}
-
-export interface ArticleArgumentStructure {
-  developmentFlow: string;
-  paragraphRelationships: string[];
-  mainSupportingReasons: string[];
-  counterargumentsAndConcessions?: string[];
-  conclusionRole: string;
-}
-
-export interface ArticleExtractedVocab {
-  word: string;
-  partOfSpeech?: string;
-  contextualMeaning: string;
-  bengaliMeaning: string;
-  contextSentence: string;
-}
-
-export interface ArticleAnalysisResult {
-  id: string;
-  title: string;
-  sourceUrl?: string;
-  rawText: string;
-  createdAt: string;
-  summary: ArticleSummarySection;
-  paragraphs: ArticleParagraphItem[];
-  connectors: ArticleConnectorItem[];
-  claims: ArticleClaimItem[];
-  argumentStructure: ArticleArgumentStructure;
-  extractedVocabulary: ArticleExtractedVocab[];
-}
-
-export interface ArticleDraft {
-  id: string;
-  title: string;
-  sourceUrl?: string;
-  rawText: string;
-  analysisMode: 'comprehensive' | 'summary' | 'structural' | 'vocabulary';
-  lastModified: string;
-  analysisResult?: ArticleAnalysisResult;
-}
-
 // Offline Lexicon / Fallback types
 export interface PhoneticItem {
   text?: string;
@@ -487,6 +561,7 @@ export interface PhoneticItem {
 export interface DefinitionItem {
   definition: string;
   example?: string;
+  exampleBengali?: string;
   synonyms?: string[];
   antonyms?: string[];
 }
@@ -548,6 +623,8 @@ export interface HighlightExtractionResult {
   totalAnalyzedWords?: number;
   sourceMode?: 'ai_reasoning' | 'curated_offline_fallback' | 'evaluation_fixture';
   articleSummary?: string;
+  /** Why the offline word list was used instead of AI (only set when sourceMode is curated_offline_fallback). */
+  fallbackReason?: 'no_ai_configured' | 'ai_unsupported' | 'ai_failed' | 'ai_empty';
 }
 
 export interface UserSettings {
@@ -556,7 +633,7 @@ export interface UserSettings {
   autoPronounce?: boolean;
   showBengaliByDefault: boolean;
   theme: 'light' | 'dark' | 'system';
-  aiProvider: 'mock' | 'gemini' | 'openai' | 'anthropic' | 'ollama';
+  aiProvider: 'mock' | 'gemini' | 'openai' | 'anthropic' | 'ollama' | 'lexiflow';
   apiKey?: string;
   apiEndpoint?: string;
   selectedModel?: string;
@@ -564,13 +641,41 @@ export interface UserSettings {
   dailyReviewLimit: number;
   sidePanelEnabled?: boolean;
   popupSize?: 'small' | 'medium' | 'large' | 'xlarge';
+  sourceLanguage?: string;
   targetLanguage?: string;
   customLanguages?: CustomLanguageConfig[];
-  articleDrafts?: ArticleDraft[];
+  /** 'off' (default): LexiFlow runs only on enabledSites. 'on': everywhere except disabledSites. */
+  siteMode?: 'off' | 'on';
+  enabledSites?: string[];
   disabledSites?: string[];
   isGloballyPaused?: boolean;
   // Feature A: AI Highlight Mode
   highlightModeEnabled?: boolean;
   highlightColor?: HighlightColor;
   highlightFilters?: HighlightFilters;
+  // LexiFlow 2.0 Reading Modes
+  readingMode?: 'quick' | 'learn';
+}
+
+// Phase 0: Target Exam & Staged Learner Profiles
+export type TargetExam = 'pte_academic' | 'ielts_academic';
+
+export interface LearnerProfile {
+  userId: string;
+  targetExam: TargetExam;
+  targetScore: string;
+  targetExamDate: string | null;
+  motherTongue: string;
+  studyHoursWeekly: number;
+  createdAt: string;
+  updatedAt: string;
+  activeExamProfile?: ExamProfile | null;
+}
+
+export interface ExamProfile {
+  id: string;
+  examType: TargetExam;
+  diagnosticScore: string | null;
+  weakCategories: string[];
+  settings: Record<string, unknown>;
 }

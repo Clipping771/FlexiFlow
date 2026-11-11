@@ -24,7 +24,38 @@ export interface LanguagePairConfig {
   isCustom?: boolean;          // Whether language was added by user
 }
 
+export interface SourceLanguageConfig {
+  code: string;
+  name: string;
+  nativeName: string;
+  flagEmoji: string;
+}
+
+export const SUPPORTED_SOURCE_LANGUAGES: SourceLanguageConfig[] = [
+  { code: 'en', name: 'English', nativeName: 'English', flagEmoji: '🇬🇧' },
+  { code: 'es', name: 'Spanish', nativeName: 'Español', flagEmoji: '🇪🇸' },
+  { code: 'fr', name: 'French', nativeName: 'Français', flagEmoji: '🇫🇷' },
+  { code: 'de', name: 'German', nativeName: 'Deutsch', flagEmoji: '🇩🇪' },
+  { code: 'zh', name: 'Chinese', nativeName: '中文', flagEmoji: '🇨🇳' },
+  { code: 'ja', name: 'Japanese', nativeName: '日本語', flagEmoji: '🇯🇵' },
+  { code: 'ru', name: 'Russian', nativeName: 'Русский', flagEmoji: '🇷🇺' },
+  { code: 'ar', name: 'Arabic', nativeName: 'العربية', flagEmoji: '🇸🇦' },
+  { code: 'auto', name: 'Auto Detect', nativeName: 'Auto Detect', flagEmoji: '✨' }
+];
+
 export const SUPPORTED_PAIRS: Record<string, LanguagePairConfig> = {
+  'en-en': {
+    sourceLang: 'en',
+    targetLang: 'en',
+    sourceLabel: 'English',
+    targetLabel: 'English',
+    targetNativeLabel: 'English',
+    targetNativeHeader: 'Simple English',
+    flagEmoji: '🇬🇧',
+    pairId: 'en-en',
+    promptTutorRole: 'elite linguistic tutor specializing in explaining complex English grammar and syntax in simple, beginner-friendly English',
+    promptTargetInstruction: 'Simple, beginner-friendly English explanation using short sentences and familiar vocabulary. Strict rule: Write exclusively in English. Never output Bengali or any other language.'
+  },
   'en-bn': {
     sourceLang: 'en',
     targetLang: 'bn',

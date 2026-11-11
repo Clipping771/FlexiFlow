@@ -1,12 +1,14 @@
+import { recordUsage } from '../logging/usageRecord';
 import {
   SelectionType,
   LinguisticAnalysisResult,
   WritingGoal,
   WritingAssistResult,
   FollowUpResponse,
-  HighlightExtractionResult
+  HighlightExtractionResult,
+  StageAExplanation,
+  StageBDetailedVocabulary
 } from '../../types';
-import { getLanguageConfig } from '../../config/languages';
 import {
   WordAnalysisSchema,
   PhraseAnalysisSchema,
@@ -18,6 +20,25 @@ import {
 } from './schemas';
 import { AIProvider } from './types';
 import { safeParseJSON } from './safeJson';
+import { SummaryEvaluation } from '../../types';
+import { buildSummaryEvaluationPrompt, SummaryEvaluationInput } from './prompts';
+import { parseSummaryEvaluation } from './summarySchema';
+import { UsageCoachFeedback } from '../../types';
+import { buildUsageEvaluationPrompt } from './prompts';
+import { UsageCoachFeedbackSchema } from './usageCoachSchema';
+import {
+  buildStageAPrompt,
+  buildStageACorrection,
+  buildStageBPrompt,
+  buildStageBCorrection,
+  buildAnalyzePrompt,
+  buildWritingAssistPrompt,
+  buildFollowUpPrompt,
+  buildHighlightsPrompt,
+  withJsonOnlyReminder,
+  toSinglePrompt
+} from './prompts';
+import { validateStageA, validateStageB } from './validation';
 
 export class OllamaProvider implements AIProvider {
   name = 'ollama';
@@ -39,8 +60,11 @@ export class OllamaProvider implements AIProvider {
     return true;
   }
 
-  private async callOllama(prompt: string): Promise<string> {
+  private async callOllama(prompt: string, numCtx?: number): Promise<string> {
     const formattedPrompt = `${prompt}\nRespond with JSON only adhering strictly to schema.`;
+    // Ollama silently drops the start of a prompt longer than its context window (often only 2-4K tokens),
+    // which for long prompts loses the instructions. Long-input calls pass an explicit window.
+    const options = numCtx ? { options: { num_ctx: numCtx } } : {};
 
     // Try primary endpoint, with automatic fallback between localhost and 127.0.0.1
     const candidateEndpoints = [this.endpoint];
@@ -54,7 +78,7 @@ export class OllamaProvider implements AIProvider {
 
     for (const ep of candidateEndpoints) {
       try {
-        console.log(`[LexiFlow Ollama] Dispatching request to endpoint: ${ep}, active model: ${this.model}`);
+        console.debug(`[LexiFlow Ollama] Dispatching request to endpoint: ${ep}, active model: ${this.model}`);
         
         // 1. Primary attempt: /api/chat
         let chatRes = await fetch(`${ep}/api/chat`, {
@@ -64,7 +88,8 @@ export class OllamaProvider implements AIProvider {
             model: this.model,
             messages: [{ role: 'user', content: formattedPrompt }],
             format: 'json',
-            stream: false
+            stream: false,
+            ...options
           })
         });
 
@@ -75,7 +100,7 @@ export class OllamaProvider implements AIProvider {
             console.warn(`[LexiFlow Ollama] Model "${this.model}" not found at ${ep}. Attempting model auto-discovery from /api/tags...`);
             const discovered = await this.autoDiscoverModel(ep);
             if (discovered && discovered !== this.model) {
-              console.log(`[LexiFlow Ollama] Discovered and switched to active model: "${discovered}"`);
+              console.debug(`[LexiFlow Ollama] Discovered and switched to active model: "${discovered}"`);
               this.model = discovered;
               chatRes = await fetch(`${ep}/api/chat`, {
                 method: 'POST',
@@ -84,7 +109,8 @@ export class OllamaProvider implements AIProvider {
                   model: this.model,
                   messages: [{ role: 'user', content: formattedPrompt }],
                   format: 'json',
-                  stream: false
+                  stream: false,
+                  ...options
                 })
               });
             }
@@ -94,6 +120,7 @@ export class OllamaProvider implements AIProvider {
         if (chatRes.ok) {
           this.endpoint = ep; // lock on working endpoint
           const data = await chatRes.json();
+          void recordUsage({ provider: 'ollama', model: this.model, systemPrompt: prompt, userPrompt: '', body: data });
           const content = data?.message?.content || data?.response;
           if (content) return content;
         }
@@ -106,13 +133,15 @@ export class OllamaProvider implements AIProvider {
             model: this.model,
             prompt: formattedPrompt,
             format: 'json',
-            stream: false
+            stream: false,
+            ...options
           })
         });
 
         if (genRes.ok) {
           this.endpoint = ep;
           const data = await genRes.json();
+          void recordUsage({ provider: 'ollama', model: this.model, systemPrompt: prompt, userPrompt: '', body: data });
           return data.response;
         }
 
@@ -163,103 +192,130 @@ export class OllamaProvider implements AIProvider {
     return null;
   }
 
+  async analyzeStageA(
+    text: string,
+    contextSentence?: string,
+    paragraphContext?: string
+  ): Promise<StageAExplanation> {
+    const cleanText = text.trim();
+    const prompt = toSinglePrompt(buildStageAPrompt({ text, contextSentence, paragraphContext }, this.targetLang));
+
+    let raw = await this.callOllama(prompt);
+    let parsed: any;
+    try {
+      parsed = safeParseJSON(raw);
+    } catch {
+      raw = await this.callOllama(withJsonOnlyReminder(prompt));
+      parsed = safeParseJSON(raw);
+    }
+
+    let validation = validateStageA(parsed, this.targetLang);
+    if (!validation.isValid) {
+      console.warn('[LexiFlow Ollama] Stage A validation failed, retrying once...', validation.errors);
+      const correctionPrompt = buildStageACorrection(prompt, validation.errors, this.targetLang);
+      const retryRaw = await this.callOllama(correctionPrompt);
+      try {
+        const retryParsed = safeParseJSON(retryRaw);
+        const retryVal = validateStageA(retryParsed, this.targetLang);
+        if (retryVal.isValid && retryVal.data) {
+          if (cleanText && (!retryVal.data.selectedText || retryVal.data.selectedText.trim() !== cleanText)) {
+            retryVal.data.selectedText = cleanText;
+          }
+          return retryVal.data;
+        }
+      } catch (err) {
+        console.warn('[LexiFlow Ollama] Stage A retry parse error:', err);
+      }
+    }
+
+    if (validation.isValid && validation.data) {
+      if (cleanText && (!validation.data.selectedText || validation.data.selectedText.trim() !== cleanText)) {
+        validation.data.selectedText = cleanText;
+      }
+      return validation.data;
+    }
+
+    return {
+      selectedText: cleanText,
+      lemma: parsed?.lemma || cleanText.toLowerCase(),
+      partOfSpeech: parsed?.partOfSpeech || 'word',
+      easyEnglish: parsed?.easyEnglish || 'Used in this sentence to convey a specific idea.',
+      easyBengali: parsed?.easyBengali || 'প্রাসঙ্গিক অর্থ',
+      contextMeaning: parsed?.contextMeaning || 'Meaning in this context.',
+      example: parsed?.example || contextSentence,
+      exampleBengali: parsed?.exampleBengali || undefined,
+      confidence: 'medium',
+      contextualSenseId: 'sense_1'
+    };
+  }
+
+  async analyzeStageB(
+    lemma: string,
+    partOfSpeech: string = 'word',
+    contextualSenseId: string = 'sense_1'
+  ): Promise<StageBDetailedVocabulary> {
+    const cleanLemma = lemma.trim().toLowerCase();
+    const prompt = toSinglePrompt(buildStageBPrompt({ lemma, partOfSpeech, contextualSenseId }, this.targetLang));
+
+    let raw = await this.callOllama(prompt);
+    let parsed: any;
+    try {
+      parsed = safeParseJSON(raw);
+    } catch {
+      raw = await this.callOllama(withJsonOnlyReminder(prompt));
+      parsed = safeParseJSON(raw);
+    }
+
+    let validation = validateStageB(parsed, cleanLemma, this.targetLang);
+    if (!validation.isValid) {
+      console.warn('[LexiFlow Ollama] Stage B validation failed, retrying once...', validation.errors);
+      const correctionPrompt = buildStageBCorrection(prompt, validation.errors, this.targetLang);
+      const retryRaw = await this.callOllama(correctionPrompt);
+      try {
+        const retryParsed = safeParseJSON(retryRaw);
+        const retryVal = validateStageB(retryParsed, cleanLemma, this.targetLang);
+        if (retryVal.isValid && retryVal.data) {
+          return retryVal.data;
+        }
+      } catch (err) {
+        console.warn('[LexiFlow Ollama] Stage B retry parse error:', err);
+      }
+    }
+
+    if (validation.isValid && validation.data) {
+      return validation.data;
+    }
+
+    return {
+      lemma: cleanLemma,
+      partOfSpeech,
+      contextualSenseId,
+      senses: [
+        {
+          id: contextualSenseId,
+          partOfSpeech,
+          easyEnglish: parsed?.senses?.[0]?.easyEnglish || `Main common meaning in daily English.`,
+          easyBengali: parsed?.senses?.[0]?.easyBengali || 'Main meaning',
+          isContextual: true,
+          registerOrType: 'standard',
+          examples: parsed?.senses?.[0]?.examples || [{ english: `He used the word ${cleanLemma} properly.`, bengali: `Example translation.` }],
+          synonyms: parsed?.senses?.[0]?.synonyms || [],
+          antonyms: parsed?.senses?.[0]?.antonyms || []
+        }
+      ],
+      collocations: parsed?.collocations || [],
+      idiomsAndPhrases: parsed?.idiomsAndPhrases || [],
+      wordForms: parsed?.wordForms || [{ form: cleanLemma, partOfSpeech }]
+    };
+  }
+
   async analyze(
     text: string,
     type: SelectionType,
     contextSentence?: string,
     paragraphContext?: string
   ): Promise<LinguisticAnalysisResult> {
-    const lang = getLanguageConfig(this.targetLang);
-    let prompt = '';
-
-    if (type === 'word') {
-      prompt = `You are an expert bilingual lexicographer for an ESL ${lang.targetLabel} learner.
-Analyze the word "${text}" in the context of this sentence: "${contextSentence || ''}".
-In "bengaliTranslation", provide ${lang.promptTargetInstruction}.
-Return a valid raw JSON object strictly adhering to this schema:
-{
-  "selectedText": "${text}",
-  "selectionType": "word",
-  "contextualMeaning": "Precise meaning in this context",
-  "simpleEnglishExplanation": "Plain English explanation",
-  "bengaliTranslation": "${lang.targetLabel} meaning and explanation",
-  "whyFitsContext": "Why this specific meaning fits this sentence",
-  "partOfSpeech": "noun / verb / adjective / adverb",
-  "grammaticalNote": "Grammar or syntactic role",
-  "collocations": ["collocation 1", "collocation 2"],
-  "examples": ["example sentence 1"],
-  "synonyms": ["synonym 1"],
-  "antonyms": ["antonym 1"],
-  "registerAndTone": "Tone description"
-}`;
-    } else if (type === 'phrase') {
-      prompt = `You are an expert bilingual tutor for an ESL ${lang.targetLabel} learner.
-Analyze the phrase or idiom "${text}" in context: "${contextSentence || ''}".
-In "bengaliTranslation", provide ${lang.promptTargetInstruction}.
-Return a valid raw JSON object strictly adhering to this schema:
-{
-  "selectedText": "${text}",
-  "selectionType": "phrase",
-  "phraseType": "idiom",
-  "overallMeaning": "Meaning as a unified unit",
-  "simpleEnglishExplanation": "Simple English explanation",
-  "bengaliTranslation": "${lang.targetLabel} translation and explanation",
-  "literalVsFigurative": "Literal vs figurative distinction",
-  "whyFitsContext": "Why it fits this context",
-  "examples": ["example sentence 1"]
-}`;
-    } else if (type === 'sentence') {
-      prompt = `Analyze this sentence for an ESL ${lang.targetLabel} learner: "${text}".
-Context: "${contextSentence || ''}".
-In "bengaliTranslation" and "easyBengali", provide ${lang.promptTargetInstruction}.
-Return a valid raw JSON object strictly adhering to this schema:
-{
-  "selectedText": "${text}",
-  "selectionType": "sentence",
-  "plainEnglishParaphrase": "Very easy plain English paraphrase",
-  "overallMeaning": "Overall meaning",
-  "bengaliTranslation": "Complete natural ${lang.targetLabel} translation",
-  "phraseBreakdown": [
-    {
-      "phrase": "Exact meaningful phrase from sentence",
-      "easyEnglish": "Very simple everyday English explanation.",
-      "easyBengali": "Natural easy ${lang.targetLabel} explanation"
-    }
-  ],
-  "clauses": [
-    {
-      "text": "Clause text",
-      "type": "main",
-      "role": "Main Clause",
-      "explanationBengali": "Clause explanation in ${lang.targetLabel}"
-    }
-  ],
-  "grammaticalHighlights": ["Key grammar point"],
-  "difficultVocabulary": [{"word": "word", "meaningInContext": "meaning", "bengali": "translation"}],
-  "toneAndRegister": "Standard English"
-}`;
-    } else {
-      prompt = `Analyze this paragraph for an ESL ${lang.targetLabel} learner: "${text}".
-In "bengaliTranslation" and "easyBengali", provide ${lang.promptTargetInstruction}.
-Return a valid raw JSON object strictly adhering to this schema:
-{
-  "selectedText": "${text}",
-  "selectionType": "paragraph",
-  "mainIdea": "Main thesis of the paragraph",
-  "conciseSummary": "Concise summary",
-  "bengaliTranslation": "Complete natural ${lang.targetLabel} translation",
-  "phraseBreakdown": [
-    {
-      "phrase": "Exact phrase",
-      "easyEnglish": "Simple English explanation",
-      "easyBengali": "Natural ${lang.targetLabel} explanation"
-    }
-  ],
-  "keyVocabulary": [{"term": "term", "meaning": "meaning", "bengali": "translation"}],
-  "toneAndRegister": "Standard English"
-}`;
-    }
-
+    const prompt = toSinglePrompt(buildAnalyzePrompt({ text, type, contextSentence, paragraphContext }, this.targetLang, 'compact'));
     const raw = await this.callOllama(prompt);
     let parsed: any;
     try {
@@ -279,101 +335,41 @@ Return a valid raw JSON object strictly adhering to this schema:
   }
 
   async assistWriting(text: string, goal: WritingGoal): Promise<WritingAssistResult> {
-    const lang = getLanguageConfig(this.targetLang);
-    const prompt = `Writing assist for goal "${goal}" on text: "${text}".
-In "bengaliExplanation", provide ${lang.promptTargetInstruction}.
-Return a valid raw JSON object strictly adhering to this schema:
-{
-  "originalText": "${text}",
-  "goal": "${goal}",
-  "improvedText": "Improved version of text",
-  "changesExplanation": "Clear explanation of improvements made",
-  "bengaliExplanation": "Explanation in ${lang.targetLabel}",
-  "alternatives": ["Alternative phrasing 1", "Alternative phrasing 2"]
-}`;
+    const prompt = toSinglePrompt(buildWritingAssistPrompt({ text, goal }, this.targetLang, 'compact'));
     const raw = await this.callOllama(prompt);
     return WritingAssistSchema.parse(safeParseJSON(raw));
   }
 
   async askFollowUp(text: string, context: string, question: string): Promise<FollowUpResponse> {
-    const lang = getLanguageConfig(this.targetLang);
-    const prompt = `You are LexiFlow AI Language Coach, an expert bilingual English-${lang.targetLabel} tutor.
-Answer question "${question}" about text: "${text}" in context: "${context}".
-In "bengaliSummary" and example translations, provide ${lang.promptTargetInstruction}.
-Return a valid raw JSON object strictly adhering to this schema:
-{
-  "question": "${question}",
-  "keyTakeaway": "Short memorable punchline or rule",
-  "answer": "Engaging, conversational, well-structured explanation",
-  "bengaliSummary": "Clear, natural ${lang.targetLabel} summary",
-  "suggestedFollowUps": ["Follow-up question 1?", "Follow-up question 2?"],
-  "examples": [
-    { "english": "Example sentence", "bengali": "${lang.targetLabel} translation of example" }
-  ]
-}`;
+    const prompt = toSinglePrompt(buildFollowUpPrompt({ text, context, question }, this.targetLang, 'compact'));
     const raw = await this.callOllama(prompt);
     return FollowUpResponseSchema.parse(safeParseJSON(raw));
   }
 
-  async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
-    const lang = getLanguageConfig(this.targetLang);
-    console.log(`[LexiFlow Ollama] Extracting highlights using model: "${this.model}" at ${this.endpoint}`);
-
-    const prompt = `You are LexiFlow AI, an elite university reading instructor and bilingual language acquisition tutor.
-Your mission is to identify the words, collocations, phrasal verbs, idioms, and discourse connectors that provide the GREATEST PEDAGOGICAL LEARNING VALUE for an English learner reading this specific article.
-
-Analyze the article holistically to understand its topic, central thesis, and argument flow before selecting items.
-
-SELECTION CRITERIA (Prioritize in this order):
-1. CENTRAL-IDEA VOCABULARY: Key terms and concepts essential to comprehending the author's primary arguments and claims.
-2. HIGH-VALUE DOMAIN & JOURNALISTIC VOCABULARY: Precise academic, professional, or domain-relevant words with high transferable utility across future reading situations (CEFR B2-C1).
-3. MULTIWORD EXPRESSIONS & PHRASES: Idioms, phrasal verbs, and natural collocations where meaning resides in the whole phrase rather than individual words (e.g., "go beyond", "in the wake of"). Select the ENTIRE phrase, never just a single word!
-4. CONTEXT-DEPENDENT MEANINGS: Words whose meaning in this article differs from their standard everyday meaning.
-5. DISCOURSE CONNECTORS: Structural connectors that signal contrast, concession, cause, or qualification (e.g., "notwithstanding").
-
-WHAT TO STRICTLY AVOID & PENALIZE:
-- Trivial, everyday words with zero learning value (e.g., "wearing", "make", "piece", "good", "people", "start", "discover").
-- Obscure, archaic words.
-- Single words that are part of a larger multiword phrase.
-- Over-highlighting: Only select terms with genuine learning value.
-
-EVERY ITEM MUST BE GROUNDED IN THE ARTICLE:
-- "text": The exact word or phrase verbatim as it appears in the text.
-- "contextSentence": The complete sentence from the text containing this item.
-- "type": "word" | "phrase" | "idiom".
-- "easyEnglish": Clear, learner-friendly English explanation.
-- "easyBengali": Natural ${lang.targetLabel} translation (${lang.promptTargetInstruction}).
-- "reason": Pedagogical reason explaining why this item is valuable to learn from this article.
-- "difficulty": "easy" | "medium" | "hard".
-- "learningValueScore": Floating number from 0.0 to 1.0 ranking its educational value.
-- "isArticleCore": boolean (true if directly related to the article's central message).
-
-Return raw JSON strictly adhering to this schema:
-{
-  "items": [
-    {
-      "id": "hl_1",
-      "text": "Exact word or phrase from text",
-      "type": "word",
-      "contextSentence": "Full sentence from the text where it appears",
-      "easyEnglish": "Very clear, everyday English definition in 1 short sentence",
-      "easyBengali": "Natural ${lang.targetLabel} translation",
-      "reason": "Why this item is useful for learners to acquire",
-      "difficulty": "easy" | "medium" | "hard",
-      "learningValueScore": 0.85,
-      "isArticleCore": true
-    }
-  ],
-  "pageTitle": "${pageTitle || 'Webpage Article'}",
-  "articleSummary": "Brief 1-sentence summary of the article's core thesis"
-}
-
-Article:
-"""
-${rawText.slice(0, 15000)}
-"""`;
-
+  async evaluateUsage(targetWord: string, sentence: string): Promise<UsageCoachFeedback> {
+    const prompt = toSinglePrompt(buildUsageEvaluationPrompt({ targetWord, sentence }, this.targetLang));
     const raw = await this.callOllama(prompt);
+    return UsageCoachFeedbackSchema.parse({ ...(safeParseJSON(raw) as Record<string, unknown>), targetWord });
+  }
+
+  async evaluateSummary(input: SummaryEvaluationInput): Promise<SummaryEvaluation> {
+    const spec = buildSummaryEvaluationPrompt(input, this.targetLang);
+    const prompt = toSinglePrompt(spec);
+    const raw = await this.callOllama(prompt, ollamaContextFor(prompt, spec.maxTokens));
+    return parseSummaryEvaluation(safeParseJSON(raw));
+  }
+
+  async completeJson(systemPrompt: string, userPrompt: string): Promise<string> {
+    const prompt = toSinglePrompt({ system: systemPrompt, user: userPrompt });
+    return this.callOllama(prompt, ollamaContextFor(prompt, 1500));
+  }
+
+  async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
+    console.debug(`[LexiFlow Ollama] Extracting highlights using model: "${this.model}" at ${this.endpoint}`);
+
+    const spec = buildHighlightsPrompt({ rawText, pageTitle }, this.targetLang, 'compact');
+    const prompt = toSinglePrompt(spec);
+    const raw = await this.callOllama(prompt, ollamaContextFor(prompt, spec.maxTokens));
     let parsed: any;
     try {
       parsed = safeParseJSON(raw);
@@ -391,4 +387,16 @@ ${rawText.slice(0, 15000)}
       articleSummary: parsed?.articleSummary
     });
   }
+}
+
+/**
+ * Context window big enough for the prompt plus the expected output, rounded up to a power of two
+ * (so repeated calls reuse the same loaded model instead of reloading it for every size).
+ * ~3.5 characters per token is a conservative estimate for English text.
+ */
+export function ollamaContextFor(prompt: string, outputTokens: number): number {
+  const needed = Math.ceil(prompt.length / 3.5) + outputTokens + 256;
+  let ctx = 4096;
+  while (ctx < needed && ctx < 32768) ctx *= 2;
+  return ctx;
 }

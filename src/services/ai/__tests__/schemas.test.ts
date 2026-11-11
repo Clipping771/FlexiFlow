@@ -28,7 +28,24 @@ describe('AI-Native Output Validation & Schemas', () => {
       expect(parsed.data.bengaliTranslation).toBeTruthy();
       expect(parsed.data.whyFitsContext).toBeTruthy();
       expect(parsed.data.collocations.length).toBeGreaterThan(0);
+      expect(parsed.data.exampleBengali).toBeTruthy();
     }
+  });
+
+  it('parses exampleBengali and variations in WordAnalysisSchema', () => {
+    const parsed1 = WordAnalysisSchema.parse({
+      selectedText: 'inflicted',
+      examples: ['The storm inflicted severe damage on the coastal village.'],
+      exampleBengali: 'ঝড়টি উপকূলীয় গ্রামে মারাত্মক ক্ষয়ক্ষতি সাধন করেছিল।'
+    });
+    expect(parsed1.exampleBengali).toBe('ঝড়টি উপকূলীয় গ্রামে মারাত্মক ক্ষয়ক্ষতি সাধন করেছিল।');
+
+    const parsed2 = WordAnalysisSchema.parse({
+      selectedText: 'inflicted',
+      examples: ['The storm inflicted severe damage on the coastal village.'],
+      exampleTranslation: 'ঝড়টি উপকূলীয় গ্রামে মারাত্মক ক্ষয়ক্ষতি সাধন করেছিল।'
+    });
+    expect(parsed2.exampleBengali).toBe('ঝড়টি উপকূলীয় গ্রামে মারাত্মক ক্ষয়ক্ষতি সাধন করেছিল।');
   });
 
   it('validates Phrase Analysis schema for phrasal verbs, idioms, and collocations', async () => {
@@ -107,6 +124,33 @@ describe('AI-Native Output Validation & Schemas', () => {
       expect(parsed.data.question).toContain('positive');
       expect(parsed.data.answer).toBeTruthy();
       expect(parsed.data.bengaliSummary).toBeTruthy();
+    }
+  });
+
+  it('automatically decodes HTML entities in FollowUpResponseSchema', () => {
+    const rawWithEntities = {
+      question: "What is India&#039;s policy &amp; goal?",
+      answer: "The government didn&#039;t want &quot;BIG-B&quot; without context.",
+      keyTakeaway: "India&#039;s position is clear.",
+      bengaliSummary: "ভারতের &#039;BIG-B&#039; নিয়ে সিদ্ধান্ত।",
+      suggestedFollowUps: ["Why didn&#039;t they join?"],
+      examples: [
+        {
+          english: "It wasn&#039;t easy.",
+          bengali: "এটি সহজ ছিল না।"
+        }
+      ]
+    };
+
+    const parsed = FollowUpResponseSchema.safeParse(rawWithEntities);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.question).toBe("What is India's policy & goal?");
+      expect(parsed.data.answer).toBe('The government didn\'t want "BIG-B" without context.');
+      expect(parsed.data.keyTakeaway).toBe("India's position is clear.");
+      expect(parsed.data.bengaliSummary).toBe("ভারতের 'BIG-B' নিয়ে সিদ্ধান্ত।");
+      expect(parsed.data.suggestedFollowUps[0]).toBe("Why didn't they join?");
+      expect(parsed.data.examples[0].english).toBe("It wasn't easy.");
     }
   });
 });

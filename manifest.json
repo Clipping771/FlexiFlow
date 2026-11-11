@@ -10,7 +10,10 @@
     "tabs",
     "scripting",
     "sidePanel",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "identity",
+    "alarms",
+    "notifications"
   ],
   "side_panel": {
     "default_path": "dashboard.html"
@@ -22,10 +25,9 @@
     "https://generativelanguage.googleapis.com/*",
     "https://api.openai.com/*",
     "https://api.anthropic.com/*",
+    "https://api.lexiflow.app/*",
     "http://localhost/*",
-    "http://127.0.0.1/*",
-    "http://localhost:11434/*",
-    "http://127.0.0.1:11434/*"
+    "http://127.0.0.1/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -49,6 +51,12 @@
       "128": "assets/icon128.png"
     }
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/fonts/*.woff2"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "options_ui": {
     "page": "dashboard.html",
     "open_in_tab": true
@@ -58,11 +66,5 @@
     "32": "assets/icon32.png",
     "48": "assets/icon48.png",
     "128": "assets/icon128.png"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["assets/*"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }

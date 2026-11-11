@@ -36,9 +36,9 @@ export const WordDifferenceView: React.FC = () => {
       </div>
 
       <div className="card" style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '12px', alignItems: 'flex-end' }}>
+        <div className="wd-form">
           <div>
-            <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>
               Word 1:
             </label>
             <input
@@ -50,7 +50,7 @@ export const WordDifferenceView: React.FC = () => {
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>
               Word 2:
             </label>
             <input
@@ -67,7 +67,7 @@ export const WordDifferenceView: React.FC = () => {
         </div>
 
         <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '11px', color: '#94a3b8', alignSelf: 'center' }}>Presets:</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)', alignSelf: 'center' }}>Presets:</span>
           <button className="btn-secondary" style={{ padding: '3px 8px', fontSize: '11px' }} onClick={() => { setWordA('mitigate'); setWordB('alleviate'); }}>
             mitigate vs alleviate
           </button>
@@ -86,13 +86,13 @@ export const WordDifferenceView: React.FC = () => {
       {result && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div className="card" style={{ borderLeft: '4px solid #f59e0b' }}>
-            <h4 style={{ color: '#d97706', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600, marginBottom: '6px' }}>
+            <h4 style={{ color: 'var(--warning)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600, marginBottom: '6px' }}>
               Core Semantic Difference:
             </h4>
             <p style={{ fontSize: '15px', color: 'var(--text-main)', lineHeight: '1.5', fontWeight: 600 }}>
               {result.coreDifference}
             </p>
-            <div style={{ marginTop: '10px', color: '#48484a', fontSize: '14px', lineHeight: '1.5' }}>
+            <div style={{ marginTop: '10px', color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.5' }}>
               {result.bengaliDifference}
             </div>
           </div>
@@ -104,7 +104,7 @@ export const WordDifferenceView: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {result.minimalPairs.map((pair, i) => (
                 <div key={i} style={{ background: 'rgba(0, 0, 0, 0.02)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '8px' }}>
+                  <div className="wd-two-col" style={{ marginBottom: '8px' }}>
                     <div style={{ borderLeft: '2px solid var(--accent)', paddingLeft: '8px' }}>
                       <strong style={{ color: 'var(--accent)', fontSize: '12px' }}>{result.wordA}:</strong>
                       <p style={{ color: 'var(--text-main)', fontSize: '13.5px', marginTop: '2px' }}>"{pair.sentenceA}"</p>
@@ -122,7 +122,7 @@ export const WordDifferenceView: React.FC = () => {
             </div>
           </div>
 
-          <div className="card" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="card wd-two-col wide-gap">
             <div>
               <h5 style={{ color: 'var(--accent)', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>
                 Collocations with "{result.wordA}":

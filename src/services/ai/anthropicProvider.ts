@@ -1,21 +1,43 @@
+import { recordUsageFromResponse } from '../logging/usageRecord';
 import {
   SelectionType,
   LinguisticAnalysisResult,
   WritingGoal,
   WritingAssistResult,
-  FollowUpResponse
+  FollowUpResponse,
+  StageAExplanation,
+  StageBDetailedVocabulary,
+  HighlightExtractionResult
 } from '../../types';
-import { getLanguageConfig } from '../../config/languages';
 import {
   WordAnalysisSchema,
   PhraseAnalysisSchema,
   SentenceAnalysisSchema,
   ParagraphAnalysisSchema,
   WritingAssistSchema,
-  FollowUpResponseSchema
+  FollowUpResponseSchema,
+  HighlightExtractionResultSchema
 } from './schemas';
 import { AIProvider } from './types';
 import { safeParseJSON } from './safeJson';
+import { SummaryEvaluation } from '../../types';
+import { buildSummaryEvaluationPrompt, SummaryEvaluationInput } from './prompts';
+import { parseSummaryEvaluation } from './summarySchema';
+import { UsageCoachFeedback } from '../../types';
+import { buildUsageEvaluationPrompt } from './prompts';
+import { UsageCoachFeedbackSchema } from './usageCoachSchema';
+import {
+  buildStageAPrompt,
+  buildStageACorrection,
+  buildStageBPrompt,
+  buildStageBCorrection,
+  buildAnalyzePrompt,
+  buildWritingAssistPrompt,
+  buildFollowUpPrompt,
+  buildHighlightsPrompt,
+  withJsonOnlyReminder
+} from './prompts';
+import { validateStageA, validateStageB } from './validation';
 
 export class AnthropicProvider implements AIProvider {
   name = 'anthropic';
@@ -37,7 +59,7 @@ export class AnthropicProvider implements AIProvider {
     return Boolean(this.apiKey && this.apiKey.trim().length > 0);
   }
 
-  private async callAnthropic(systemPrompt: string, userPrompt: string, timeoutMs: number = 12000): Promise<string> {
+  private async callAnthropic(systemPrompt: string, userPrompt: string, timeoutMs: number = 12000, maxTokens: number = 1800): Promise<string> {
     if (!this.isAvailable()) {
       throw new Error('Anthropic API key is not configured.');
     }
@@ -58,7 +80,7 @@ export class AnthropicProvider implements AIProvider {
         },
         body: JSON.stringify({
           model: this.model,
-          max_tokens: 1800,
+          max_tokens: maxTokens,
           system: `${systemPrompt}\nOutput strictly valid raw JSON only. Do not add markdown backticks.`,
           messages: [{ role: 'user', content: userPrompt }]
         }),
@@ -69,6 +91,8 @@ export class AnthropicProvider implements AIProvider {
       clearTimeout(timeoutId);
       throw err;
     }
+
+    recordUsageFromResponse('anthropic', this.model, res, systemPrompt, userPrompt);
 
     if (!res.ok) {
       const err = await res.text();
@@ -82,102 +106,131 @@ export class AnthropicProvider implements AIProvider {
     return content.replace(/```json/g, '').replace(/```/g, '').trim();
   }
 
+  async analyzeStageA(
+    text: string,
+    contextSentence?: string,
+    paragraphContext?: string
+  ): Promise<StageAExplanation> {
+    const cleanText = text.trim();
+    const { system: systemPrompt, user: userPrompt } = buildStageAPrompt({ text, contextSentence, paragraphContext }, this.targetLang);
+
+    let raw = await this.callAnthropic(systemPrompt, userPrompt);
+    let parsed: any;
+    try {
+      parsed = safeParseJSON(raw);
+    } catch {
+      raw = await this.callAnthropic(systemPrompt, withJsonOnlyReminder(userPrompt));
+      parsed = safeParseJSON(raw);
+    }
+
+    let validation = validateStageA(parsed, this.targetLang);
+    if (!validation.isValid) {
+      console.warn('[LexiFlow Anthropic] Stage A validation failed, retrying once...', validation.errors);
+      const correctionPrompt = buildStageACorrection(userPrompt, validation.errors, this.targetLang);
+      const retryRaw = await this.callAnthropic(systemPrompt, correctionPrompt);
+      try {
+        const retryParsed = safeParseJSON(retryRaw);
+        const retryVal = validateStageA(retryParsed, this.targetLang);
+        if (retryVal.isValid && retryVal.data) {
+          if (cleanText && (!retryVal.data.selectedText || retryVal.data.selectedText.trim() !== cleanText)) {
+            retryVal.data.selectedText = cleanText;
+          }
+          return retryVal.data;
+        }
+      } catch (err) {
+        console.warn('[LexiFlow Anthropic] Stage A retry parse error:', err);
+      }
+    }
+
+    if (validation.isValid && validation.data) {
+      if (cleanText && (!validation.data.selectedText || validation.data.selectedText.trim() !== cleanText)) {
+        validation.data.selectedText = cleanText;
+      }
+      return validation.data;
+    }
+
+    return {
+      selectedText: cleanText,
+      lemma: parsed?.lemma || cleanText.toLowerCase(),
+      partOfSpeech: parsed?.partOfSpeech || 'word',
+      easyEnglish: parsed?.easyEnglish || 'Used in this sentence to convey a specific idea.',
+      easyBengali: parsed?.easyBengali || 'প্রাসঙ্গিক অর্থ',
+      contextMeaning: parsed?.contextMeaning || 'Meaning in this context.',
+      example: parsed?.example || contextSentence,
+      exampleBengali: parsed?.exampleBengali || undefined,
+      confidence: 'medium',
+      contextualSenseId: 'sense_1'
+    };
+  }
+
+  async analyzeStageB(
+    lemma: string,
+    partOfSpeech: string = 'word',
+    contextualSenseId: string = 'sense_1'
+  ): Promise<StageBDetailedVocabulary> {
+    const cleanLemma = lemma.trim().toLowerCase();
+    const { system: systemPrompt, user: userPrompt } = buildStageBPrompt({ lemma, partOfSpeech, contextualSenseId }, this.targetLang);
+
+    let raw = await this.callAnthropic(systemPrompt, userPrompt);
+    let parsed: any;
+    try {
+      parsed = safeParseJSON(raw);
+    } catch {
+      raw = await this.callAnthropic(systemPrompt, withJsonOnlyReminder(userPrompt));
+      parsed = safeParseJSON(raw);
+    }
+
+    let validation = validateStageB(parsed, cleanLemma, this.targetLang);
+    if (!validation.isValid) {
+      console.warn('[LexiFlow Anthropic] Stage B validation failed, retrying once...', validation.errors);
+      const correctionPrompt = buildStageBCorrection(userPrompt, validation.errors, this.targetLang);
+      const retryRaw = await this.callAnthropic(systemPrompt, correctionPrompt);
+      try {
+        const retryParsed = safeParseJSON(retryRaw);
+        const retryVal = validateStageB(retryParsed, cleanLemma, this.targetLang);
+        if (retryVal.isValid && retryVal.data) {
+          return retryVal.data;
+        }
+      } catch (err) {
+        console.warn('[LexiFlow Anthropic] Stage B retry parse error:', err);
+      }
+    }
+
+    if (validation.isValid && validation.data) {
+      return validation.data;
+    }
+
+    return {
+      lemma: cleanLemma,
+      partOfSpeech,
+      contextualSenseId,
+      senses: [
+        {
+          id: contextualSenseId,
+          partOfSpeech,
+          easyEnglish: parsed?.senses?.[0]?.easyEnglish || `Main common meaning in daily English.`,
+          easyBengali: parsed?.senses?.[0]?.easyBengali || 'Main meaning',
+          isContextual: true,
+          registerOrType: 'standard',
+          examples: parsed?.senses?.[0]?.examples || [{ english: `He used the word ${cleanLemma} properly.`, bengali: `Example translation.` }],
+          synonyms: parsed?.senses?.[0]?.synonyms || [],
+          antonyms: parsed?.senses?.[0]?.antonyms || []
+        }
+      ],
+      collocations: parsed?.collocations || [],
+      idiomsAndPhrases: parsed?.idiomsAndPhrases || [],
+      wordForms: parsed?.wordForms || [{ form: cleanLemma, partOfSpeech }]
+    };
+  }
+
   async analyze(
     text: string,
     type: SelectionType,
     contextSentence?: string,
     paragraphContext?: string
   ): Promise<LinguisticAnalysisResult> {
-    const lang = getLanguageConfig(this.targetLang);
-    let sys = '';
-
-    if (type === 'word') {
-      sys = `You are an expert bilingual lexicographer for an ESL ${lang.targetLabel} learner.
-In "bengaliTranslation", provide ${lang.promptTargetInstruction}.
-Return a valid raw JSON object strictly adhering to this schema:
-{
-  "selectedText": "${text}",
-  "selectionType": "word",
-  "contextualMeaning": "Precise meaning in this context",
-  "simpleEnglishExplanation": "Plain English explanation",
-  "bengaliTranslation": "${lang.targetLabel} meaning and explanation",
-  "whyFitsContext": "Why this specific meaning fits this sentence",
-  "partOfSpeech": "noun / verb / adjective / adverb",
-  "grammaticalNote": "Grammar or syntactic role",
-  "collocations": ["collocation 1", "collocation 2"],
-  "examples": ["example sentence 1"],
-  "synonyms": ["synonym 1"],
-  "antonyms": ["antonym 1"],
-  "registerAndTone": "Tone description"
-}`;
-    } else if (type === 'phrase') {
-      sys = `You are an expert bilingual tutor for an ESL ${lang.targetLabel} learner.
-In "bengaliTranslation", provide ${lang.promptTargetInstruction}.
-Return a valid raw JSON object strictly adhering to this schema:
-{
-  "selectedText": "${text}",
-  "selectionType": "phrase",
-  "phraseType": "idiom",
-  "overallMeaning": "Meaning as a unified unit",
-  "simpleEnglishExplanation": "Simple English explanation",
-  "bengaliTranslation": "${lang.targetLabel} translation and explanation",
-  "literalVsFigurative": "Literal vs figurative distinction",
-  "whyFitsContext": "Why it fits this context",
-  "examples": ["example sentence 1"]
-}`;
-    } else if (type === 'sentence') {
-      sys = `Analyze this sentence for an ESL ${lang.targetLabel} learner.
-In "bengaliTranslation" and "easyBengali", provide ${lang.promptTargetInstruction}.
-Return a valid raw JSON object strictly adhering to this schema:
-{
-  "selectedText": "${text}",
-  "selectionType": "sentence",
-  "plainEnglishParaphrase": "Very easy plain English paraphrase",
-  "overallMeaning": "Overall meaning",
-  "bengaliTranslation": "Complete natural ${lang.targetLabel} translation",
-  "phraseBreakdown": [
-    {
-      "phrase": "Exact meaningful phrase from sentence",
-      "easyEnglish": "Very simple everyday English explanation.",
-      "easyBengali": "Natural easy ${lang.targetLabel} explanation"
-    }
-  ],
-  "clauses": [
-    {
-      "text": "Clause text",
-      "type": "main",
-      "role": "Main Clause",
-      "explanationBengali": "Clause explanation in ${lang.targetLabel}"
-    }
-  ],
-  "grammaticalHighlights": ["Key grammar point"],
-  "difficultVocabulary": [{"word": "word", "meaningInContext": "meaning", "bengali": "translation"}],
-  "toneAndRegister": "Standard English"
-}`;
-    } else {
-      sys = `Analyze this paragraph for an ESL ${lang.targetLabel} learner.
-In "bengaliTranslation" and "easyBengali", provide ${lang.promptTargetInstruction}.
-Return a valid raw JSON object strictly adhering to this schema:
-{
-  "selectedText": "${text}",
-  "selectionType": "paragraph",
-  "mainIdea": "Main thesis of the paragraph",
-  "conciseSummary": "Concise summary",
-  "bengaliTranslation": "Complete natural ${lang.targetLabel} translation",
-  "phraseBreakdown": [
-    {
-      "phrase": "Exact phrase",
-      "easyEnglish": "Simple English explanation",
-      "easyBengali": "Natural ${lang.targetLabel} explanation"
-    }
-  ],
-  "keyVocabulary": [{"term": "term", "meaning": "meaning", "bengali": "translation"}],
-  "toneAndRegister": "Standard English"
-}`;
-    }
-
-    const prompt = `Text: ${text}\nType: ${type}\nSentence: ${contextSentence || ''}\nParagraph: ${paragraphContext || ''}`;
-    const raw = await this.callAnthropic(sys, prompt);
+    const prompt = buildAnalyzePrompt({ text, type, contextSentence, paragraphContext }, this.targetLang, 'compact');
+    const raw = await this.callAnthropic(prompt.system, prompt.user);
     let parsed: any;
     try {
       parsed = safeParseJSON(raw);
@@ -196,39 +249,39 @@ Return a valid raw JSON object strictly adhering to this schema:
   }
 
   async assistWriting(text: string, goal: WritingGoal): Promise<WritingAssistResult> {
-    const lang = getLanguageConfig(this.targetLang);
-    const prompt = `Writing assistant for goal "${goal}".
-In "bengaliExplanation", provide ${lang.promptTargetInstruction}.
-Return a valid raw JSON object strictly adhering to this schema:
-{
-  "originalText": "${text}",
-  "goal": "${goal}",
-  "improvedText": "Improved version of text",
-  "changesExplanation": "Clear explanation of improvements made",
-  "bengaliExplanation": "Explanation in ${lang.targetLabel}",
-  "alternatives": ["Alternative phrasing 1", "Alternative phrasing 2"]
-}`;
-    const raw = await this.callAnthropic(prompt, text);
+    const prompt = buildWritingAssistPrompt({ text, goal }, this.targetLang, 'compact');
+    const raw = await this.callAnthropic(prompt.system, prompt.user);
     return WritingAssistSchema.parse(safeParseJSON(raw));
   }
 
   async askFollowUp(text: string, context: string, question: string): Promise<FollowUpResponse> {
-    const lang = getLanguageConfig(this.targetLang);
-    const sys = `You are LexiFlow AI Language Coach, an expert, warm, and highly engaging bilingual English-${lang.targetLabel} tutor.
-Answer the learner's question with pedagogical clarity, conversational engagement, and natural ${lang.targetLabel} insight (${lang.targetNativeHeader}).
-In "bengaliSummary" and example translations, provide ${lang.promptTargetInstruction}.
-Return JSON adhering to FollowUpResponseSchema:
-{
-  "question": "${question}",
-  "keyTakeaway": "Short memorable punchline or rule",
-  "answer": "Engaging, conversational, well-structured explanation",
-  "bengaliSummary": "Clear, natural ${lang.targetLabel} summary (${lang.targetNativeHeader})",
-  "suggestedFollowUps": ["Follow-up 1?", "Follow-up 2?"],
-  "examples": [
-    { "english": "Example sentence", "bengali": "${lang.targetLabel} translation of example" }
-  ]
-}`;
-    const raw = await this.callAnthropic(sys, `Text: ${text}\nContext: ${context}\nQuestion: ${question}`);
+    const prompt = buildFollowUpPrompt({ text, context, question }, this.targetLang, 'compact');
+    const raw = await this.callAnthropic(prompt.system, prompt.user);
     return FollowUpResponseSchema.parse(safeParseJSON(raw));
+  }
+
+  async evaluateUsage(targetWord: string, sentence: string): Promise<UsageCoachFeedback> {
+    const prompt = buildUsageEvaluationPrompt({ targetWord, sentence }, this.targetLang);
+    const raw = await this.callAnthropic(prompt.system, prompt.user, 30000, prompt.maxTokens);
+    return UsageCoachFeedbackSchema.parse({ ...(safeParseJSON(raw) as Record<string, unknown>), targetWord });
+  }
+
+  async evaluateSummary(input: SummaryEvaluationInput): Promise<SummaryEvaluation> {
+    const prompt = buildSummaryEvaluationPrompt(input, this.targetLang);
+    const raw = await this.callAnthropic(prompt.system, prompt.user, 60000, prompt.maxTokens);
+    return parseSummaryEvaluation(safeParseJSON(raw));
+  }
+
+  async completeJson(systemPrompt: string, userPrompt: string): Promise<string> {
+    return this.callAnthropic(systemPrompt, userPrompt, 60000, 1500);
+  }
+
+  async extractHighlights(rawText: string, pageTitle?: string): Promise<HighlightExtractionResult> {
+    const prompt = buildHighlightsPrompt({ rawText, pageTitle }, this.targetLang, 'full');
+    // A whole article takes far longer than a single-word lookup
+    const raw = await this.callAnthropic(prompt.system, prompt.user, 60000, prompt.maxTokens);
+    const validated = HighlightExtractionResultSchema.parse(safeParseJSON(raw));
+    validated.sourceMode = 'ai_reasoning';
+    return validated;
   }
 }

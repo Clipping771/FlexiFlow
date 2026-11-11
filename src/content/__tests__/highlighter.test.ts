@@ -14,25 +14,34 @@ describe('DOMHighlighter Safe Webpage Highlighting', () => {
 
   const sampleItems: HighlightVocabularyItem[] = [
     {
+      id: 'hl_test_1',
       text: 'scrutiny',
-      category: 'word',
+      type: 'word',
       easyEnglish: 'close and careful examination',
       easyBengali: 'পুঙ্খানুপুঙ্খ পরীক্ষা',
-      context: 'Under close scrutiny, the hypothesis failed.'
+      contextSentence: 'Under close scrutiny, the hypothesis failed.',
+      reason: 'Academic vocabulary',
+      difficulty: 'hard'
     },
     {
+      id: 'hl_test_2',
       text: 'look into',
-      category: 'phrase',
+      type: 'phrase',
       easyEnglish: 'investigate or check',
       easyBengali: 'তদন্ত করা বা খতিয়ে দেখা',
-      context: 'The committee will look into the matter.'
+      contextSentence: 'The committee will look into the matter.',
+      reason: 'Common phrasal verb',
+      difficulty: 'medium'
     },
     {
+      id: 'hl_test_3',
       text: 'break the ice',
-      category: 'idiom',
+      type: 'idiom',
       easyEnglish: 'make people feel relaxed',
       easyBengali: 'আড়ষ্টতা দূর করা',
-      context: 'He told a funny joke to break the ice.'
+      contextSentence: 'He told a funny joke to break the ice.',
+      reason: 'Popular idiom',
+      difficulty: 'medium'
     }
   ];
 
@@ -199,5 +208,56 @@ describe('DOMHighlighter Safe Webpage Highlighting', () => {
       }),
       expect.anything()
     );
+  });
+
+  it('highlights a phrase split by source line breaks, non-breaking spaces and inline tags', () => {
+    container.innerHTML = `<p>New rules could pave
+   the <a href="#">way</a> for talks, officials said.</p>
+      <p>The deal was struck in the wake of the protests.</p>`;
+    const highlighter = new DOMHighlighter();
+    highlighter.applyHighlights(
+      [
+        { ...sampleItems[2], id: 'hl_a', text: 'pave the way', contextSentence: 'New rules could pave the way for talks, officials said.' },
+        { ...sampleItems[1], id: 'hl_b', text: 'in the wake of', contextSentence: 'The deal was struck in the wake of the protests.' }
+      ],
+      container
+    );
+
+    // One occurrence each, even though "pave the way" became two mark pieces around the link
+    expect(highlighter.getHighlightCount()).toBe(2);
+    const paveMarks = container.querySelectorAll('mark[data-lexiflow-id="hl_a"]');
+    expect(Array.from(paveMarks).map((m) => m.textContent).join('|')).toBe('pave\n   the |way');
+    expect(container.querySelector('a mark')).not.toBeNull();
+    expect(container.querySelector('mark[data-lexiflow-id="hl_b"]')?.textContent).toBe('in the wake of');
+
+    // Clearing restores the original text exactly
+    const before = container.textContent;
+    highlighter.clearHighlights();
+    expect(container.querySelectorAll('mark').length).toBe(0);
+    expect(container.textContent).toBe(before);
+  });
+
+  it('matches curly apostrophes and never marks text inside a longer word', () => {
+    container.innerHTML = `<p>Investors won’t back down at the start of trading.</p>`;
+    const highlighter = new DOMHighlighter();
+    highlighter.applyHighlights(
+      [
+        { ...sampleItems[1], id: 'hl_c', text: "won't back down", contextSentence: '' },
+        { ...sampleItems[0], id: 'hl_d', text: 'tart', contextSentence: '' }
+      ],
+      container
+    );
+    expect(container.querySelector('mark[data-lexiflow-id="hl_c"]')?.textContent).toBe('won’t back down');
+    expect(container.querySelector('mark[data-lexiflow-id="hl_d"]')).toBeNull();
+  });
+
+  it('activates every piece of a split phrase together', () => {
+    container.innerHTML = `<p>They hope to <em>pave</em> the way.</p>`;
+    const highlighter = new DOMHighlighter();
+    highlighter.applyHighlights([{ ...sampleItems[2], id: 'hl_e', text: 'pave the way', contextSentence: '' }], container);
+    const marks = container.querySelectorAll('mark[data-lexiflow-id="hl_e"]');
+    expect(marks.length).toBe(2);
+    (marks[1] as HTMLElement).click();
+    marks.forEach((m) => expect(m.classList.contains('lexiflow-highlight-active')).toBe(true));
   });
 });

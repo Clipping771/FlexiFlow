@@ -1,4 +1,5 @@
 import { HighlightColor, HighlightFilters, HighlightVocabularyItem } from '../types';
+import { escapeHtml } from './popupHtml';
 
 export interface HighlightToolbarCallbacks {
   onAnalyzePage: () => void;
@@ -147,16 +148,16 @@ export class HighlightToolbar {
           </div>
           <div class="lf-hl-summary-list">
             ${this.discoveredItems.map((item) => `
-              <div class="lf-hl-summary-item" data-id="${item.id}">
+              <div class="lf-hl-summary-item" data-id="${escapeHtml(item.id)}">
                 <div class="lf-hl-summary-item-top">
                   <div class="lf-hl-summary-term">
-                    <span class="lf-hl-type-tag type-${item.type}">${item.type.toUpperCase()}</span>
-                    <strong>${item.text}</strong>
+                    <span class="lf-hl-type-tag type-${escapeHtml(item.type)}">${escapeHtml(item.type.toUpperCase())}</span>
+                    <strong>${escapeHtml(item.text)}</strong>
                   </div>
-                  <span class="lf-hl-diff-badge diff-${item.difficulty}">${item.difficulty}</span>
+                  <span class="lf-hl-diff-badge diff-${escapeHtml(item.difficulty)}">${escapeHtml(item.difficulty)}</span>
                 </div>
-                <div class="lf-hl-summary-meaning">${item.easyEnglish}</div>
-                <div class="lf-hl-summary-bengali">${item.easyBengali}</div>
+                <div class="lf-hl-summary-meaning">${escapeHtml(item.easyEnglish)}</div>
+                ${item.easyBengali ? `<div class="lf-hl-summary-bengali">${escapeHtml(item.easyBengali)}</div>` : ''}
               </div>
             `).join('')}
           </div>

@@ -1,0 +1,261 @@
+# IELTS Academic — Official Versioned Task Inventory
+# Version: 1.0.0
+# Checked Date: 2026-11-01
+# Source: IELTS Official Test Format Guide (https://ielts.org/take-a-test/test-format)
+
+metadata:
+  exam: "IELTS Academic"
+  version: "1.0.0"
+  scoring_scale: "0.0 - 9.0 (0.5 increments)"
+  official_overview_url: "https://ielts.org/take-a-test/test-format"
+
+modules:
+  # -------------------------------------------------------------
+  # 1. Writing (60 Minutes Total)
+  # -------------------------------------------------------------
+  - id: "ielts_writing_task_1"
+    name: "Academic Writing Task 1"
+    section: "Writing"
+    official_source_url: "https://ielts.org/take-a-test/test-format/writing"
+    checked_date: "2026-11-01"
+    skill_impact: ["Writing (Academic Data Interpretation)"]
+    timing:
+      suggested_minutes: 20
+    response_format: "Factual descriptive report of visual data (bar chart, line graph, pie chart, table, map, diagram/process) of at least 150 words"
+    scoring_traits:
+      - "Task Achievement (TA)"
+      - "Coherence and Cohesion (CC)"
+      - "Lexical Resource (LR)"
+      - "Grammatical Range and Accuracy (GRA)"
+
+  - id: "ielts_writing_task_2"
+    name: "Academic Writing Task 2"
+    section: "Writing"
+    official_source_url: "https://ielts.org/take-a-test/test-format/writing"
+    checked_date: "2026-11-01"
+    skill_impact: ["Writing (Discursive Essay)"]
+    timing:
+      suggested_minutes: 40
+    response_format: "Discursive essay (opinion, discussion, advantages/disadvantages, problem-solution, double question) of at least 250 words"
+    scoring_traits:
+      - "Task Response (TR)"
+      - "Coherence and Cohesion (CC)"
+      - "Lexical Resource (LR)"
+      - "Grammatical Range and Accuracy (GRA)"
+
+  # -------------------------------------------------------------
+  # 2. Speaking (11-14 Minutes Total)
+  # -------------------------------------------------------------
+  - id: "ielts_speaking_part_1"
+    name: "Speaking Part 1: Introduction & Interview"
+    section: "Speaking"
+    official_source_url: "https://ielts.org/take-a-test/test-format/speaking"
+    checked_date: "2026-11-01"
+    skill_impact: ["Speaking"]
+    timing:
+      duration_minutes: "4-5"
+    response_format: "Spoken answers to familiar personal topics (home, work/studies, hobbies, daily habits)"
+    scoring_traits:
+      - "Fluency and Coherence (FC)"
+      - "Lexical Resource (LR)"
+      - "Grammatical Range and Accuracy (GRA)"
+      - "Pronunciation (PR)"
+
+  - id: "ielts_speaking_part_2"
+    name: "Speaking Part 2: Long Turn (Cue Card)"
+    section: "Speaking"
+    official_source_url: "https://ielts.org/take-a-test/test-format/speaking"
+    checked_date: "2026-11-01"
+    skill_impact: ["Speaking (Monologue)"]
+    timing:
+      preparation_seconds: 60
+      speaking_duration_minutes: "1-2"
+    response_format: "Uninterrupted spoken monologue based on a prompt card with 4 sub-points"
+    scoring_traits:
+      - "Fluency and Coherence (FC)"
+      - "Lexical Resource (LR)"
+      - "Grammatical Range and Accuracy (GRA)"
+      - "Pronunciation (PR)"
+
+  - id: "ielts_speaking_part_3"
+    name: "Speaking Part 3: Two-Way Discussion"
+    section: "Speaking"
+    official_source_url: "https://ielts.org/take-a-test/test-format/speaking"
+    checked_date: "2026-11-01"
+    skill_impact: ["Speaking (Abstract Discussion)"]
+    timing:
+      duration_minutes: "4-5"
+    response_format: "Spoken discussion on abstract issues and ideas related to the Part 2 theme"
+    scoring_traits:
+      - "Fluency and Coherence (FC)"
+      - "Lexical Resource (LR)"
+      - "Grammatical Range and Accuracy (GRA)"
+      - "Pronunciation (PR)"
+
+  # -------------------------------------------------------------
+  # 3. Reading (60 Minutes, 3 Passages, 40 Questions)
+  # -------------------------------------------------------------
+  - id: "ielts_reading_mcq"
+    name: "Multiple Choice"
+    section: "Reading"
+    official_source_url: "https://ielts.org/take-a-test/test-format/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    response_format: "Choose 1 correct option (A, B, C, D) or multiple correct options"
+    scoring_traits: ["1 point per correct answer"]
+
+  - id: "ielts_reading_identifying_information"
+    name: "Identifying Information (True/False/Not Given)"
+    section: "Reading"
+    official_source_url: "https://ielts.org/take-a-test/test-format/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    response_format: "Determine whether factual statements agree with information in text"
+    scoring_traits: ["1 point per correct answer"]
+
+  - id: "ielts_reading_identifying_views"
+    name: "Identifying Writer's Views/Claims (Yes/No/Not Given)"
+    section: "Reading"
+    official_source_url: "https://ielts.org/take-a-test/test-format/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    response_format: "Determine whether opinions agree with the writer's perspective"
+    scoring_traits: ["1 point per correct answer"]
+
+  - id: "ielts_reading_matching_information"
+    name: "Matching Information"
+    section: "Reading"
+    official_source_url: "https://ielts.org/take-a-test/test-format/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    response_format: "Locate specific information within lettered paragraphs/sections"
+    scoring_traits: ["1 point per correct answer"]
+
+  - id: "ielts_reading_matching_headings"
+    name: "Matching Headings"
+    section: "Reading"
+    official_source_url: "https://ielts.org/take-a-test/test-format/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    response_format: "Match the main idea of paragraphs to roman-numeral headings"
+    scoring_traits: ["1 point per correct answer"]
+
+  - id: "ielts_reading_matching_features"
+    name: "Matching Features"
+    section: "Reading"
+    official_source_url: "https://ielts.org/take-a-test/test-format/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    response_format: "Match statements to a list of options (e.g., researchers, eras, cities)"
+    scoring_traits: ["1 point per correct answer"]
+
+  - id: "ielts_reading_matching_sentence_endings"
+    name: "Matching Sentence Endings"
+    section: "Reading"
+    official_source_url: "https://ielts.org/take-a-test/test-format/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    response_format: "Complete first half of sentences by choosing from a bank of endings"
+    scoring_traits: ["1 point per correct answer"]
+
+  - id: "ielts_reading_sentence_completion"
+    name: "Sentence Completion"
+    section: "Reading"
+    official_source_url: "https://ielts.org/take-a-test/test-format/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    response_format: "Fill gaps in sentences using words directly taken from the passage"
+    scoring_traits: ["1 point per correctly spelled word(s) adhering to word limit"]
+
+  - id: "ielts_reading_summary_completion"
+    name: "Summary, Note, Table, Flow-chart Completion"
+    section: "Reading"
+    official_source_url: "https://ielts.org/take-a-test/test-format/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    response_format: "Complete summary gaps from a word box or directly from passage text"
+    scoring_traits: ["1 point per correct gap fill within word count limit"]
+
+  - id: "ielts_reading_diagram_label_completion"
+    name: "Diagram Label Completion"
+    section: "Reading"
+    official_source_url: "https://ielts.org/take-a-test/test-format/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    response_format: "Label technical parts of a diagram based on passage description"
+    scoring_traits: ["1 point per correct label within word limit"]
+
+  - id: "ielts_reading_short_answer"
+    name: "Short-answer Questions"
+    section: "Reading"
+    official_source_url: "https://ielts.org/take-a-test/test-format/reading"
+    checked_date: "2026-11-01"
+    skill_impact: ["Reading"]
+    response_format: "Answer factual comprehension questions using words from text"
+    scoring_traits: ["1 point per correct response adhering to word limit"]
+
+  # -------------------------------------------------------------
+  # 4. Listening (30 Minutes + 10 Minutes Transfer / Review)
+  # -------------------------------------------------------------
+  - id: "ielts_listening_completion"
+    name: "Form, Note, Table, Flow-chart, Summary Completion"
+    section: "Listening"
+    official_source_url: "https://ielts.org/take-a-test/test-format/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening"]
+    response_format: "Fill missing information in structured notes or summary from audio"
+    scoring_traits: ["1 point per correctly spelled answer within word count"]
+
+  - id: "ielts_listening_mcq"
+    name: "Multiple Choice (Listening)"
+    section: "Listening"
+    official_source_url: "https://ielts.org/take-a-test/test-format/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening"]
+    response_format: "Choose 1 or multiple answers to a question or statement from audio"
+    scoring_traits: ["1 point per correct choice"]
+
+  - id: "ielts_listening_short_answer"
+    name: "Short-answer Questions (Listening)"
+    section: "Listening"
+    official_source_url: "https://ielts.org/take-a-test/test-format/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening"]
+    response_format: "Write concise answers to questions based on factual audio details"
+    scoring_traits: ["1 point per correct answer within word limit"]
+
+  - id: "ielts_listening_sentence_completion"
+    name: "Sentence Completion (Listening)"
+    section: "Listening"
+    official_source_url: "https://ielts.org/take-a-test/test-format/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening"]
+    response_format: "Complete sentences summarizing the audio recording"
+    scoring_traits: ["1 point per accurately spelled answer"]
+
+  - id: "ielts_listening_map_diagram_labelling"
+    name: "Labelling a Diagram, Map, Plan"
+    section: "Listening"
+    official_source_url: "https://ielts.org/take-a-test/test-format/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening"]
+    response_format: "Match lettered locations on visual map/plan to spoken descriptions"
+    scoring_traits: ["1 point per correct label"]
+
+  - id: "ielts_listening_classification"
+    name: "Classification"
+    section: "Listening"
+    official_source_url: "https://ielts.org/take-a-test/test-format/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening"]
+    response_format: "Categorize heard points into predefined criteria groups (e.g., A, B, C)"
+    scoring_traits: ["1 point per correct classification"]
+
+  - id: "ielts_listening_matching"
+    name: "Matching (Listening)"
+    section: "Listening"
+    official_source_url: "https://ielts.org/take-a-test/test-format/listening"
+    checked_date: "2026-11-01"
+    skill_impact: ["Listening"]
+    response_format: "Match numbered items from audio to a fixed list of options"
+    scoring_traits: ["1 point per correct match"]

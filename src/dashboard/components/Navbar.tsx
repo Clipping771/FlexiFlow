@@ -3,13 +3,16 @@ import {
   BookOpen,
   Target,
   RotateCw,
-  Newspaper,
-  Microscope,
   Scale,
   PenTool,
   BarChart3,
   Settings as SettingsIcon,
-  PanelRight
+  PanelRight,
+  BookmarkCheck,
+  PenLine,
+  BrainCircuit,
+  Sparkles,
+  Home
 } from 'lucide-react';
 
 export type DashboardTab =
@@ -17,8 +20,10 @@ export type DashboardTab =
   | 'vocabulary'
   | 'targeted_practice'
   | 'review'
-  | 'article_reader'
-  | 'sentence_xray'
+  | 'reading_list'
+  | 'summary_practice'
+  | 'smart_practice'
+  | 'mistake_memory'
   | 'word_difference'
   | 'usage_coach'
   | 'analytics'
@@ -61,18 +66,32 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Navigation Sections */}
       <nav className="nav-menu">
-        {/* Section: Library */}
+        {/* Section: Study & Memory */}
         <div className="nav-section">
-          <div className="nav-section-title">Library</div>
+          <button
+            type="button"
+            data-testid="nav-today"
+            className={`nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => onTabChange('overview')}
+          >
+            <span className="nav-item-icon">
+              <Home size={16} />
+            </span>
+            <span className="nav-item-label">Today</span>
+          </button>
+        </div>
+
+        <div className="nav-section">
+          <div className="nav-section-title">Study &amp; Memory</div>
 
           <button
             className={`nav-item ${activeTab === 'vocabulary' ? 'active' : ''}`}
             onClick={() => onTabChange('vocabulary')}
           >
-            <span className="nav-icon-box" style={{ background: '#0071e3' }}>
-              <BookOpen size={14} strokeWidth={2.2} />
+            <span className="nav-icon-box">
+              <BookOpen size={16} strokeWidth={2} />
             </span>
-            <span>Vocabulary</span>
+            <span className="nav-item-label">Vocabulary</span>
             <span className="badge-neutral">{totalVocab}</span>
           </button>
 
@@ -80,10 +99,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             className={`nav-item ${activeTab === 'review' ? 'active' : ''}`}
             onClick={() => onTabChange('review')}
           >
-            <span className="nav-icon-box" style={{ background: '#32ade6' }}>
-              <RotateCw size={14} strokeWidth={2.2} />
+            <span className="nav-icon-box">
+              <RotateCw size={16} strokeWidth={2} />
             </span>
-            <span>Spaced Review</span>
+            <span className="nav-item-label">Review</span>
             {dueCount > 0 && <span className="badge-count">{dueCount}</span>}
           </button>
 
@@ -91,98 +110,115 @@ export const Navbar: React.FC<NavbarProps> = ({
             className={`nav-item ${activeTab === 'targeted_practice' ? 'active' : ''}`}
             onClick={() => onTabChange('targeted_practice')}
           >
-            <span className="nav-icon-box" style={{ background: '#e8890c' }}>
-              <Target size={14} strokeWidth={2.2} />
+            <span className="nav-icon-box">
+              <Target size={16} strokeWidth={2} />
             </span>
-            <span>Practice</span>
-            {weakCount > 0 && <span className="badge-count">{weakCount}</span>}
+            <span className="nav-item-label">Targeted Practice</span>
+            {weakCount > 0 && <span className="badge-count badge-warning">{weakCount}</span>}
+          </button>
+
+          <button
+            className={`nav-item ${activeTab === 'reading_list' ? 'active' : ''}`}
+            onClick={() => onTabChange('reading_list')}
+          >
+            <span className="nav-icon-box">
+              <BookmarkCheck size={16} strokeWidth={2} />
+            </span>
+            <span className="nav-item-label">Reading List</span>
+          </button>
+
+          <button
+            className={`nav-item ${activeTab === 'summary_practice' ? 'active' : ''}`}
+            onClick={() => onTabChange('summary_practice')}
+          >
+            <span className="nav-icon-box">
+              <PenLine size={16} strokeWidth={2} />
+            </span>
+            <span className="nav-item-label">Summary Practice</span>
           </button>
         </div>
 
-        {/* Section: Tools */}
+        {/* Section: Practice */}
         <div className="nav-section">
-          <div className="nav-section-title">Tools</div>
+          <div className="nav-section-title">Practice</div>
 
           <button
-            className={`nav-item ${activeTab === 'article_reader' ? 'active' : ''}`}
-            onClick={() => onTabChange('article_reader')}
+            data-testid="nav-smart-practice"
+            className={`nav-item ${activeTab === 'smart_practice' ? 'active' : ''}`}
+            onClick={() => onTabChange('smart_practice')}
           >
-            <span className="nav-icon-box" style={{ background: '#5856d6' }}>
-              <Newspaper size={14} strokeWidth={2.2} />
+            <span className="nav-icon-box">
+              <Sparkles size={16} strokeWidth={2} />
             </span>
-            <span>Article Reader</span>
+            <span className="nav-item-label">Smart Practice</span>
           </button>
 
           <button
-            className={`nav-item ${activeTab === 'sentence_xray' ? 'active' : ''}`}
-            onClick={() => onTabChange('sentence_xray')}
+            data-testid="nav-mistake-memory"
+            className={`nav-item ${activeTab === 'mistake_memory' ? 'active' : ''}`}
+            onClick={() => onTabChange('mistake_memory')}
           >
-            <span className="nav-icon-box" style={{ background: '#af52de' }}>
-              <Microscope size={14} strokeWidth={2.2} />
+            <span className="nav-icon-box">
+              <BrainCircuit size={16} strokeWidth={2} />
             </span>
-            <span>Sentence X-Ray</span>
+            <span className="nav-item-label">Mistake Memory</span>
           </button>
+        </div>
+
+        {/* Section: AI Studio */}
+        <div className="nav-section">
+          <div className="nav-section-title">AI Studio &amp; Tools</div>
 
           <button
             className={`nav-item ${activeTab === 'word_difference' ? 'active' : ''}`}
             onClick={() => onTabChange('word_difference')}
           >
-            <span className="nav-icon-box" style={{ background: '#ff9500' }}>
-              <Scale size={14} strokeWidth={2.2} />
+            <span className="nav-icon-box">
+              <Scale size={16} strokeWidth={2} />
             </span>
-            <span>Word Difference</span>
+            <span className="nav-item-label">Word Difference</span>
           </button>
 
           <button
             className={`nav-item ${activeTab === 'usage_coach' ? 'active' : ''}`}
             onClick={() => onTabChange('usage_coach')}
           >
-            <span className="nav-icon-box" style={{ background: '#e8890c' }}>
-              <PenTool size={14} strokeWidth={2.2} />
+            <span className="nav-icon-box">
+              <PenTool size={16} strokeWidth={2} />
             </span>
-            <span>Usage Coach</span>
+            <span className="nav-item-label">Usage Coach</span>
           </button>
         </div>
 
         {/* Section: Insights & System */}
         <div className="nav-section">
-          <div className="nav-section-title">Insights</div>
+          <div className="nav-section-title">Insights &amp; System</div>
 
           <button
             className={`nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
             onClick={() => onTabChange('analytics')}
           >
-            <span className="nav-icon-box" style={{ background: '#0071e3' }}>
-              <BarChart3 size={14} strokeWidth={2.2} />
+            <span className="nav-icon-box">
+              <BarChart3 size={16} strokeWidth={2} />
             </span>
-            <span>Analytics</span>
+            <span className="nav-item-label">Progress</span>
           </button>
 
           <button
             className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => onTabChange('settings')}
           >
-            <span className="nav-icon-box" style={{ background: '#8e8e93' }}>
-              <SettingsIcon size={14} strokeWidth={2.2} />
+            <span className="nav-icon-box">
+              <SettingsIcon size={16} strokeWidth={2} />
             </span>
-            <span>Settings</span>
+            <span className="nav-item-label">Settings</span>
           </button>
         </div>
       </nav>
 
       {/* Sidebar Footer Controls */}
       <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '14px', borderTop: '1px solid var(--line)' }}>
-        {onToggleTheme && (
-          <button
-            type="button"
-            className="theme-toggle-btn"
-            onClick={onToggleTheme}
-            title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
-          >
-            <span>{theme === 'dark' ? '☀️' : '🌙'}</span>
-            <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-          </button>
-        )}
+
 
         {onOpenSidePanel && (
           <button

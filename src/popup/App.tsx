@@ -13,32 +13,32 @@ import {
 } from '../types';
 import { PopupView } from '../content/popupView';
 import { POPUP_STYLES } from '../content/styles';
+import { observeTargetLanguage } from '../shared/targetLang';
+import { ReadingTab, PageHighlightState } from './components/ReadingTab';
+import { LookupTab } from './components/LookupTab';
+import { LibraryTab } from './components/LibraryTab';
 import { DictionaryService, dictionaryResultToStageA } from '../services/dictionary';
 import { AIService } from '../services/ai';
+import { SettingsService } from '../services/storage/settings';
 import { FSRSEngine } from '../services/fsrs/engine';
 import { getLanguageConfig } from '../config/languages';
+import { ReadingListService, ReadingListItem } from '../services/storage/readingList';
+import { isSiteActive, siteModeOf, toggleSite, LOCAL_FILES } from '../shared/siteAccess';
+import { setExamArticle } from '../services/examContent/articleSource';
+import { SummaryPracticeService } from '../services/storage/summaryPractice';
 import { detectSelectionType } from '../content/selection';
 import {
   Search,
   Sparkles,
   Check,
-  BookmarkPlus,
   PanelRight,
   ExternalLink,
-  Volume2,
-  X,
-  Send,
-  MessageSquare,
-  Lightbulb,
-  BookOpen,
-  Layers,
-  Copy,
-  ArrowLeft,
-  ChevronUp,
-  ChevronDown,
-  RotateCcw
+  Settings,
+  Sun,
+  Moon,
+  BookMarked
 } from 'lucide-react';
-import { playPronunciation } from '../services/audio/voiceService';
+import { MONETIZATION_ENABLED } from '../config/features';
 import './popup.css';
 
 export const resolveEffectiveTheme = (t?: string): 'light' | 'dark' => {
@@ -147,6 +147,7 @@ const PopupCardHost: React.FC<PopupCardHostProps> = ({ initialWord }) => {
         view.setTheme(s.theme);
       }
       if (s.popupSize) view.setSize(s.popupSize);
+      if (s.sourceLanguage) view.setSourceLanguage(s.sourceLanguage);
       if (s.targetLanguage) view.setTargetLanguage(s.targetLanguage);
     };
 
@@ -170,7 +171,12 @@ const PopupCardHost: React.FC<PopupCardHostProps> = ({ initialWord }) => {
 
     const executeLookup = (text: string, forcedType?: SelectionType) => {
       if (!text || !text.trim()) return;
-      currentWord = text.trim();
+      // Normalize soft line breaks and hyphens across lines (typical in PDFs and column selections)
+      let normalized = text.trim();
+      normalized = normalized.replace(/(\w+)-\r?\n\s*(\w+)/g, '$1$2');
+      normalized = normalized.replace(/([^\n])\r?\n([^\n])/g, '$1 $2');
+      normalized = normalized.replace(/[ \t]+/g, ' ');
+      currentWord = normalized;
 
       const effectiveType: SelectionType = forcedType || detectSelectionType(currentWord);
 
@@ -261,6 +267,8 @@ const PopupCardHost: React.FC<PopupCardHostProps> = ({ initialWord }) => {
   );
 };
 
+const ONBOARDING_KEY = 'lexiflow_onboarding_done';
+
 export const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [result, setResult] = useState<LinguisticAnalysisResult | null>(null);
@@ -268,19 +276,54 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
   const [dueCount, setDueCount] = useState(0);
+  const [recentVocab, setRecentVocab] = useState<VocabularyItem[]>([]);
+  const [popupTab, setPopupTab] = useState<'reading' | 'lookup' | 'library'>('reading');
   const [isSaved, setIsSaved] = useState(false);
   const [isCardMode, setIsCardMode] = useState(false);
   const [targetLang, setTargetLang] = useState('bn');
+  const targetLangRef = useRef(targetLang);
+  targetLangRef.current = targetLang;
+
+  // Tag translated text with its language and direction as the popup re-renders
+  useEffect(() => observeTargetLanguage(document.body, () => targetLangRef.current), []);
   const [customLanguages, setCustomLanguages] = useState<any[]>([]);
 
   // Site domain & whitelist/blacklist toggle (eJOY-style)
   const [currentDomain, setCurrentDomain] = useState<string>('');
-  const [disabledSites, setDisabledSites] = useState<string[]>([]);
+  const [currentFavicon, setCurrentFavicon] = useState<string>('');
+  const [siteAccess, setSiteAccess] = useState<Pick<UserSettings, 'siteMode' | 'enabledSites' | 'disabledSites'>>({
+    siteMode: 'off',
+    enabledSites: [],
+    disabledSites: []
+  });
 
   // Text size: small, medium, large, xlarge
   const [textSize, setTextSize] = useState<'small' | 'medium' | 'large' | 'xlarge'>('medium');
 
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+
+  // First-run welcome guide (dismissed once, remembered in extension storage)
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  useEffect(() => {
+    if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
+    chrome.storage.local.get(ONBOARDING_KEY, (res) => {
+      if (!res?.[ONBOARDING_KEY]) setShowOnboarding(true);
+    });
+  }, []);
+
+  const dismissOnboarding = () => {
+    setShowOnboarding(false);
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({ [ONBOARDING_KEY]: true });
+    }
+  };
+
+  const chooseTextSize = (size: 'small' | 'medium' | 'large' | 'xlarge') => {
+    setTextSize(size);
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({ type: 'UPDATE_SETTINGS', payload: { popupSize: size } });
+    }
+  };
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -301,28 +344,95 @@ export const App: React.FC = () => {
 
   // Page AI Article Highlighting Studio state
   const [activeTabId, setActiveTabId] = useState<number | null>(null);
-  const [highlightState, setHighlightState] = useState<{
-    isSiteDisabled: boolean;
-    articleTitle?: string;
-    hasMainArticle: boolean;
-    count: { total: number; visible: number; words: number; phrases: number; idioms: number };
-    currentIndex: number;
-    items: Array<{
-      id?: string;
-      text: string;
-      type: 'word' | 'phrase' | 'idiom';
-      contextSentence?: string;
-      easyEnglish?: string;
-      easyBengali?: string;
-      contextualMeaning?: string;
-      bengaliMeaning?: string;
-    }>;
-    color: string;
-    filters: { words: boolean; phrases: boolean; idioms: boolean };
-  } | null>(null);
+  const [highlightState, setHighlightState] = useState<PageHighlightState | null>(null);
   const [highlightLoading, setHighlightLoading] = useState(false);
   const [showVocabDrawer, setShowVocabDrawer] = useState(false);
   const [highlightFeedback, setHighlightFeedback] = useState<{ message: string; type: 'info' | 'error' | 'success' } | null>(null);
+
+  // Read Later: the active page and whether it is already on the reading list
+  const [currentPage, setCurrentPage] = useState<{ url: string; title: string } | null>(null);
+  const [readLaterItem, setReadLaterItem] = useState<ReadingListItem | null>(null);
+  const [readingListCount, setReadingListCount] = useState(0);
+
+  const refreshReadLater = async (url: string) => {
+    try {
+      const [found, all] = await Promise.all([ReadingListService.findByUrl(url), ReadingListService.getAll()]);
+      setReadLaterItem(found);
+      setReadingListCount(all.filter((i) => !i.readAt).length);
+    } catch {
+      // storage unavailable; the button just shows the unsaved state
+    }
+  };
+
+  const toggleReadLater = async () => {
+    if (!currentPage) return;
+    try {
+      if (readLaterItem) {
+        await ReadingListService.remove(readLaterItem.id);
+      } else {
+        await ReadingListService.save({
+          url: currentPage.url,
+          title: highlightState?.articleTitle || currentPage.title,
+          wordCount: highlightState?.articleWordCount
+        });
+      }
+      await refreshReadLater(currentPage.url);
+    } catch (err) {
+      setHighlightFeedback({ message: (err as Error).message || 'Could not update your reading list.', type: 'error' });
+    }
+  };
+
+  const writeSummary = () => {
+    if (!activeTabId || typeof chrome === 'undefined' || !chrome.tabs?.sendMessage) return;
+    chrome.tabs.sendMessage(activeTabId, { type: 'EXTRACT_ARTICLE_TEXT' }, async (res) => {
+      if (chrome.runtime?.lastError || !res?.success || !res.data?.text) {
+        setHighlightFeedback({
+          message: chrome.runtime?.lastError
+            ? 'Could not read this page. Refresh the tab and try again.'
+            : 'No article text found on this page to summarize.',
+          type: 'error'
+        });
+        return;
+      }
+      await SummaryPracticeService.setDraft({
+        url: res.data.url,
+        title: highlightState?.articleTitle || res.data.title || currentPage?.title || 'Article',
+        text: res.data.text
+      });
+      chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html#summary') });
+    });
+  };
+
+  /** Captures this article for the exam screens, which build their questions from it. */
+  const startExamPractice = () => {
+    if (!activeTabId || typeof chrome === 'undefined' || !chrome.tabs?.sendMessage) return;
+    chrome.tabs.sendMessage(activeTabId, { type: 'EXTRACT_ARTICLE_TEXT' }, async (res) => {
+      if (chrome.runtime?.lastError || !res?.success || !res.data?.text) {
+        setHighlightFeedback({
+          message: chrome.runtime?.lastError
+            ? 'Could not read this page. Refresh the tab and try again.'
+            : 'No article text found on this page to build questions from.',
+          type: 'error'
+        });
+        return;
+      }
+      await setExamArticle({
+        url: res.data.url,
+        title: highlightState?.articleTitle || res.data.title || currentPage?.title || 'Article',
+        text: res.data.text
+      });
+      chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html#exam') });
+    });
+  };
+
+  const openReadingList = () => {
+    const url = 'dashboard.html#reading_list';
+    if (typeof chrome !== 'undefined' && chrome.tabs?.create && chrome.runtime?.getURL) {
+      chrome.tabs.create({ url: chrome.runtime.getURL(url) });
+    } else {
+      window.open(url, '_blank');
+    }
+  };
 
   useEffect(() => {
     // 0. Query active browser tab domain and highlight state
@@ -334,9 +444,15 @@ export const App: React.FC = () => {
           if (tabs[0].url) {
             try {
               const parsed = new URL(tabs[0].url);
-              if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-                const host = parsed.hostname.replace(/^www\./, '');
+              if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'file:') {
+                // Files opened from the computer count as one site, so they can be switched on too
+                const host = parsed.protocol === 'file:' ? LOCAL_FILES : parsed.hostname.replace(/^www\./, '');
                 setCurrentDomain(host);
+                // The browser already loaded this icon for the tab, so showing it costs no extra lookup
+                const icon = tabs[0].favIconUrl || '';
+                if (/^(https?:|data:image\/)/.test(icon)) setCurrentFavicon(icon);
+                setCurrentPage({ url: tabs[0].url, title: tabs[0].title || host });
+                refreshReadLater(tabs[0].url);
                 // Fetch page highlight state from content script
                 chrome.tabs.sendMessage(tabId, { type: 'GET_PAGE_HIGHLIGHT_STATE' }, (res) => {
                   if (chrome.runtime?.lastError) {
@@ -386,15 +502,14 @@ export const App: React.FC = () => {
           if (s.targetLanguage) setTargetLang(s.targetLanguage);
           if (s.customLanguages) setCustomLanguages(s.customLanguages);
           if (s.popupSize) setTextSize(s.popupSize);
-          if (s.disabledSites && Array.isArray(s.disabledSites)) {
-            setDisabledSites(s.disabledSites);
-          }
+          setSiteAccess({ siteMode: s.siteMode, enabledSites: s.enabledSites || [], disabledSites: s.disabledSites || [] });
         }
       });
 
       chrome.runtime.sendMessage({ type: 'GET_ALL_VOCAB' }, (res) => {
         if (res?.success && Array.isArray(res.data)) {
           setSavedCount(res.data.length);
+          setRecentVocab(res.data.slice(-5).reverse());
         }
       });
 
@@ -414,15 +529,18 @@ export const App: React.FC = () => {
             setTheme(effective);
             document.documentElement.setAttribute('data-theme', effective);
           }
-          if (newSettings.disabledSites && Array.isArray(newSettings.disabledSites)) {
-            setDisabledSites(newSettings.disabledSites);
-          }
+          setSiteAccess({
+            siteMode: newSettings.siteMode,
+            enabledSites: newSettings.enabledSites || [],
+            disabledSites: newSettings.disabledSites || []
+          });
         }
         if (changes.lexiflow_vocab_updated_at) {
           if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
             chrome.runtime.sendMessage({ type: 'GET_ALL_VOCAB' }, (res) => {
               if (res?.success && Array.isArray(res.data)) {
                 setSavedCount(res.data.length);
+                setRecentVocab(res.data.slice(-5).reverse());
               }
             });
             chrome.runtime.sendMessage({ type: 'GET_DUE_ITEMS' }, (res) => {
@@ -438,57 +556,35 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  const isCurrentSiteEnabled = currentDomain
-    ? !disabledSites.some((site) => {
-        const s = site.toLowerCase().trim();
-        const host = currentDomain.toLowerCase();
-        return host === s || host.endsWith('.' + s);
-      })
-    : true;
+  const isCurrentSiteEnabled = currentDomain ? isSiteActive(currentDomain, siteAccess) : false;
 
   const toggleCurrentSite = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!currentDomain) return;
 
-    const host = currentDomain.toLowerCase();
-    let updatedList: string[];
+    const change = toggleSite(currentDomain, siteAccess);
+    const turningOn = !isCurrentSiteEnabled;
+    setSiteAccess({ ...siteAccess, ...change });
 
-    if (isCurrentSiteEnabled) {
-      updatedList = [...disabledSites.filter((s) => s.toLowerCase() !== host), host];
-    } else {
-      updatedList = disabledSites.filter((s) => {
-        const sLower = s.toLowerCase().trim();
-        return sLower !== host && !host.endsWith('.' + sLower);
-      });
-    }
-
-    setDisabledSites(updatedList);
-
-    // Immediately update active tab action badge to 'OFF' or empty
+    // Badge: "ON" marks the chosen sites when LexiFlow is off by default; "OFF" marks paused ones otherwise
     if (typeof chrome !== 'undefined' && chrome.action && chrome.tabs?.query) {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const activeTabId = tabs[0]?.id;
-        if (typeof activeTabId === 'number') {
-          if (isCurrentSiteEnabled) {
-            // Toggling from enabled -> paused
-            chrome.action.setBadgeText({ tabId: activeTabId, text: 'OFF' });
-            chrome.action.setBadgeBackgroundColor({ tabId: activeTabId, color: '#EF4444' });
-            if ((chrome.action as any).setBadgeTextColor) {
-              (chrome.action as any).setBadgeTextColor({ tabId: activeTabId, color: '#FFFFFF' });
-            }
-          } else {
-            // Toggling from paused -> enabled
-            chrome.action.setBadgeText({ tabId: activeTabId, text: '' });
+        if (typeof activeTabId !== 'number') return;
+        const offByDefault = siteModeOf(siteAccess) === 'off';
+        const text = offByDefault ? (turningOn ? 'ON' : '') : turningOn ? '' : 'OFF';
+        chrome.action.setBadgeText({ tabId: activeTabId, text });
+        if (text) {
+          chrome.action.setBadgeBackgroundColor({ tabId: activeTabId, color: text === 'ON' ? '#1E40AF' : '#EF4444' });
+          if ((chrome.action as any).setBadgeTextColor) {
+            (chrome.action as any).setBadgeTextColor({ tabId: activeTabId, color: '#FFFFFF' });
           }
         }
       });
     }
 
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      chrome.runtime.sendMessage({
-        type: 'UPDATE_SETTINGS',
-        payload: { disabledSites: updatedList }
-      });
+      chrome.runtime.sendMessage({ type: 'UPDATE_SETTINGS', payload: change });
     }
   };
 
@@ -779,10 +875,24 @@ export const App: React.FC = () => {
       }
       if (res?.success && res.data) {
         const count = res.data.count?.total || res.data.items?.length || 0;
-        setHighlightFeedback({
-          message: `Highlighted ${count} key vocabulary items across the article!`,
-          type: 'success'
-        });
+        if (res.data.sourceMode === 'curated_offline_fallback') {
+          // Be honest that these came from the small built-in list, and why
+          const why: Record<string, string> = {
+            no_ai_configured: 'No AI provider is set up',
+            ai_unsupported: 'This AI provider cannot scan articles',
+            ai_failed: 'The AI request failed',
+            ai_empty: 'The AI found no suitable words'
+          };
+          setHighlightFeedback({
+            message: `${why[res.data.fallbackReason] || 'AI was unavailable'}, so ${count} item(s) came from the offline idiom list. Set up AI in Settings for a full scan.`,
+            type: 'info'
+          });
+        } else {
+          setHighlightFeedback({
+            message: `Highlighted ${count} key vocabulary items across the article!`,
+            type: 'success'
+          });
+        }
         setHighlightState((prev) =>
           prev
             ? {
@@ -879,6 +989,30 @@ export const App: React.FC = () => {
   const wordResult = result as WordAnalysisResult | null;
   const phraseResult = result as PhraseAnalysisResult | null;
 
+  const renderInteractiveWords = (text?: string) => {
+    if (!text) return null;
+    const tokens = text.match(/[\p{L}\p{N}]+|[^\p{L}\p{N}\s]+|\s+/gu) || [text];
+    return tokens.map((token, i) => {
+      const isWord = /^[\p{L}\p{N}]+$/u.test(token);
+      if (!isWord) return <React.Fragment key={i}>{token}</React.Fragment>;
+      const cleanWord = token.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '').trim();
+      if (!cleanWord) return <React.Fragment key={i}>{token}</React.Fragment>;
+      return (
+        <span
+          key={i}
+          className="popup-interactive-word"
+          onClick={(e) => {
+            e.stopPropagation();
+            executeSearch(cleanWord);
+          }}
+          title={`Inspect "${cleanWord}"`}
+        >
+          {token}
+        </span>
+      );
+    });
+  };
+
   /* ------------------------------------------------------------- */
   /* STANDALONE POPUP HOST: 100% Identical to Website Popup       */
   /* ------------------------------------------------------------- */
@@ -891,395 +1025,165 @@ export const App: React.FC = () => {
   /* ------------------------------------------------------------- */
   return (
     <div className="popup-container">
-      {/* Header */}
-      <div className="popup-header">
-        <div className="logo-group">
-          <img
-            src="/assets/icon48.png"
-            alt="LexiFlow"
-            style={{ width: 28, height: 28, borderRadius: 7, boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }}
-          />
-          <div>
-            <div className="app-title">LexiFlow</div>
-            <div className="app-sub">Contextual Reading & Language Mastery</div>
+      {/* 1. Sleek Modern Header */}
+      <div className="hub-header">
+        <div className="hub-brand">
+          <div className="brand-logo-container">
+            <img src="/assets/icon48.png" alt="LexiFlow" className="brand-logo-img" />
+          </div>
+          <div className="brand-text-block">
+            <div className="app-title-row">
+              <span className="app-title">LexiFlow</span>
+              {MONETIZATION_ENABLED && <span className="app-badge-pro">PRO</span>}
+            </div>
+            <div className="app-sub">Contextual reading companion</div>
           </div>
         </div>
 
-        <div className="popup-header-actions">
+        <div className="hub-header-actions">
           <button
             type="button"
-            className="popup-theme-btn"
+            className="hub-icon-btn"
             onClick={handleToggleTheme}
             title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
             aria-label="Toggle theme"
           >
-            {theme === 'dark' ? '☀️' : '🌙'}
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
           </button>
           <button
             type="button"
-            className="popup-theme-btn"
+            className="hub-icon-btn"
             onClick={openDashboard}
-            title="Open LexiFlow Dashboard & Settings"
+            title="Open LexiFlow Settings"
             aria-label="Settings"
           >
-            ⚙️
+            <Settings size={14} />
           </button>
         </div>
       </div>
 
-      {/* Inset Stat Counter Pills */}
-      <div className="stats-bar">
-        <div className="stat-item">
-          <span className="stat-val">{savedCount}</span>
-          <span className="stat-label">Saved Words</span>
-        </div>
-        <div className="stat-item">
-          <span className={`stat-val ${dueCount > 0 ? 'orange' : ''}`}>{dueCount}</span>
-          <span className="stat-label">Due for Review</span>
-        </div>
-      </div>
+      {/* 2. Top Segmented Navigation Tabs */}
+      <div className="hub-segmented-tabs">
+        <button
+          type="button"
+          className={`hub-tab-item ${popupTab === 'reading' ? 'active' : ''}`}
+          onClick={() => setPopupTab('reading')}
+        >
+          <Sparkles size={13} />
+          <span>Reading AI</span>
+        </button>
 
-      {/* Spotlight Search Box */}
-      <div className="search-box">
-        <div className="search-input-wrapper">
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Search word or sentence..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && executeSearch(searchTerm)}
-          />
-        </div>
-        <button className="btn-primary" onClick={() => executeSearch(searchTerm)} disabled={loading}>
-          {loading ? (
-            '...'
-          ) : (
-            <>
-              <Sparkles size={13} />
-              <span>Analyze</span>
-            </>
-          )}
+        <button
+          type="button"
+          className={`hub-tab-item ${popupTab === 'lookup' ? 'active' : ''}`}
+          onClick={() => setPopupTab('lookup')}
+        >
+          <Search size={13} />
+          <span>Lookup</span>
+        </button>
+
+        <button
+          type="button"
+          className={`hub-tab-item ${popupTab === 'library' ? 'active' : ''}`}
+          onClick={() => setPopupTab('library')}
+        >
+          <BookMarked size={13} />
+          <span>Library</span>
+          {dueCount > 0 && <span className="hub-tab-badge">{dueCount}</span>}
         </button>
       </div>
 
-      {/* Site Active / Paused Slider Toggle (matching eJOY style) */}
-      <div
-        className="site-toggle-card"
-        onClick={toggleCurrentSite}
-        title={`Click to ${isCurrentSiteEnabled ? 'disable' : 'enable'} LexiFlow on ${currentDomain || 'web pages'}`}
-      >
-        <div className="site-toggle-left">
-          <div className="site-toggle-text">
-            <span className="site-toggle-brand">LexiFlow in </span>
-            <span className="site-toggle-domain">{currentDomain || 'web pages'}</span>
-          </div>
-        </div>
+      {/* 3. Tab Contents Area */}
+      <div className="hub-content-area">
+        {/* ======================================================== */}
+        {/* TAB 1: READING AI (Current Tab Article Companion)         */}
+        {/* ======================================================== */}
+        {popupTab === 'reading' && (
+          <ReadingTab
+            meaningLanguageLabel={targetLang === 'en' ? 'Simple English' : langConfig.targetLabel}
+            savedCount={savedCount}
+            dueCount={dueCount}
+            setPopupTab={setPopupTab}
+            currentDomain={currentDomain}
+            currentFavicon={currentFavicon}
+            readLater={currentPage ? { saved: Boolean(readLaterItem), unreadCount: readingListCount } : null}
+            onToggleReadLater={toggleReadLater}
+            onOpenReadingList={openReadingList}
+            onWriteSummary={writeSummary}
+            onExamPractice={startExamPractice}
+            textSize={textSize}
+            showOnboarding={showOnboarding}
+            dismissOnboarding={dismissOnboarding}
+            chooseTextSize={chooseTextSize}
+            highlightState={highlightState}
+            highlightLoading={highlightLoading}
+            showVocabDrawer={showVocabDrawer}
+            setShowVocabDrawer={setShowVocabDrawer}
+            highlightFeedback={highlightFeedback}
+            isCurrentSiteEnabled={isCurrentSiteEnabled}
+            toggleCurrentSite={toggleCurrentSite}
+            handleTriggerHighlight={handleTriggerHighlight}
+            handleNavigateHighlight={handleNavigateHighlight}
+            handleChangeHighlightColor={handleChangeHighlightColor}
+            handleToggleFilter={handleToggleFilter}
+            handleClearHighlights={handleClearHighlights}
+            handleScrollToItem={handleScrollToItem}
+          />
+        )}
 
-        <div
-          className={`site-slider-switch ${isCurrentSiteEnabled ? 'active' : ''}`}
-          role="switch"
-          aria-checked={isCurrentSiteEnabled}
-        >
-          <div className="site-slider-thumb" />
-        </div>
+        {/* ======================================================== */}
+        {/* TAB 2: QUICK LOOKUP (Dictionary & Instant Explainer)     */}
+        {/* ======================================================== */}
+        {popupTab === 'lookup' && (
+          <LookupTab
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            executeSearch={executeSearch}
+            setResult={setResult}
+            loading={loading}
+            result={result}
+            isSentenceMode={isSentenceMode}
+            sentenceResult={sentenceResult}
+            isSaved={isSaved}
+            handleSave={handleSave}
+            renderInteractiveWords={renderInteractiveWords}
+          />
+        )}
+
+        {/* ======================================================== */}
+        {/* TAB 3: LIBRARY & REVIEW (Spaced Repetition & Saved Words) */}
+        {/* ======================================================== */}
+        {popupTab === 'library' && (
+          <LibraryTab
+            savedCount={savedCount}
+            dueCount={dueCount}
+            recentVocab={recentVocab}
+            onOpenDashboard={openDashboard}
+            onLookupWord={(word) => {
+              setPopupTab('lookup');
+              executeSearch(word);
+            }}
+          />
+        )}
       </div>
 
-      {/* Smart Article Reader & AI Highlights Studio (Replaces static guide card) */}
-      {!result && !loading && (
-        <div className="popup-studio-card">
-          {/* Studio Header */}
-          <div className="studio-header">
-            <div className="studio-brand">
-              <div className="studio-icon-badge">
-                <Sparkles size={16} />
-              </div>
-              <div>
-                <div className="studio-title-row">
-                  <span className="studio-title">AI Article Highlights</span>
-                  {highlightState && highlightState.count.total > 0 && (
-                    <span className="studio-badge-pill">
-                      {highlightState.count.visible} of {highlightState.count.total} active
-                    </span>
-                  )}
-                </div>
-                <div className="studio-subtext">
-                  {highlightState?.articleTitle
-                    ? `Scope: ${highlightState.articleTitle.slice(0, 32)}${highlightState.articleTitle.length > 32 ? '...' : ''}`
-                    : 'Scope: Main article text only (noise-filtered)'}
-                </div>
-              </div>
-            </div>
-
-            {highlightState && highlightState.count.total > 0 && (
-              <button
-                type="button"
-                className="studio-btn-icon-clear"
-                title="Clear Highlights"
-                onClick={handleClearHighlights}
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-
-          {/* Status Content */}
-          {!isCurrentSiteEnabled ? (
-            <div className="studio-paused-notice">
-              LexiFlow reading companion is paused on {currentDomain || 'this site'}. Toggle the slider above to re-enable.
-            </div>
-          ) : highlightLoading ? (
-            <div className="studio-loading-state">
-              <div className="studio-spinner" />
-              <div className="studio-loading-text">
-                <div className="studio-loading-title">Analyzing Main Article Body...</div>
-                <div className="studio-loading-desc">Filtering page headers, footers & sidebars to extract key vocabulary</div>
-              </div>
-            </div>
-          ) : !highlightState || highlightState.count.total === 0 ? (
-            <div className="studio-ready-body">
-              <p className="studio-ready-desc">
-                Identifies the <strong>core editorial article</strong> on this page, ignoring navigation, headers, footers, and ads. Automatically extracts and highlights learning-worthy vocabulary, collocations, and idioms with instant explanations.
-              </p>
-              {highlightFeedback && (
-                <div className={`studio-feedback-banner ${highlightFeedback.type}`}>
-                  <span>{highlightFeedback.type === 'error' ? '⚠️' : highlightFeedback.type === 'success' ? '✨' : 'ℹ️'}</span>
-                  <span>{highlightFeedback.message}</span>
-                </div>
-              )}
-              <button
-                type="button"
-                className="studio-btn-primary-highlight"
-                onClick={handleTriggerHighlight}
-              >
-                <Sparkles size={15} />
-                <span>Highlight Main Article</span>
-              </button>
-            </div>
-          ) : (
-            <div className="studio-active-controls">
-              {highlightFeedback && (
-                <div className={`studio-feedback-banner ${highlightFeedback.type}`} style={{ marginBottom: '8px' }}>
-                  <span>{highlightFeedback.type === 'error' ? '⚠️' : highlightFeedback.type === 'success' ? '✨' : 'ℹ️'}</span>
-                  <span>{highlightFeedback.message}</span>
-                </div>
-              )}
-              {/* Navigation Bar */}
-              <div className="studio-nav-bar">
-                <div className="studio-nav-arrows">
-                  <button
-                    type="button"
-                    className="studio-nav-btn"
-                    title="Previous Highlight (Shift+Tab)"
-                    onClick={() => handleNavigateHighlight('prev')}
-                  >
-                    <ChevronUp size={14} />
-                    <span>Prev</span>
-                  </button>
-                  <span className="studio-nav-counter">
-                    {(highlightState.currentIndex ?? -1) >= 0 ? highlightState.currentIndex + 1 : 1} / {highlightState.count.visible || highlightState.count.total}
-                  </span>
-                  <button
-                    type="button"
-                    className="studio-nav-btn"
-                    title="Next Highlight (Tab)"
-                    onClick={() => handleNavigateHighlight('next')}
-                  >
-                    <span>Next</span>
-                    <ChevronDown size={14} />
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  className={`studio-drawer-toggle ${showVocabDrawer ? 'active' : ''}`}
-                  onClick={() => setShowVocabDrawer(!showVocabDrawer)}
-                  title="View discovered terms"
-                >
-                  <BookOpen size={13} />
-                  <span>Vocab ({highlightState.items?.length || highlightState.count.total})</span>
-                </button>
-              </div>
-
-              {/* Color Swatches & Filter Pills */}
-              <div className="studio-settings-row">
-                <div className="studio-color-group" title="Select Highlight Color">
-                  {(['yellow', 'blue', 'green', 'pink', 'purple'] as const).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={`studio-color-dot ${highlightState.color === c ? 'selected' : ''}`}
-                      data-color={c}
-                      onClick={() => handleChangeHighlightColor(c)}
-                      aria-label={`Highlight Color ${c}`}
-                    />
-                  ))}
-                </div>
-
-                <div className="studio-filter-group">
-                  <button
-                    type="button"
-                    className={`studio-filter-pill ${highlightState.filters.words ? 'active' : ''}`}
-                    onClick={() => handleToggleFilter('words')}
-                    title="Toggle Words"
-                  >
-                    Words
-                  </button>
-                  <button
-                    type="button"
-                    className={`studio-filter-pill ${highlightState.filters.phrases ? 'active' : ''}`}
-                    onClick={() => handleToggleFilter('phrases')}
-                    title="Toggle Phrases"
-                  >
-                    Phrases
-                  </button>
-                  <button
-                    type="button"
-                    className={`studio-filter-pill ${highlightState.filters.idioms ? 'active' : ''}`}
-                    onClick={() => handleToggleFilter('idioms')}
-                    title="Toggle Idioms"
-                  >
-                    Idioms
-                  </button>
-                </div>
-              </div>
-
-              {/* Collapsible Vocabulary Drawer */}
-              {showVocabDrawer && highlightState.items && highlightState.items.length > 0 && (
-                <div className="studio-vocab-drawer">
-                  <div className="studio-vocab-header">
-                    <div className="studio-vocab-header-left">
-                      <span className="studio-vocab-header-title">Vocabulary In Article</span>
-                      <span className="studio-vocab-count-badge">{highlightState.items.length}</span>
-                    </div>
-                    <span className="studio-vocab-header-hint">Tap word to jump ↗</span>
-                  </div>
-                  <div className="studio-vocab-list">
-                    {highlightState.items.map((it, idx) => {
-                      const meaning = it.easyBengali || it.bengaliMeaning || it.easyEnglish || it.contextualMeaning;
-                      return (
-                        <div
-                          key={idx}
-                          className="studio-vocab-item"
-                          onClick={() => handleScrollToItem(it.text)}
-                          title={`Click to scroll to "${it.text}" in the article`}
-                        >
-                          <div className="studio-vocab-item-top">
-                            <span className="studio-vocab-item-text">{it.text}</span>
-                            <span className={`studio-vocab-tag ${it.type}`}>{it.type}</span>
-                          </div>
-                          {meaning && (
-                            <div className="studio-vocab-item-meaning">
-                              {meaning}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Bottom Re-scan row */}
-              <div className="studio-bottom-actions">
-                <button
-                  type="button"
-                  className="studio-btn-rescan"
-                  onClick={handleTriggerHighlight}
-                >
-                  <RotateCcw size={12} />
-                  <span>Re-scan Article Body</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {loading && (
-        <div style={{ textAlign: 'center', padding: '24px 16px', color: '#6e6e73', fontSize: '13px' }}>
-          Interpreting with LexiFlow AI...
-        </div>
-      )}
-
-      {/* Result Card */}
-      {result && (
-        <div className="result-card">
-          <div className="word-header" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span className="word-title">{result.selectedText}</span>
-            <button
-              type="button"
-              title="Pronounce"
-              style={{
-                background: 'rgba(0, 0, 0, 0.05)',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                padding: '2px 6px',
-                fontSize: '13px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                lineHeight: 1
-              }}
-              onClick={() => playPronunciation(result.selectedText)}
-            >
-              🔊
-            </button>
-            <span className="word-pos">{result.selectionType.toUpperCase()}</span>
-          </div>
-
-          {result.bengaliTranslation && (
-            <div className="word-bengali">{result.bengaliTranslation}</div>
-          )}
-
-          <div className="word-def">
-            {(result as WordAnalysisResult).contextualMeaning ||
-              (result as WordAnalysisResult).simpleEnglishExplanation ||
-              (result as SentenceAnalysisResult).plainEnglishParaphrase}
-          </div>
-
-          <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              className="btn-primary"
-              style={{
-                background: isSaved ? 'rgba(0, 113, 227, 0.12)' : '#0071e3',
-                color: isSaved ? '#0071e3' : '#ffffff',
-                fontSize: '12px',
-                padding: '6px 14px'
-              }}
-              onClick={handleSave}
-            >
-              {isSaved ? (
-                <>
-                  <Check size={13} strokeWidth={2.5} />
-                  <span>Saved in Library</span>
-                </>
-              ) : (
-                <>
-                  <BookmarkPlus size={13} />
-                  <span>Save Word</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Launch Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: 'auto' }}>
+      {/* 4. Bottom Dock Actions */}
+      <div className="hub-bottom-dock">
         <button
-          className="btn-secondary"
-          style={{ width: '100%', justifyContent: 'center' }}
+          type="button"
+          className="hub-dock-btn"
           onClick={openSidePanel}
+          title="Open LexiFlow in browser Side Panel"
         >
           <PanelRight size={14} />
           <span>Side Panel</span>
         </button>
+
         <button
-          className="btn-dashboard"
-          style={{ width: '100%', justifyContent: 'center' }}
+          type="button"
+          className="hub-dock-btn primary"
           onClick={openDashboard}
+          title="Open full LexiFlow Learning Dashboard"
         >
           <ExternalLink size={14} />
           <span>Dashboard</span>

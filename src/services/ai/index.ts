@@ -6,11 +6,21 @@ import { GeminiProvider } from './geminiProvider';
 import { MockAIProvider } from './mockProvider';
 import { OllamaProvider } from './ollamaProvider';
 import { OpenAIProvider } from './openaiProvider';
+import { CloudProvider, type CloudExamRequest } from './cloudProvider';
 import { TwoStageCacheService } from './cache';
 import { CacheManager } from '../cache';
 import { hashString } from '../cache/normalization';
 import { AIProvider } from './types';
-import { HighlightIntelligenceService } from './highlightIntelligence';
+import { buildExamItemPrompt, parseExamItem, EXAM_ITEM_KINDS, type ExamItemKind } from '../examContent/aiItems';
+import { safeParseJSON } from './safeJson';
+import { SummaryEvaluation, UsageCoachFeedback } from '../../types';
+import { SummaryEvaluationInput, SUMMARY_MAX_ARTICLE_CHARS, SUMMARY_MAX_CHARS } from './prompts';
+import {
+  HighlightIntelligenceService,
+  splitArticleIntoChunks,
+  HIGHLIGHT_CHUNK_CHARS,
+  HIGHLIGHT_MAX_CHUNKS
+} from './highlightIntelligence';
 
 export class AIService {
   private static cache = new Map<string, unknown>();
@@ -36,6 +46,8 @@ export class AIService {
     }
 
     switch (effectiveProvider) {
+      case 'lexiflow':
+        return new CloudProvider(userSettings.targetLanguage || 'bn');
       case 'gemini':
         if (userSettings.apiKey?.trim()) {
           const model = (!userSettings.selectedModel || userSettings.selectedModel === 'gemini-1.5-flash')
@@ -68,7 +80,7 @@ export class AIService {
         const model = (userSettings.selectedModel && userSettings.selectedModel !== 'llama3.2')
           ? userSettings.selectedModel
           : 'gemma4:31b-cloud';
-        console.log(`[LexiFlow AIService] Instantiating OllamaProvider with endpoint: ${ep}, model: ${model}`);
+        console.debug(`[LexiFlow AIService] Instantiating OllamaProvider with endpoint: ${ep}, model: ${model}`);
         return new OllamaProvider(
           ep,
           model,
@@ -98,6 +110,18 @@ export class AIService {
       }
       // Fallback: adapt from generic analyze
       const generic = await provider.analyze(text, 'word', contextSentence, paragraphContext) as any;
+      const example = generic.examples?.[0] || contextSentence;
+      let exampleBengali = generic.exampleBengali;
+      if (!exampleBengali || exampleBengali === 'উদাহরণ বাক্যের অর্থ' || exampleBengali === 'বাক্যে এর ব্যবহার।') {
+        if (example) {
+          try {
+            const tr = await provider.analyze(example, 'sentence') as any;
+            exampleBengali = tr.bengaliTranslation || tr.easyBengali || '';
+          } catch {
+            exampleBengali = undefined;
+          }
+        }
+      }
       return {
         selectedText: text,
         lemma: text.toLowerCase(),
@@ -105,8 +129,8 @@ export class AIService {
         easyEnglish: generic.simpleEnglishExplanation || generic.contextualMeaning || 'Contextual meaning.',
         easyBengali: generic.bengaliTranslation || 'বাংলা অর্থ',
         contextMeaning: generic.contextualMeaning || generic.whyFitsContext || 'Meaning in this context.',
-        example: generic.examples?.[0] || contextSentence,
-        exampleBengali: 'উদাহরণ বাক্যের অর্থ',
+        example,
+        exampleBengali: exampleBengali || undefined,
         confidence: 'high',
         contextualSenseId: 'sense_1'
       };
@@ -139,9 +163,20 @@ export class AIService {
             easyEnglish: generic.simpleEnglishExplanation || 'Primary meaning.',
             easyBengali: generic.bengaliTranslation || 'প্রধান অর্থ',
             isContextual: true,
-            examples: (generic.examples || []).map((e: string) => ({ english: e, bengali: 'উদাহরণ' })),
-            synonyms: (generic.synonyms || []).map((s: string) => ({ word: s, easyEnglish: 'Similar word', easyBengali: 'সমার্থক শব্দ' })),
-            antonyms: []
+            examples: (generic.examples || []).map((e: string, idx: number) => ({
+              english: e,
+              bengali: idx === 0 && generic.exampleBengali ? generic.exampleBengali : ''
+            })),
+            synonyms: (generic.synonyms || []).map((s: string) => ({
+              word: s,
+              easyEnglish: 'Similar word',
+              easyBengali: ''
+            })),
+            antonyms: (generic.antonyms || []).map((a: string) => ({
+              word: a,
+              easyEnglish: 'Opposite word',
+              easyBengali: ''
+            }))
           }
         ],
         collocations: (generic.collocations || []).map((c: string) => ({ english: c })),
@@ -174,39 +209,162 @@ export class AIService {
     const providerName = userSettings.aiProvider || 'mock';
     const isOllama = providerName === 'ollama';
     const hasApiKey = Boolean(userSettings.apiKey?.trim());
-    const isLiveAI = (isOllama || hasApiKey) && providerName !== 'mock';
-    const key = `extractHighlights:${hashString(rawText.slice(0, 15000))}::${targetLang}::${providerName}::${isLiveAI ? 'ai' : 'offline'}`;
+    const isLiveAI = providerName === 'lexiflow' || ((isOllama || hasApiKey) && providerName !== 'mock');
+    const key = `extractHighlights:${hashString(rawText)}::${targetLang}::${providerName}::${isLiveAI ? 'ai' : 'offline'}`;
 
     return CacheManager.getInstance().executeDeduplicated(key, async () => {
       const provider = await this.getProvider(userSettings);
+      let fallbackReason: HighlightExtractionResult['fallbackReason'] = isLiveAI ? 'ai_unsupported' : 'no_ai_configured';
 
-      console.log(`[LexiFlow AIService] extractHighlights starting with provider: "${providerName}", isLiveAI: ${isLiveAI}`);
+      console.debug(`[LexiFlow AIService] extractHighlights starting with provider: "${providerName}", isLiveAI: ${isLiveAI}`);
 
       // 1. If an actual AI provider is configured and available (cloud with API key OR local Ollama)
       if (isLiveAI && provider.extractHighlights) {
-        try {
-          const aiResult = await provider.extractHighlights(rawText, pageTitle);
-          if (aiResult && Array.isArray(aiResult.items) && aiResult.items.length > 0) {
-            const processed = HighlightIntelligenceService.processCandidates(aiResult, rawText);
-            processed.sourceMode = 'ai_reasoning';
-            console.log(`[LexiFlow AIService] AI extraction succeeded with ${processed.items.length} items (provider: ${providerName})`);
-            return processed;
-          } else {
-            console.warn(`[LexiFlow AIService] AI provider ${providerName} returned 0 items.`);
+        // Long articles go to the model in paragraph-aligned chunks so the end of the piece is read too
+        const chunks = splitArticleIntoChunks(rawText, HIGHLIGHT_CHUNK_CHARS, HIGHLIGHT_MAX_CHUNKS);
+        const candidates: HighlightExtractionResult['items'] = [];
+        let articleSummary: string | undefined;
+        let failures = 0;
+
+        for (const chunk of chunks) {
+          try {
+            const aiResult = await provider.extractHighlights(chunk, pageTitle);
+            if (aiResult && Array.isArray(aiResult.items)) {
+              candidates.push(...aiResult.items);
+              articleSummary = articleSummary || aiResult.articleSummary;
+            }
+          } catch (err) {
+            failures++;
+            console.warn(`[LexiFlow AIService] ${providerName} extractHighlights failed on a chunk:`, err);
           }
-        } catch (err) {
-          console.warn(`[LexiFlow AIService] ${providerName} extractHighlights failed, using curated offline fallback:`, err);
         }
+
+        if (candidates.length > 0) {
+          // Ids from separate chunks collide ("hl_1" in each), so renumber before merging
+          const items = candidates.map((item, idx) => ({ ...item, id: `hl_${idx + 1}` }));
+          const processed = HighlightIntelligenceService.processCandidates(
+            { items, pageTitle, articleSummary, sourceMode: 'ai_reasoning', totalAnalyzedWords: 0 },
+            rawText,
+            { maxItems: Math.min(40, 20 + 10 * (chunks.length - 1)) }
+          );
+          processed.sourceMode = 'ai_reasoning';
+          console.debug(`[LexiFlow AIService] AI extraction succeeded with ${processed.items.length} items from ${chunks.length} chunk(s) (provider: ${providerName})`);
+          return processed;
+        }
+
+        fallbackReason = failures > 0 ? 'ai_failed' : 'ai_empty';
+        console.warn(`[LexiFlow AIService] AI provider ${providerName} produced no usable items (${failures} failed chunk(s)).`);
       }
 
       // 2. Honest curated offline fallback when AI provider is unconfigured, mock, or failed
-      console.log(`[LexiFlow AIService] Using curated offline fallback for highlights`);
+      console.debug(`[LexiFlow AIService] Using curated offline fallback for highlights`);
       const mock = new MockAIProvider(targetLang);
       const rawMock = await mock.extractHighlights(rawText, pageTitle);
       const processedMock = HighlightIntelligenceService.processCandidates(rawMock, rawText);
       processedMock.sourceMode = 'curated_offline_fallback';
+      processedMock.fallbackReason = fallbackReason;
       return processedMock;
     });
+  }
+
+  /**
+   * Usage Coach. Judging the learner's sentence needs a real model, so without one this throws a message
+   * the page shows as-is instead of returning a verdict nobody measured.
+   */
+  static async evaluateUsage(targetWord: string, sentence: string): Promise<UsageCoachFeedback> {
+    const word = (targetWord || '').trim();
+    const text = (sentence || '').trim();
+    if (!word || !text) throw new Error('Enter the word and a sentence that uses it.');
+
+    const userSettings = await SettingsService.getSettings();
+    const provider = await this.getProvider(userSettings);
+    if (!this.hasLiveAI(userSettings) || !provider.evaluateUsage) {
+      throw new Error('Checking your sentence needs an AI provider. Set one up in Settings (LexiFlow Cloud, Gemini, OpenAI, Claude or Ollama).');
+    }
+    return provider.evaluateUsage(word, text);
+  }
+
+  /** Whether the settings point at a real model (not the offline mode, and with a key where one is needed). */
+  private static hasLiveAI(settings: UserSettings): boolean {
+    const providerName = settings.aiProvider || 'mock';
+    const hasApiKey = Boolean(settings.apiKey?.trim());
+    return providerName === 'lexiflow' || ((providerName === 'ollama' || hasApiKey) && providerName !== 'mock');
+  }
+
+  /**
+   * Summary practice. Marking needs a real model, so there is no offline fallback: without one this
+   * throws a message the page shows as-is, rather than inventing a score.
+   */
+  static async evaluateSummary(input: SummaryEvaluationInput): Promise<SummaryEvaluation> {
+    const summary = (input.summary || '').trim();
+    const articleText = (input.articleText || '').trim();
+    if (articleText.length < 200) throw new Error('This article is too short to summarize. Open a longer article and try again.');
+    if (summary.split(/\s+/).filter(Boolean).length < 15) throw new Error('Write at least 15 words so there is something to mark.');
+    if (summary.length > SUMMARY_MAX_CHARS) throw new Error(`Keep the summary under ${SUMMARY_MAX_CHARS} characters.`);
+
+    const userSettings = await SettingsService.getSettings();
+    const provider = await this.getProvider(userSettings);
+
+    if (!this.hasLiveAI(userSettings) || !provider.evaluateSummary) {
+      throw new Error('Marking a summary needs an AI provider. Set one up in Settings (LexiFlow Cloud, Gemini, OpenAI, Claude or Ollama).');
+    }
+    return provider.evaluateSummary({ ...input, summary, articleText: articleText.slice(0, SUMMARY_MAX_ARTICLE_CHARS) });
+  }
+
+  /**
+   * Exam engines: runs an exam-specific grading prompt and returns the raw JSON text for the engine to validate.
+   * LexiFlow Cloud never takes a prompt from the client: it marks `cloud`, the exam task itself, with the
+   * engine's prompt on the server.
+   */
+  static async completeExamJson(
+    systemPrompt: string,
+    userPrompt: string,
+    cloud?: CloudExamRequest
+  ): Promise<{ rawText: string; model: string }> {
+    const userSettings = await SettingsService.getSettings();
+    const provider = await this.getProvider(userSettings);
+
+    if (provider instanceof CloudProvider) {
+      if (!cloud) throw new Error('This exam task cannot be marked on LexiFlow Cloud yet.');
+      return { rawText: JSON.stringify(await provider.markExam(cloud)), model: 'LexiFlow Cloud' };
+    }
+    if (!this.hasLiveAI(userSettings) || !provider.completeJson) {
+      throw new Error('Exam marking needs an AI provider. Set one up in Settings (LexiFlow Cloud, Gemini, OpenAI, Claude or Ollama).');
+    }
+    const rawText = await provider.completeJson(systemPrompt, userPrompt);
+    return { rawText, model: userSettings.selectedModel || provider.name };
+  }
+
+  /**
+   * Writes one exam item from the article (or marks a Summarize Spoken Text answer). The reply is
+   * validated here; one retry carries the validation error back to the model.
+   */
+  static async generateExamItem(kind: ExamItemKind, source: string, answer?: string): Promise<unknown> {
+    if (!EXAM_ITEM_KINDS.includes(kind)) throw new Error('Unknown exam item.');
+    if ((source || '').trim().split(/\s+/).length < 40) throw new Error('This article is too short to build exam questions from.');
+
+    const userSettings = await SettingsService.getSettings();
+    const provider = await this.getProvider(userSettings);
+
+    if (provider instanceof CloudProvider) {
+      return parseExamItem(kind, await provider.generateExamItem(kind, source, answer));
+    }
+    if (!this.hasLiveAI(userSettings) || !provider.completeJson) {
+      throw new Error('Writing these questions needs an AI provider. Set one up in Settings (LexiFlow Cloud, Gemini, OpenAI, Claude or Ollama).');
+    }
+    const prompt = buildExamItemPrompt(kind, source, answer);
+    let lastError = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const user = attempt === 0 ? prompt.user : `${prompt.user}
+
+Your previous reply was not valid (${lastError}). Reply again with only the JSON object.`;
+      try {
+        return parseExamItem(kind, safeParseJSON(await provider.completeJson(prompt.system, user)));
+      } catch (err) {
+        lastError = ((err as Error).message || 'invalid JSON').slice(0, 300);
+      }
+    }
+    throw new Error('The AI did not return usable questions. Try "New questions".');
   }
 
   static getCacheKey(action: string, args: Record<string, unknown>): string {
@@ -282,10 +440,6 @@ export class AIService {
       };
     }
   }
-
-  static clearCache(): void {
-    this.cache.clear();
-  }
 }
 
 export * from './types';
@@ -295,4 +449,5 @@ export * from './geminiProvider';
 export * from './openaiProvider';
 export * from './anthropicProvider';
 export * from './ollamaProvider';
+export * from './cloudProvider';
 export * from './safeJson';

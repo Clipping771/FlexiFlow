@@ -1,13 +1,15 @@
+import { SummaryEvaluation } from '../../types';
+import { SummaryEvaluationInput } from './prompts';
 import {
   SelectionType,
   LinguisticAnalysisResult,
   WritingGoal,
   WritingAssistResult,
   FollowUpResponse,
-  ArticleAnalysisResult,
   StageAExplanation,
   StageBDetailedVocabulary,
-  HighlightExtractionResult
+  HighlightExtractionResult,
+  UsageCoachFeedback
 } from '../../types';
 
 export interface AIProvider {
@@ -31,6 +33,13 @@ export interface AIProvider {
   ): Promise<LinguisticAnalysisResult>;
   assistWriting(text: string, goal: WritingGoal): Promise<WritingAssistResult>;
   askFollowUp(text: string, context: string, question: string): Promise<FollowUpResponse>;
-  analyzeArticle?(rawText: string, title?: string, mode?: string, signal?: AbortSignal): Promise<ArticleAnalysisResult>;
   extractHighlights?(rawText: string, pageTitle?: string, signal?: AbortSignal): Promise<HighlightExtractionResult>;
+  /** Word Difference in one call; providers without it get two analyze(word) calls. */
+  compareWords?(wordA: string, wordB: string): Promise<{ wordA: LinguisticAnalysisResult; wordB: LinguisticAnalysisResult }>;
+  /** Usage Coach evaluation of the learner's own sentence. */
+  evaluateUsage?(targetWord: string, sentence: string): Promise<UsageCoachFeedback>;
+  /** Summary practice: marks the learner's summary of an article. Offline providers do not have it. */
+  evaluateSummary?(input: SummaryEvaluationInput): Promise<SummaryEvaluation>;
+  /** Exam engines: one raw JSON completion for an exam-specific prompt. The engine validates the result. */
+  completeJson?(systemPrompt: string, userPrompt: string): Promise<string>;
 }

@@ -149,4 +149,20 @@ describe('Two-Layer Semantic Validation (Layer 1 Schema & Layer 2 Semantic Check
       expect(res.warnings.some((w) => w.includes('Duplicate sense ID'))).toBe(true);
     });
   });
+
+  describe('Example Sentence Translation Integrity', () => {
+    it('correctly filters out placeholder strings from being rendered as translations', async () => {
+      const { isValidExampleTranslation } = await import('../../../content/popupView');
+      expect(isValidExampleTranslation('উদাহরণ বাক্যের অর্থ')).toBe(false);
+      expect(isValidExampleTranslation('উদাহরণ')).toBe(false);
+      expect(isValidExampleTranslation('বাক্যে এর ব্যবহার।')).toBe(false);
+      expect(isValidExampleTranslation('বাক্যটিতে এর ভাবার্থ স্পষ্টভাবে প্রকাশ পেয়েছে।')).toBe(false);
+      expect(isValidExampleTranslation('Example sentence translated into Bengali.')).toBe(false);
+      expect(isValidExampleTranslation('')).toBe(false);
+      expect(isValidExampleTranslation(undefined)).toBe(false);
+
+      expect(isValidExampleTranslation('ঝড়টি উপকূলীয় গ্রামে মারাত্মক ক্ষয়ক্ষতি সাধন করেছিল।')).toBe(true);
+      expect(isValidExampleTranslation('সে চুক্তিতে স্বাক্ষর করতে অনাগ্রহী ছিল।')).toBe(true);
+    });
+  });
 });

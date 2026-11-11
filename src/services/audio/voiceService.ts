@@ -10,6 +10,10 @@
  */
 
 let currentAudio: HTMLAudioElement | null = null;
+/** Settles the in-flight playAudioElement promise when playback is cut off externally. */
+let pendingAudioFinish: ((ok: boolean) => void) | null = null;
+/** Bumped by stopPronunciation so an in-flight playPronunciation stops trying further sources/chunks. */
+let playbackGeneration = 0;
 let cachedVoices: SpeechSynthesisVoice[] = [];
 
 /**
@@ -365,6 +369,11 @@ export function playNaturalSpeech(
  * Stops any currently playing audio or speech synthesis.
  */
 export function stopAllAudio(): void {
+  if (pendingAudioFinish) {
+    const finish = pendingAudioFinish;
+    pendingAudioFinish = null;
+    finish(false);
+  }
   if (currentAudio) {
     try {
       currentAudio.pause();
@@ -432,6 +441,7 @@ function playAudioElement(audio: HTMLAudioElement, startTimeoutMs: number = 3500
     const finish = (ok: boolean) => {
       if (!settled) {
         settled = true;
+        if (pendingAudioFinish === finish) pendingAudioFinish = null;
         if (loadTimer) {
           clearTimeout(loadTimer);
           loadTimer = null;
@@ -445,6 +455,8 @@ function playAudioElement(audio: HTMLAudioElement, startTimeoutMs: number = 3500
         resolve(ok);
       }
     };
+
+    pendingAudioFinish = finish;
 
     // Connection / startup timeout only: only fires if audio fails to begin playing
     let loadTimer: any = setTimeout(() => {
@@ -546,17 +558,19 @@ async function tryPlayAudioUrl(url: string): Promise<boolean> {
 /**
  * Plays ultra-realistic Natural Female Neural audio streams for sentences or paragraphs.
  */
-async function playNaturalNeuralStream(text: string): Promise<boolean> {
+async function playNaturalNeuralStream(text: string, isCancelled: () => boolean = () => false): Promise<boolean> {
   const chunks = splitTextIntoAudioChunks(text, 180);
   if (chunks.length === 0) return false;
 
   let anyChunkPlayed = false;
 
   for (const chunk of chunks) {
+    if (isCancelled()) return true;
     const encoded = encodeURIComponent(chunk);
     // 1. Google Neural Female Studio Voice (ultra-natural human cadence, no robotic distortion)
     const googleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=tw-ob&q=${encoded}`;
     let ok = await tryPlayAudioUrl(googleTtsUrl);
+    if (isCancelled()) return true;
 
     // 2. Studio Audio Female CDN
     if (!ok) {
@@ -605,10 +619,13 @@ export async function playPronunciation(
   const clean = text.trim();
   if (!clean) return;
 
+  const generation = ++playbackGeneration;
+  const isCancelled = () => generation !== playbackGeneration;
+
   // 1. Explicit audioUrl provided
   if (options.audioUrl) {
     const success = await tryPlayAudioUrl(options.audioUrl);
-    if (success) return;
+    if (success || isCancelled()) return;
   }
 
   const wordCount = clean.split(/\s+/).length;
@@ -621,14 +638,14 @@ export async function playPronunciation(
     if (normalizedWord) {
       const googleOxfordUrl = `https://ssl.gstatic.com/dictionary/static/sounds/oxford/${encodeURIComponent(normalizedWord)}--_us_1.mp3`;
       const oxfordOk = await tryPlayAudioUrl(googleOxfordUrl);
-      if (oxfordOk) return;
+      if (oxfordOk || isCancelled()) return;
     }
 
     // Candidate B: Youdao Studio Female Recording
     if (normalizedWord) {
       const youdaoUrl = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(normalizedWord)}&type=0`;
       const youdaoOk = await tryPlayAudioUrl(youdaoUrl);
-      if (youdaoOk) return;
+      if (youdaoOk || isCancelled()) return;
     }
 
     // Candidate C: Lemma lookup for inflected forms (e.g., "abideth" -> "abide")
@@ -637,22 +654,43 @@ export async function playPronunciation(
       if (cleanLemma) {
         const lemmaUrl = `https://ssl.gstatic.com/dictionary/static/sounds/oxford/${encodeURIComponent(cleanLemma)}--_us_1.mp3`;
         const lemmaOk = await tryPlayAudioUrl(lemmaUrl);
-        if (lemmaOk) return;
+        if (lemmaOk || isCancelled()) return;
       }
     }
   }
 
   // 3. Sentences, phrases & words: Ultra-realistic Neural Female Studio Stream
-  const streamOk = await playNaturalNeuralStream(clean);
-  if (streamOk) return;
+  const streamOk = await playNaturalNeuralStream(clean, isCancelled);
+  if (streamOk || isCancelled()) return;
 
   // 4. Offline Fallback: Only use SpeechSynthesis if a genuine Natural/Neural online voice exists (e.g. MS Jenny Online)
   // Strictly refuse to play robotic/mechanical desktop voices like Microsoft Zira.
   stopAllAudio();
   const voice = await ensureFemaleVoice();
+  if (isCancelled()) return;
   if (voice && !isMechanicalVoice(voice)) {
-    executeSpeech(clean, voice, { rate: options.rate });
+    // Resolve only once the utterance finishes (or is cancelled) so callers can track playing state
+    await new Promise<void>((resolve) => {
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      executeSpeech(clean, voice, { rate: options.rate, onEnd: finish });
+      const poll = setInterval(() => {
+        if (isCancelled() || !window.speechSynthesis.speaking) {
+          clearInterval(poll);
+          finish();
+        }
+      }, 300);
+    });
   } else {
     console.warn('[LexiFlow Audio] Offline and no natural female neural voice available; skipped mechanical synthesis.');
   }
+}
+
+/**
+ * Stops whatever playPronunciation is doing, including any remaining chunks or fallback sources.
+ * The pending playPronunciation promise resolves shortly after.
+ */
+export function stopPronunciation(): void {
+  playbackGeneration++;
+  stopAllAudio();
 }

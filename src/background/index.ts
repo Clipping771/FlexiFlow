@@ -1,12 +1,18 @@
+import { synthesizeAiSpeech } from '../services/audio/aiVoice';
+import { registerReminderHandlers, scheduleReminder } from './reminder';
 import { AIService } from '../services/ai';
 import { StorageService } from '../services/storage/db';
 import { SettingsService } from '../services/storage/settings';
 import { FSRSEngine } from '../services/fsrs/engine';
-import { ArticleAnalyzer } from '../services/article/analyzer';
 import { fetchProviderModels } from '../services/ai/modelFetcher';
 import { VocabularyItem, FSRSRating, SelectionType, WritingGoal, WrongMeaningReport } from '../types';
 import { setupOllamaOriginRules } from './ollamaRules';
+import { openSavedArticle, captureArticleText } from './openArticle';
 import { setupBadgeListeners, updateAllTabBadges } from './badgeService';
+import { EventLogger, ApprovedEventName } from '../services/logging/eventLogger';
+import { AuthService, CloudAuthError } from '../services/auth/authService';
+import { CloudAIError, type CloudExamRequest } from '../services/ai/cloudProvider';
+import type { ExamItemKind } from '../services/examContent/aiItems';
 
 // Immediately ensure Ollama dynamic rules and Badge synchronization are registered
 setupOllamaOriginRules();
@@ -28,6 +34,8 @@ async function injectContentScriptIntoOpenTabs(): Promise<void> {
     // Non-blocking fallback
   }
 }
+
+registerReminderHandlers();
 
 // Setup Context Menu and rules on installation
 if (typeof chrome !== 'undefined' && chrome.runtime) {
@@ -52,6 +60,9 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
     });
   }
 }
+
+// Hosts the content script may ask us to fetch pronunciation audio from (must match manifest host_permissions).
+const AUDIO_FETCH_HOSTS = new Set(['translate.google.com', 'ssl.gstatic.com', 'dict.youdao.com']);
 
 // Track the active normal browser window ID for reliable Side Panel dispatching
 let lastFocusedNormalWindowId: number | null = null;
@@ -231,6 +242,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
               reports.push(report);
               await chrome.storage.local.set({ lexiflow_feedback_reports: reports });
             }
+            await EventLogger.log('report_submitted', {
+              reason: report?.reason || 'wrong_meaning',
+              hasUserNote: Boolean(report?.userNote && report.userNote.trim().length > 0),
+              hasContextSentence: Boolean(report?.contextSentence && report.contextSentence.trim().length > 0)
+            }).catch(() => {});
             sendResponse({ success: true });
             break;
           }
@@ -243,18 +259,6 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
               paragraphContext?: string;
             };
             const result = await AIService.analyzeSelection(text, selectionType, contextSentence, paragraphContext);
-            sendResponse({ success: true, data: result });
-            break;
-          }
-
-          case 'ANALYZE_ARTICLE': {
-            const { rawText, title, sourceUrl, mode } = payload as {
-              rawText: string;
-              title?: string;
-              sourceUrl?: string;
-              mode?: 'comprehensive' | 'summary' | 'structural' | 'vocabulary';
-            };
-            const result = await ArticleAnalyzer.analyze(rawText, title, sourceUrl, mode);
             sendResponse({ success: true, data: result });
             break;
           }
@@ -286,41 +290,12 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             break;
           }
 
-          case 'EXPLAIN_SENTENCE': {
-            const { sentence } = payload as { sentence: string };
-            const provider = await AIService.getProvider();
-            const result = (await provider.analyze(sentence, 'sentence')) as any;
-            const resMapped = {
-              ...result,
-              sentence: result.selectedText || sentence,
-              bengaliTranslation: result.bengaliTranslation || '',
-              paraphrase: result.plainEnglishParaphrase || result.overallMeaning || result.paraphrase || '',
-              mainMessage: result.mainMessage || result.plainEnglishParaphrase || '',
-              sentenceStructure: result.sentenceStructure || undefined,
-              clauses: Array.isArray(result.clauses) ? result.clauses : [],
-              structureMap: result.structureMap || undefined,
-              grammarRules: Array.isArray(result.grammarRules) ? result.grammarRules : [],
-              connectors: Array.isArray(result.connectors) ? result.connectors : [],
-              wordLevelGrammar: Array.isArray(result.wordLevelGrammar) ? result.wordLevelGrammar : [],
-              commonMistakesAndAlternatives: result.commonMistakesAndAlternatives || undefined,
-              practice: result.practice || undefined,
-              grammaticalFeatures: Array.isArray(result.grammaticalHighlights)
-                ? result.grammaticalHighlights
-                : (Array.isArray(result.grammaticalFeatures) ? result.grammaticalFeatures : []),
-              grammaticalHighlights: Array.isArray(result.grammaticalHighlights) ? result.grammaticalHighlights : [],
-              phraseBreakdown: Array.isArray(result.phraseBreakdown) ? result.phraseBreakdown : [],
-              difficultVocabulary: Array.isArray(result.difficultVocabulary) ? result.difficultVocabulary : [],
-              toneAndRegister: result.toneAndRegister || 'Standard English'
-            };
-            sendResponse({ success: true, data: resMapped });
-            break;
-          }
-
           case 'COMPARE_WORDS': {
             const { wordA, wordB } = payload as { wordA: string; wordB: string };
             const provider = await AIService.getProvider();
-            const resA = (await provider.analyze(wordA, 'word')) as any;
-            const resB = (await provider.analyze(wordB, 'word')) as any;
+            const [resA, resB] = (provider.compareWords
+              ? await provider.compareWords(wordA, wordB).then((r) => [r.wordA, r.wordB])
+              : [await provider.analyze(wordA, 'word'), await provider.analyze(wordB, 'word')]) as any[];
             sendResponse({
               success: true,
               data: {
@@ -344,20 +319,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 
           case 'EVALUATE_USAGE': {
             const { targetWord, sentence } = payload as { targetWord: string; sentence: string };
-            const provider = await AIService.getProvider();
-            const assist = await provider.assistWriting(sentence, 'natural');
-            sendResponse({
-              success: true,
-              data: {
-                targetWord,
-                isGrammaticallyCorrect: true,
-                collocationScore: 92,
-                grammarCorrectness: 'Excellent grammatical structure and natural collocation.',
-                bengaliFeedback: assist.bengaliExplanation || `বাক্যটিতে "${targetWord}" যথাযথ ও স্বাভাবিকভাবে প্রয়োগ করা হয়েছে।`,
-                naturalAlternative: assist.improvedText || sentence,
-                alternativeCollocations: assist.alternatives || []
-              }
-            });
+            sendResponse({ success: true, data: await AIService.evaluateUsage(targetWord, sentence) });
             break;
           }
 
@@ -371,8 +333,12 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 
           case 'SAVE_VOCAB': {
             const { item } = payload as { item: VocabularyItem };
-            await StorageService.saveItem(item);
-            sendResponse({ success: true, data: item });
+            const saved = await StorageService.saveOrUpdate(item);
+            await EventLogger.log('word_saved', {
+              selectionType: item.selectionType || 'word',
+              hasContext: Boolean(item.contextSentence && item.contextSentence.trim().length > 0)
+            }).catch(() => {});
+            sendResponse({ success: true, data: saved });
             break;
           }
 
@@ -413,7 +379,35 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             const updatedFSRS = FSRSEngine.scheduleNextReview(item.fsrs, rating);
             item.fsrs = updatedFSRS;
             await StorageService.saveItem(item);
+            await EventLogger.log('review_completed', {
+              rating,
+              elapsedDays: item.fsrs.elapsedDays,
+              scheduledDays: updatedFSRS.scheduledDays
+            }).catch(() => {});
             sendResponse({ success: true, data: item });
+            break;
+          }
+
+          case 'AUTH_LOGIN': {
+            await AuthService.login();
+            sendResponse({ success: true, data: await AuthService.getAccount() });
+            break;
+          }
+
+          case 'AUTH_LOGOUT': {
+            await AuthService.logout();
+            sendResponse({ success: true });
+            break;
+          }
+
+          case 'AUTH_DELETE_ACCOUNT': {
+            await AuthService.deleteAccount();
+            sendResponse({ success: true });
+            break;
+          }
+
+          case 'GET_ACCOUNT': {
+            sendResponse({ success: true, data: await AuthService.getAccount() });
             break;
           }
 
@@ -424,7 +418,15 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
           }
 
           case 'UPDATE_SETTINGS': {
+            const currentSettings = await SettingsService.getSettings();
+            const prevMode = currentSettings.readingMode || 'quick';
             const settings = await SettingsService.updateSettings(payload || {});
+            if (payload?.readingMode && payload.readingMode !== prevMode) {
+              await EventLogger.log('mode_changed', {
+                from: prevMode,
+                to: payload.readingMode
+              }).catch(() => {});
+            }
             AIService.clearCache();
             await updateAllTabBadges(settings);
 
@@ -463,6 +465,40 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             break;
           }
 
+          case 'OPEN_SAVED_ARTICLE': {
+            const { url, highlight } = payload as { url: string; highlight?: boolean };
+            await openSavedArticle(url, Boolean(highlight));
+            sendResponse({ success: true });
+            break;
+          }
+
+          case 'EVALUATE_SUMMARY': {
+            const { articleText, articleTitle, summary } = payload as { articleText: string; articleTitle?: string; summary: string };
+            const result = await AIService.evaluateSummary({ articleText, articleTitle, summary });
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
+          case 'EXAM_AI_COMPLETE': {
+            const { systemPrompt, userPrompt, cloud } = payload as { systemPrompt: string; userPrompt: string; cloud?: CloudExamRequest };
+            const result = await AIService.completeExamJson(systemPrompt, userPrompt, cloud);
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
+          case 'EXAM_GENERATE': {
+            const { kind, source, answer } = payload as { kind: ExamItemKind; source: string; answer?: string };
+            const result = await AIService.generateExamItem(kind, source, answer);
+            sendResponse({ success: true, data: result });
+            break;
+          }
+
+          case 'CAPTURE_ARTICLE_TEXT': {
+            const { url } = payload as { url: string };
+            sendResponse({ success: true, data: await captureArticleText(url) });
+            break;
+          }
+
           case 'EXPORT_DATA': {
             const data = await StorageService.exportData();
             sendResponse({ success: true, data });
@@ -476,10 +512,30 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
             break;
           }
 
+          case 'SET_REMINDER': {
+            const { time } = (payload || {}) as { time: string | null };
+            await scheduleReminder(time ?? null);
+            sendResponse({ success: true });
+            break;
+          }
+
+          case 'SYNTHESIZE_SPEECH': {
+            const { text } = payload as { text: string };
+            const audio = await synthesizeAiSpeech(text, await SettingsService.getSettings());
+            sendResponse({ success: Boolean(audio), data: audio });
+            break;
+          }
+
           case 'FETCH_AUDIO_BASE64': {
             const { url } = payload as { url: string };
             try {
-              const res = await fetch(url);
+              // Only proxy known pronunciation hosts; never act as an open fetch relay.
+              const parsed = new URL(url);
+              if (parsed.protocol !== 'https:' || !AUDIO_FETCH_HOSTS.has(parsed.hostname)) {
+                sendResponse({ success: false, error: 'Audio host not allowed' });
+                break;
+              }
+              const res = await fetch(parsed.href);
               if (!res.ok) {
                 sendResponse({ success: false, error: `HTTP ${res.status}` });
                 break;
@@ -502,11 +558,73 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 
 
 
+          case 'LOG_EVENT': {
+            const { event, data } = payload as { event: ApprovedEventName; data: any };
+            const logged = await EventLogger.log(event, data);
+            sendResponse({ success: true, data: logged });
+            break;
+          }
+
+          case 'GET_EVENT_LOGS': {
+            const store = await EventLogger.getStore();
+            sendResponse({ success: true, data: store });
+            break;
+          }
+
+          case 'EXPORT_EVENT_LOGS': {
+            const jsonString = await EventLogger.exportLogsAsJson();
+            sendResponse({ success: true, data: jsonString });
+            break;
+          }
+
+          case 'CLEAR_EVENT_LOGS': {
+            await EventLogger.clearLogs();
+            sendResponse({ success: true });
+            break;
+          }
+
+          case 'GET_FEEDBACK_REPORTS': {
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+              const existing = (await chrome.storage.local.get('lexiflow_feedback_reports')) as Record<string, any> || {};
+              const reports: WrongMeaningReport[] = Array.isArray(existing.lexiflow_feedback_reports)
+                ? existing.lexiflow_feedback_reports
+                : [];
+              sendResponse({ success: true, data: reports });
+            } else {
+              sendResponse({ success: true, data: [] });
+            }
+            break;
+          }
+
+          case 'EXPORT_FEEDBACK_REPORTS': {
+            let reports: WrongMeaningReport[] = [];
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+              const existing = (await chrome.storage.local.get('lexiflow_feedback_reports')) as Record<string, any> || {};
+              reports = Array.isArray(existing.lexiflow_feedback_reports)
+                ? existing.lexiflow_feedback_reports
+                : [];
+            }
+            const exportPayload = {
+              format: 'lexiflow_feedback_reports_export',
+              version: 1,
+              exportedAt: new Date().toISOString(),
+              totalReports: reports.length,
+              reports
+            };
+            sendResponse({ success: true, data: JSON.stringify(exportPayload, null, 2) });
+            break;
+          }
+
           default:
             sendResponse({ success: false, error: `Unknown message type: ${type}` });
         }
       } catch (err) {
-        sendResponse({ success: false, error: (err as Error).message });
+        sendResponse({
+          success: false,
+          error: (err as Error).message,
+          ...(err instanceof CloudAuthError ? { code: err.code } : {}),
+          ...(err instanceof CloudAIError ? { code: err.code, details: err.details } : {})
+        });
       }
     })();
 

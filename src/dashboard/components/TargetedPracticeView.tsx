@@ -43,7 +43,7 @@ export const TargetedPracticeView: React.FC<TargetedPracticeViewProps> = ({
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span className="tag-badge" style={{ color: practiceList.length > 0 ? '#f59e0b' : '#10b981', fontSize: '13px' }}>
+          <span className="tag-badge" style={{ color: practiceList.length > 0 ? 'var(--warning)' : 'var(--success)', fontSize: '13px' }}>
             {practiceList.length} Attention Required
           </span>
         </div>

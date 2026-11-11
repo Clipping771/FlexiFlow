@@ -1,11 +1,19 @@
+import { isSiteActive, siteModeOf } from '../shared/siteAccess';
+import { maybeShowOffHint } from './offHint';
 import { calculatePopupPosition, clampPositionToViewport } from './positioning';
-import { getSelectionData, isEditableElement } from './selection';
+import { getSelectionData, isEditableElement, detectSelectionType } from './selection';
 import { POPUP_STYLES } from './styles';
+import { installBengaliFont, extensionFontUrl } from '../shared/bengaliFont';
 import { PopupView } from './popupView';
+
+/** Set once the reader dismisses the first-use tip on the reading card. */
+const CARD_TIP_KEY = 'lexiflow_card_tip_done';
 import { TriggerView } from './triggerView';
 import { DOMHighlighter } from './highlighter';
 import { HighlightToolbar } from './highlightToolbar';
 import { MainArticleExtractor } from './articleExtractor';
+import { HIGHLIGHT_MAX_ARTICLE_CHARS } from '../services/ai/highlightIntelligence';
+import { SUMMARY_MAX_ARTICLE_CHARS } from '../services/ai/prompts/summary';
 import {
   SelectionType,
   LinguisticAnalysisResult,
@@ -21,7 +29,6 @@ import {
 } from '../types';
 import { DEFAULT_SETTINGS } from '../services/storage/settings';
 import { registerCustomLanguages } from '../config/languages';
-import { MockAIProvider } from '../services/ai/mockProvider';
 import { BengaliService } from '../services/bengali';
 import { DictionaryService, dictionaryResultToStageA } from '../services/dictionary';
 import { CacheManager } from '../services/cache';
@@ -39,6 +46,8 @@ class ContentScriptManager {
   private currentContextSentence: string = '';
   private currentNearbyParagraph: string = '';
   private currentAnchorRect: DOMRect | null = null;
+  /** Element to refocus when a card that took keyboard focus closes. */
+  private focusReturnTarget: HTMLElement | null = null;
 
   // Concurrency, Cancellation & Debounce controls
   private currentRequestId: number = 0;
@@ -51,6 +60,7 @@ class ContentScriptManager {
   private isPopupPositioned: boolean = false;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private lastErrorMessage: string | null = null;
+  private lastPointerTarget: EventTarget | null = null;
 
   private userSettings: UserSettings = DEFAULT_SETTINGS;
 
@@ -75,6 +85,9 @@ class ContentScriptManager {
     this.shadowHost.style.pointerEvents = 'none';
 
     this.shadowRoot = this.shadowHost.attachShadow({ mode: 'open' });
+
+    // Bengali typeface for the card (font faces must be declared on the page document)
+    installBengaliFont(document, extensionFontUrl);
 
     // Inject scoped stylesheet
     const styleEl = document.createElement('style');
@@ -161,27 +174,7 @@ class ContentScriptManager {
     this.highlightToolbar?.setLoading(true);
 
     // 1. Isolate the main article body (entire piece, full text)
-    const article = MainArticleExtractor.findMainArticle();
-    let cleanExcerpt = (article?.cleanText || '').slice(0, 15000);
-    const title = article?.title || document.title;
-    let targetContainer: HTMLElement | undefined = article?.container;
-
-    // Fallback: If no specialized article container detected, collect substantive paragraphs from body
-    if (!cleanExcerpt || cleanExcerpt.trim().length < 30) {
-      const substantiveParas = Array.from(document.querySelectorAll('p'))
-        .filter((p) => {
-          const txt = (p.textContent || '').trim();
-          if (txt.length < 25) return false;
-          // Ignore inside headers, footers, navs
-          if (p.closest('header, footer, nav, aside, [role="navigation"], #lexiflow-host')) return false;
-          return true;
-        });
-
-      if (substantiveParas.length > 0) {
-        cleanExcerpt = substantiveParas.map((p) => p.textContent?.trim()).join('\n\n').slice(0, 15000);
-        targetContainer = document.body;
-      }
-    }
+    const { text: cleanExcerpt, title, container: targetContainer } = this.collectArticleText(HIGHLIGHT_MAX_ARTICLE_CHARS);
 
     if (!cleanExcerpt || cleanExcerpt.trim().length < 30) {
       console.warn('[LexiFlow] Page highlighting skipped: No substantive article text found (<30 characters).');
@@ -190,7 +183,6 @@ class ContentScriptManager {
     }
 
     try {
-      console.log(`[LexiFlow] Requesting highlight extraction for: "${title}" (${cleanExcerpt.length} chars)`);
       const res = await this.sendMessage<HighlightExtractionResult>('IDENTIFY_PAGE_HIGHLIGHTS', {
         rawText: cleanExcerpt,
         pageTitle: title
@@ -210,6 +202,32 @@ class ContentScriptManager {
     } finally {
       this.highlightToolbar?.setLoading(false);
     }
+  }
+
+  /**
+   * The page's main article text: the detected article body, or else the substantive paragraphs
+   * outside headers, footers and navigation.
+   */
+  private collectArticleText(maxChars: number): { text: string; title: string; container?: HTMLElement } {
+    const article = MainArticleExtractor.findMainArticle();
+    const title = article?.title || document.title;
+    const text = (article?.cleanText || '').slice(0, maxChars);
+    if (text.trim().length >= 30) return { text, title, container: article?.container };
+
+    // Fallback: If no specialized article container detected, collect substantive paragraphs from body
+    const substantiveParas = Array.from(document.querySelectorAll('p')).filter((p) => {
+      const txt = (p.textContent || '').trim();
+      if (txt.length < 25) return false;
+      // Ignore inside headers, footers, navs
+      if (p.closest('header, footer, nav, aside, [role="navigation"], #lexiflow-host')) return false;
+      return true;
+    });
+    if (substantiveParas.length === 0) return { text, title, container: article?.container };
+    return {
+      text: substantiveParas.map((p) => p.textContent?.trim()).join('\n\n').slice(0, maxChars),
+      title,
+      container: document.body
+    };
   }
 
   private updateHighlightToolbar(): void {
@@ -268,7 +286,9 @@ class ContentScriptManager {
     if (this.userSettings.customLanguages) {
       registerCustomLanguages(this.userSettings.customLanguages);
     }
+    this.popupView.setSourceLanguage(this.userSettings.sourceLanguage || 'en');
     this.popupView.setTargetLanguage(this.userSettings.targetLanguage || 'bn');
+    this.popupView.setReadingMode(this.userSettings.readingMode || 'quick');
     if (this.isPopupPositioned) {
       this.updatePosition(false);
     }
@@ -283,26 +303,16 @@ class ContentScriptManager {
     }
   }
 
+  /** Off unless the settings allow this site (LexiFlow is off on every site by default). */
   private isSiteDisabled(): boolean {
-    if (this.userSettings?.isGloballyPaused) {
-      return true;
-    }
-    if (!this.userSettings?.disabledSites || !Array.isArray(this.userSettings.disabledSites)) {
-      return false;
-    }
-    const host = window.location.hostname.toLowerCase();
-    if (!host) return false;
-    return this.userSettings.disabledSites.some((site) => {
-      const s = site.toLowerCase().trim();
-      if (!s) return false;
-      return host === s || host.endsWith('.' + s);
-    });
+    return !isSiteActive(window.location.href, this.userSettings);
   }
 
   private setupEventListeners(): void {
-    // 1. Mouse Down Handler (Track dragging state & outside clicks)
-    document.addEventListener('mousedown', (e) => {
+    // 1. Mouse & Pointer Down Handler (Track dragging state & outside clicks)
+    const onPointerDown = (e: MouseEvent | PointerEvent) => {
       this.isMouseDown = true;
+      this.lastPointerTarget = e.target;
       if (e.detail > 1) return; // Prevent dismissal during double click sequence
       if (this.popupView && this.popupView.isPinnedMode()) return; // Keep pinned popup open
 
@@ -311,11 +321,12 @@ class ContentScriptManager {
         this.hidePopup();
         this.hideTrigger();
       }
-    }, true);
+    };
 
-    // 2. Mouse Up Handler (Selection finalized via mouse drag)
-    document.addEventListener('mouseup', (e) => {
+    // 2. Mouse & Pointer Up Handler (Selection finalized via mouse drag or touch)
+    const onPointerUp = (e: MouseEvent | PointerEvent) => {
       this.isMouseDown = false;
+      this.lastPointerTarget = e.target;
       const target = e.target as Element;
 
       // Do not re-trigger selection check if user clicked inside our own popup or trigger
@@ -323,30 +334,21 @@ class ContentScriptManager {
         return;
       }
 
-      const sel = window.getSelection();
-      // If user merely clicked inside an editable element without selecting text, ignore
-      if (isEditableElement(target) && (!sel || sel.isCollapsed || !sel.toString().trim())) {
-        return;
-      }
-
-      if (sel && !sel.isCollapsed && sel.toString().trim()) {
-        this.isUserDismissed = false;
-      }
-
+      this.isUserDismissed = false;
       // Small debounce to allow browser selection range to settle
       this.scheduleSelectionCheck(60);
-    }, true);
+    };
+
+    document.addEventListener('mousedown', onPointerDown, true);
+    window.addEventListener('pointerdown', onPointerDown, true);
+
+    document.addEventListener('mouseup', onPointerUp, true);
+    window.addEventListener('pointerup', onPointerUp, true);
 
     // 3. Double Click Handler (Instant Single-Word Selection)
     document.addEventListener('dblclick', (e) => {
       if (this.isSiteDisabled()) return;
-      const target = e.target as Element;
-      // If user double-clicked inside an editable element without outer selection, ignore
-      const sel = window.getSelection();
-      if (isEditableElement(target) && (!sel || sel.isCollapsed || !sel.toString().trim())) {
-        return;
-      }
-
+      this.lastPointerTarget = e.target;
       this.isDoubleClicked = true;
       this.isUserDismissed = false;
       this.lastAnalyzedText = '';
@@ -358,18 +360,8 @@ class ContentScriptManager {
       // Do not interrupt active mouse drag
       if (this.isMouseDown) return;
 
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-        this.lastAnalyzedText = '';
-        this.isUserDismissed = false;
-        if (!this.popupView?.isPinnedMode()) {
-          this.hideTrigger();
-        }
-        return;
-      }
-
-      // Debounce keyboard & programmatic selection changes (120ms responsive stabilization)
-      this.scheduleSelectionCheck(120);
+      // Debounce keyboard & programmatic selection changes (80ms responsive stabilization)
+      this.scheduleSelectionCheck(80);
     });
 
     // 5. Key Up Handler (Keyboard selection gestures)
@@ -421,9 +413,9 @@ class ContentScriptManager {
             width: 100,
             height: 20
           } as DOMRect;
-          this.lastAnalyzedText = text;
-          this.isUserDismissed = false;
-          this.executeAnalysis(text, 'word', '', '', dummyRect);
+          const clean = text.trim();
+          const selType = detectSelectionType(clean);
+          this.executeAnalysis(clean, selType, clean, '', dummyRect, { focusCard: true });
           sendResponse?.({ success: true });
           return;
         }
@@ -436,6 +428,7 @@ class ContentScriptManager {
             data: {
               isSiteDisabled: this.isSiteDisabled(),
               articleTitle: article?.title || document.title,
+              articleWordCount: article?.cleanText ? article.cleanText.split(/\s+/).filter(Boolean).length : 0,
               hasMainArticle: Boolean(article && article.paragraphs.length > 0),
               count,
               currentIndex: (this.highlighter as any)?.currentIndex ?? -1,
@@ -447,6 +440,13 @@ class ContentScriptManager {
           return true;
         }
 
+        if (message.type === 'EXTRACT_ARTICLE_TEXT') {
+          // For summary practice: the reader's summary is marked against this text
+          const { text, title } = this.collectArticleText(SUMMARY_MAX_ARTICLE_CHARS);
+          sendResponse?.({ success: text.trim().length >= 30, data: { url: window.location.href, title, text } });
+          return;
+        }
+
         if (message.type === 'TRIGGER_HIGHLIGHT_ARTICLE') {
           this.runPageHighlightAnalysis().then((res) => {
             const count = this.highlighter?.getCount() || { total: 0, words: 0, phrases: 0, idioms: 0, visible: 0 };
@@ -456,7 +456,8 @@ class ContentScriptManager {
               data: {
                 count,
                 items: discovered,
-                sourceMode: res?.sourceMode
+                sourceMode: res?.sourceMode,
+                fallbackReason: res?.fallbackReason
               },
               error: !res
                 ? 'No editorial article body found on this webpage (requires at least 30 characters).'
@@ -498,7 +499,9 @@ class ContentScriptManager {
         if (message.type === 'SCROLL_TO_HIGHLIGHT_ITEM') {
           const text = (message.payload?.text || '').toLowerCase().trim();
           const visible = this.highlighter?.getVisibleMarks() || [];
-          const match = visible.find((m) => (m.textContent || '').toLowerCase().trim() === text);
+          const match = visible.find(
+            (m) => (m.getAttribute('data-lexiflow-text') || m.textContent || '').toLowerCase().trim() === text
+          );
           if (match) {
             if (typeof match.scrollIntoView === 'function') {
               match.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -523,25 +526,16 @@ class ContentScriptManager {
 
   private processCurrentSelection(): void {
     if (this.isMouseDown) return;
-    if (this.isSiteDisabled()) return;
-
-    // Guard: only ignore if the selection itself is inside an editable element
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) {
-      const range = sel.getRangeAt(0);
-      const startEl = range.startContainer.nodeType === Node.ELEMENT_NODE
-        ? (range.startContainer as Element)
-        : range.startContainer.parentElement;
-      const endEl = range.endContainer.nodeType === Node.ELEMENT_NODE
-        ? (range.endContainer as Element)
-        : range.endContainer.parentElement;
-
-      if (isEditableElement(startEl) || isEditableElement(endEl)) {
-        return;
+    if (this.isSiteDisabled()) {
+      // Off by default: once in a while, tell the reader how to turn LexiFlow on for this site
+      if (siteModeOf(this.userSettings) === 'off' && !this.userSettings?.isGloballyPaused) {
+        const picked = getSelectionData(this.lastPointerTarget)?.cleanText || '';
+        if (picked.length >= 2 && picked.length <= 300) void maybeShowOffHint();
       }
+      return;
     }
 
-    const data = getSelectionData();
+    const data = getSelectionData(this.lastPointerTarget);
     if (!data || !data.cleanText) return;
 
     // Disregard massive full-page selections (e.g. Ctrl+A over 5000 chars)
@@ -572,7 +566,8 @@ class ContentScriptManager {
           data.selectionType,
           data.contextSentence,
           data.nearbyParagraph,
-          data.rect
+          data.rect,
+          { focusCard: true }
         );
       });
       return;
@@ -614,7 +609,8 @@ class ContentScriptManager {
     selectionType: SelectionType,
     contextSentence: string,
     nearbyParagraph: string,
-    anchorRect: DOMRect
+    anchorRect: DOMRect,
+    options: { focusCard?: boolean } = {}
   ): void {
     const requestId = ++this.currentRequestId;
     this.activeAbortController?.abort();
@@ -633,8 +629,29 @@ class ContentScriptManager {
     if (!this.popupView) {
       this.popupView = new PopupView({
         onClose: () => this.hidePopup(),
+        onDismissTip: () => {
+          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            chrome.storage.local.set({ [CARD_TIP_KEY]: true });
+          }
+        },
+        onRetry: () => {
+          if (!this.currentText || !this.currentAnchorRect) return;
+          this.executeAnalysis(
+            this.currentText,
+            this.currentSelectionType,
+            this.currentContextSentence,
+            this.currentNearbyParagraph,
+            this.currentAnchorRect
+          );
+        },
         onSave: async (item: VocabularyItem) => {
-          await this.sendMessage('SAVE_VOCAB', { item });
+          // Remember where the word was met so the Reading List can link saved words to their article
+          const withSource: VocabularyItem = {
+            ...item,
+            pageUrl: item.pageUrl || window.location.href,
+            pageTitle: item.pageTitle || document.title
+          };
+          await this.sendMessage('SAVE_VOCAB', { item: withSource });
         },
         onChangeMode: (mode: SelectionType) => {
           if (this.currentAnchorRect) {
@@ -675,16 +692,23 @@ class ContentScriptManager {
           return Boolean(res?.success);
         },
         onSelectWord: (word: string, contextSentence?: string) => {
-          if (this.currentAnchorRect) {
-            this.lastAnalyzedText = word;
-            this.executeAnalysis(
-              word,
-              'word',
-              contextSentence || this.currentText,
-              this.currentNearbyParagraph,
-              this.currentAnchorRect
-            );
-          }
+          const anchor = this.currentAnchorRect || this.popupView?.getElement().getBoundingClientRect() || ({
+            top: window.innerHeight / 3,
+            bottom: window.innerHeight / 3 + 20,
+            left: window.innerWidth / 2 - 50,
+            right: window.innerWidth / 2 + 50,
+            width: 100,
+            height: 20
+          } as DOMRect);
+          this.currentAnchorRect = anchor;
+          this.lastAnalyzedText = word;
+          this.executeAnalysis(
+            word,
+            'word',
+            contextSentence || this.currentText,
+            this.currentNearbyParagraph,
+            anchor
+          );
         },
         onResize: () => {
           this.updatePosition(false);
@@ -695,6 +719,12 @@ class ContentScriptManager {
         }
       });
       this.shadowRoot.appendChild(this.popupView.getElement());
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        const view = this.popupView;
+        chrome.storage.local.get(CARD_TIP_KEY, (res) => {
+          if (!res?.[CARD_TIP_KEY]) view.setFirstUseTip(true);
+        });
+      }
     }
 
     const popupEl = this.popupView.getElement();
@@ -704,22 +734,40 @@ class ContentScriptManager {
     popupEl.style.setProperty('display', 'flex', 'important');
     popupEl.style.setProperty('visibility', 'visible', 'important');
     popupEl.style.pointerEvents = 'auto';
+    if (options.focusCard) {
+      const active = document.activeElement;
+      this.focusReturnTarget = active instanceof HTMLElement && active !== document.body ? active : null;
+      this.popupView.focusCard();
+    }
+
+    // Telemetry: Record approved popup_shown lifecycle event (no text, URLs, or personal data)
+    this.sendMessage('LOG_EVENT', {
+      event: 'popup_shown',
+      data: {
+        selectionType,
+        triggerMode: this.userSettings.triggerMode || 'auto_selection',
+        readingMode: this.userSettings.readingMode || 'quick'
+      }
+    }).catch(() => {});
 
     // 1. Instant Fast-Path: Dictionary-First Local Lookup (< 1ms)
     const isWordOrPhrase = selectionType === 'word' || selectionType === 'phrase';
+    const currentTargetLang = this.userSettings.targetLanguage || 'bn';
+    const isBengali = currentTargetLang === 'bn';
+    const langPair = `en-${currentTargetLang}`;
     let hasLocalDisplay = false;
 
     if (isWordOrPhrase) {
       // Step A: Check memory cache for existing contextual AI result
-      const aiCacheKey = CacheManager.getInstance().getAIKey(text, contextSentence);
+      const aiCacheKey = CacheManager.getInstance().getAIKey(text, contextSentence, langPair);
       const cachedAI = (CacheManager.getInstance() as any).memoryCache?.get(aiCacheKey) as StageAExplanation | null;
 
       if (cachedAI) {
         this.popupView.showStageA(cachedAI, contextSentence, nearbyParagraph, false);
         this.updatePosition(true);
         hasLocalDisplay = true;
-      } else {
-        // Step B: Synchronous local dictionary search (< 0.01ms)
+      } else if (isBengali) {
+        // Step B: Synchronous local dictionary search (< 0.01ms) - only for Bengali as local dictionary is English-Bengali
         const dictHit = DictionaryService.lookupSync(text, contextSentence);
         if (dictHit) {
           const localStageA = dictionaryResultToStageA(dictHit, contextSentence);
@@ -758,7 +806,7 @@ class ContentScriptManager {
         }
 
         // Cache the successful AI explanation
-        CacheManager.getInstance().setAIExplanation(text, contextSentence, stageAResult);
+        CacheManager.getInstance().setAIExplanation(text, contextSentence, stageAResult, langPair);
 
         const savedItem = await this.sendMessage<VocabularyItem>('GET_VOCAB_BY_WORD', { word: text });
         if (requestId !== this.currentRequestId || abortSignal.aborted) return;
@@ -850,6 +898,7 @@ class ContentScriptManager {
       this.lastAnalyzedText = this.currentText;
     }
     if (this.popupView) {
+      this.popupView.stopAudio();
       this.popupView.unpin();
       this.popupView.resetDrag();
       const el = this.popupView.getElement();
@@ -858,6 +907,11 @@ class ContentScriptManager {
       el.style.setProperty('display', 'none', 'important');
       el.style.setProperty('visibility', 'hidden', 'important');
       el.style.pointerEvents = 'none';
+      // Give keyboard focus back to where the reader was before the card took it
+      if (this.shadowRoot?.activeElement && this.focusReturnTarget?.isConnected) {
+        this.focusReturnTarget.focus({ preventScroll: true });
+      }
+      this.focusReturnTarget = null;
     }
   }
 
@@ -940,9 +994,11 @@ class ContentScriptManager {
 
   private async sendMessage<T>(type: string, payload?: any): Promise<T | null> {
     if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage || !chrome.runtime.id) {
-      // Standalone browser / demo environment fallback
+      // Standalone browser / demo environment fallback (dev builds only; stripped from production)
+      if (!__LEXIFLOW_DEMO__) return null;
       try {
-        const mock = new MockAIProvider();
+        const { MockAIProvider } = await import('../services/ai/mockProvider');
+        const mock = new MockAIProvider(this.userSettings?.targetLanguage || 'bn');
         if (type === 'ANALYZE_STAGE_A') {
           return (await mock.analyzeStageA(payload.text, payload.contextSentence, payload.paragraphContext)) as unknown as T;
         }

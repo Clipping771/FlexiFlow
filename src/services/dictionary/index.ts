@@ -142,7 +142,7 @@ export function dictionaryResultToStageA(
     easyBengali,
     contextMeaning,
     example: firstDef?.example || contextSentence || `Example with ${dict.word}.`,
-    exampleBengali: 'বাক্যটিতে এর ভাবার্থ স্পষ্টভাবে প্রকাশ পেয়েছে।',
+    exampleBengali: firstDef?.exampleBengali || undefined,
     confidence: 'high',
     contextualSenseId: 'sense_dict_1'
   };

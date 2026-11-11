@@ -41,22 +41,30 @@ export function detectSelectionType(text: string): SelectionType {
   }
 
   // 1. Check for paragraph:
-  // Explicit multi-line blocks with content
-  const nonBlankLines = trimmed.split(/\r?\n+/).filter((line) => line.trim().length > 0);
-  if (nonBlankLines.length >= 2) {
+  // Explicit multi-paragraph blocks separated by double newlines
+  const doubleNewlineBlocks = trimmed.split(/\n\s*\n+/).filter((line) => line.trim().length > 0);
+  if (doubleNewlineBlocks.length >= 2) {
     return 'paragraph';
   }
 
-  // Multiple completed sentences detected with terminal punctuation followed by space and capital letter/number
-  // Filter out common abbreviations like Mr., Dr., e.g., i.e.
-  const sanitizedForBoundary = trimmed.replace(/\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|vs|etc|e\.g|i\.e)\./gi, 'ABBR');
-  const internalSentenceEndings = sanitizedForBoundary.match(/[.!?]["'”’]?\s+[A-Z0-9]/g) || [];
-  if (internalSentenceEndings.length >= 1 && /[.!?]["'”’]?$/.test(trimmed)) {
+  // Multiple completed sentences detected using robust sentence segmentation (with abbreviation/number protection)
+  const sentences = splitIntoSentences(trimmed);
+  if (sentences.length >= 2) {
     return 'paragraph';
   }
 
-  // If text is very long with multiple terminal punctuation marks (> 60 words and 2+ sentence boundaries)
-  if (wordCount > 60 && (trimmed.match(/[.!?]/g) || []).length >= 2) {
+  // Check for internal sentence boundary (e.g. terminal punctuation followed by space and capital letter/number/quote)
+  const sanitizedForBoundary = trimmed.replace(
+    /\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|vs|etc|e\.g|i\.e|U\.S|U\.K|Jan|Feb|Mar|Apr|Aug|Sept|Oct|Nov|Dec)\./gi,
+    'ABBR'
+  ).replace(/\b\d+\.\d+\b/g, 'NUM');
+  const internalSentenceEndings = sanitizedForBoundary.match(/[.!?]["'”’]?\s+[A-Z0-9"“'‘]/g) || [];
+  if (internalSentenceEndings.length >= 1) {
+    return 'paragraph';
+  }
+
+  // If text is very long with multiple terminal punctuation marks (> 50 words and 2+ sentence boundaries)
+  if (wordCount > 50 && (trimmed.match(/[.!?]/g) || []).length >= 2) {
     return 'paragraph';
   }
 
@@ -168,12 +176,15 @@ export function extractSurroundingContext(range: Range): { sentence: string; par
       sentence = localSentence;
     }
 
-    // Extract enclosing block element for paragraph context
+    // Extract enclosing block element for paragraph context (supporting both standard web DOM and PDF text layers)
     let parent = container.parentElement;
     while (parent && parent !== document.body && parent !== document.documentElement) {
       const display = window.getComputedStyle(parent).display;
-      if (display === 'block' || display === 'flex' || parent.tagName === 'P' || parent.tagName === 'ARTICLE') {
-        paragraph = (parent.innerText || parent.textContent || '').trim().slice(0, 1000);
+      const isBlock = display === 'block' || display === 'flex' || parent.tagName === 'P' || parent.tagName === 'ARTICLE';
+      const isPdfLayer = parent.classList.contains('textLayer') || parent.classList.contains('page') || parent.getAttribute('role') === 'region';
+
+      if (isBlock || isPdfLayer) {
+        paragraph = (parent.innerText || parent.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 1000);
         break;
       }
       parent = parent.parentElement;
@@ -189,31 +200,132 @@ export function extractSurroundingContext(range: Range): { sentence: string; par
   return { sentence, paragraph };
 }
 
-export function getSelectionData(): SelectionData | null {
-  const selection = window.getSelection();
-  if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+export function getInputElementSelection(): SelectionData | null {
+  try {
+    const activeEl = document.activeElement;
+    if (!activeEl) return null;
+    const isInput = activeEl instanceof HTMLInputElement && /^(?:text|search|url|tel|password)$/i.test(activeEl.type);
+    const isTextArea = activeEl instanceof HTMLTextAreaElement;
+    if (!isInput && !isTextArea) return null;
+
+    const inputEl = activeEl as HTMLInputElement | HTMLTextAreaElement;
+    const start = inputEl.selectionStart;
+    const end = inputEl.selectionEnd;
+    if (start === null || end === null || start === end) return null;
+
+    const rawText = inputEl.value.slice(Math.min(start, end), Math.max(start, end));
+    const text = rawText.trim();
+    if (!text) return null;
+
+    const words = text.split(/\s+/).filter(Boolean);
+    let cleanText = text;
+    if (words.length <= 1) {
+      cleanText = text.replace(/^["'“”‘`([{]+|[)"'“”’`\]}.,;:!?]+$/g, '').trim();
+    } else {
+      cleanText = text.replace(/^["'“”‘`([{]+|[)"'“”’`\]}]+$/g, '').trim();
+    }
+    if (!cleanText) return null;
+
+    let rect = typeof inputEl.getBoundingClientRect === 'function' ? inputEl.getBoundingClientRect() : null;
+    if (!rect || (rect.width === 0 && rect.height === 0)) {
+      rect = {
+        top: 100,
+        bottom: 120,
+        left: 100,
+        right: 200,
+        width: 100,
+        height: 20
+      } as DOMRect;
+    }
+
+    const selectionType = detectSelectionType(cleanText);
+
+    return {
+      text,
+      cleanText,
+      selectionType,
+      contextSentence: cleanText,
+      nearbyParagraph: inputEl.value.slice(0, 500),
+      rect
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function getDeepSelection(target?: EventTarget | null): { selection: Selection | null; range: Range | null } {
+  try {
+    // 1. If target is inside a ShadowRoot (e.g. Google Gemini Web Components), get selection from that ShadowRoot
+    if (target && typeof (target as any).getRootNode === 'function') {
+      const rootNode = (target as any).getRootNode();
+      if (rootNode && rootNode !== document && typeof (rootNode as any).getSelection === 'function') {
+        const shadowSel = (rootNode as any).getSelection() as Selection | null;
+        if (shadowSel && !shadowSel.isCollapsed && shadowSel.toString().trim()) {
+          const range = shadowSel.rangeCount > 0 ? shadowSel.getRangeAt(0) : null;
+          return { selection: shadowSel, range };
+        }
+      }
+    }
+
+    // 2. Check activeElement shadow root chain
+    let active: Element | null = document.activeElement;
+    while (active && active.shadowRoot) {
+      if (typeof (active.shadowRoot as any).getSelection === 'function') {
+        const shadowSel = (active.shadowRoot as any).getSelection() as Selection | null;
+        if (shadowSel && !shadowSel.isCollapsed && shadowSel.toString().trim()) {
+          const range = shadowSel.rangeCount > 0 ? shadowSel.getRangeAt(0) : null;
+          return { selection: shadowSel, range };
+        }
+      }
+      active = active.shadowRoot.activeElement;
+    }
+
+    // 3. Fallback to standard window selection
+    const winSel = window.getSelection();
+    const range = winSel && winSel.rangeCount > 0 ? winSel.getRangeAt(0) : null;
+    return { selection: winSel, range };
+  } catch {
+    const winSel = window.getSelection();
+    const range = winSel && winSel.rangeCount > 0 ? winSel.getRangeAt(0) : null;
+    return { selection: winSel, range };
+  }
+}
+
+export function getSelectionData(target?: EventTarget | null): SelectionData | null {
+  // 1. First check if selection is inside an active HTML input or textarea
+  const inputData = getInputElementSelection();
+  if (inputData) {
+    return inputData;
+  }
+
+  // 2. Check deep selection (including ShadowRoot in web components like Gemini)
+  const { selection, range } = getDeepSelection(target);
+  if (!selection || selection.isCollapsed || !range) {
     return null;
   }
 
-  const range = selection.getRangeAt(0);
   const text = selection.toString().trim();
   if (!text) return null;
 
-  // Ensure selection is not inside editable element or extension-owned UI
-  if (
-    isEditableElement(range.startContainer.parentElement) ||
-    isEditableElement(range.endContainer.parentElement)
-  ) {
-    return null;
-  }
-
+  // Ensure selection is not inside extension-owned UI
   const host = document.getElementById('lexiflow-host');
   if (host && (host.contains(range.startContainer) || host.contains(range.endContainer))) {
     return null;
   }
 
   // Clean text: strip leading/trailing quotes, outer punctuation
-  const cleanText = text.replace(/^["'“”‘`([{]+|[)"'“”’`\]}.,;:!?]+$/g, '').trim();
+  const words = text.split(/\s+/).filter(Boolean);
+  let cleanText = text;
+  if (words.length <= 1) {
+    cleanText = text.replace(/^["'“”‘`([{]+|[)"'“”’`\]}.,;:!?]+$/g, '').trim();
+  } else {
+    // Rejoin hyphenated words split across lines (typical in PDFs and columns)
+    cleanText = cleanText.replace(/(\w+)-\r?\n\s*(\w+)/g, '$1$2');
+    // Normalize soft line breaks into spaces, preserving double newlines for genuine paragraphs
+    cleanText = cleanText.replace(/([^\n])\r?\n([^\n])/g, '$1 $2');
+    cleanText = cleanText.replace(/[ \t]+/g, ' ');
+    cleanText = cleanText.replace(/^["'“”‘`([{]+|[)"'“”’`\]}]+$/g, '').trim();
+  }
   if (!cleanText) return null;
 
   let rect: DOMRect | null = typeof range.getBoundingClientRect === 'function' ? range.getBoundingClientRect() : null;
@@ -222,7 +334,9 @@ export function getSelectionData(): SelectionData | null {
     if (clientRects.length > 0) {
       rect = clientRects[0];
     } else {
-      const parent = range.startContainer.parentElement;
+      const parent = range.startContainer.nodeType === Node.ELEMENT_NODE
+        ? (range.startContainer as Element)
+        : range.startContainer.parentElement;
       if (parent && typeof parent.getBoundingClientRect === 'function') {
         rect = parent.getBoundingClientRect();
       }
@@ -247,8 +361,96 @@ export function getSelectionData(): SelectionData | null {
     text,
     cleanText,
     selectionType,
-    contextSentence: sentence || cleanText,
+    contextSentence: (sentence && sentence.length >= cleanText.length) ? sentence : cleanText,
     nearbyParagraph: paragraph,
     rect
   };
 }
+
+/**
+ * Splits text into paragraphs based on double newlines or line breaks.
+ */
+export function splitIntoParagraphs(text: string): string[] {
+  if (!text || !text.trim()) return [];
+  const normalized = text.replace(/\r\n/g, '\n').trim();
+
+  // Try double newlines first (standard paragraph breaks)
+  const doubleNewlineBlocks = normalized
+    .split(/\n\s*\n+/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+
+  if (doubleNewlineBlocks.length > 1) {
+    return doubleNewlineBlocks;
+  }
+
+  // Check if single newlines divide distinct paragraph blocks
+  const lines = normalized
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  if (lines.length > 1 && lines.every((l) => l.length > 30 || /[.!?]["'”’]?$/.test(l))) {
+    return lines;
+  }
+
+  return [normalized];
+}
+
+/**
+ * Splits paragraph text into distinct grammatical sentences.
+ * Protects common abbreviations and decimal numbers so they don't cause false splits.
+ */
+export function splitIntoSentences(paragraphText: string): string[] {
+  const clean = (paragraphText || '').trim();
+  if (!clean) return [];
+
+  // Protect known abbreviations and numbers so they don't trigger false sentence boundaries
+  const abbrMap = new Map<string, string>();
+  let placeholderCount = 0;
+  const masked = clean
+    .replace(
+      /\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|vs|etc|e\.g|i\.e|U\.S|U\.K|Jan|Feb|Mar|Apr|Aug|Sept|Oct|Nov|Dec)\./gi,
+      (m) => {
+        const key = `__ABBR_${placeholderCount++}__`;
+        abbrMap.set(key, m);
+        return key;
+      }
+    )
+    .replace(/\b\d+\.\d+\b/g, (m) => {
+      const key = `__NUM_${placeholderCount++}__`;
+      abbrMap.set(key, m);
+      return key;
+    });
+
+  let rawParts: string[] = [];
+
+  // 1. Try native Intl.Segmenter on the masked text
+  if (typeof Intl !== 'undefined' && typeof (Intl as any).Segmenter === 'function') {
+    try {
+      const segmenter = new (Intl as any).Segmenter('en', { granularity: 'sentence' });
+      const rawSegments = Array.from(segmenter.segment(masked)) as Array<{ segment: string }>;
+      rawParts = rawSegments
+        .map((s) => s.segment.trim())
+        .filter((s) => s.length > 0);
+    } catch {
+      rawParts = [];
+    }
+  }
+
+  // 2. Resilient fallback regex if Intl.Segmenter produced nothing
+  if (rawParts.length === 0) {
+    rawParts = masked.split(/(?<=[.!?]["'”’]?)\s+(?=[A-Z0-9"“'‘])/);
+  }
+
+  return rawParts
+    .map((part) => {
+      let restored = part.trim();
+      abbrMap.forEach((orig, key) => {
+        restored = restored.replaceAll(key, orig);
+      });
+      return restored;
+    })
+    .filter((s) => s.length > 0);
+}
+

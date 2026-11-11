@@ -1,0 +1,47 @@
+import { Hono } from 'hono';
+import type { AppEnv, Bindings } from './env';
+import { ApiError } from './lib/errors';
+import { runRetention } from './lib/retention';
+import { corsForExtension } from './middleware/cors';
+import { ai } from './routes/ai';
+import { auth } from './routes/auth';
+import { health } from './routes/health';
+import { me } from './routes/me';
+import { onboarding } from './routes/onboarding';
+import { mistakes } from './routes/mistakes';
+import { audio } from './routes/audio';
+import { sync } from './routes/sync';
+
+export const app = new Hono<AppEnv>();
+
+app.use('*', corsForExtension);
+
+const v1 = new Hono<AppEnv>();
+v1.route('/health', health);
+v1.route('/auth', auth);
+v1.route('/me', me);
+v1.route('/onboarding', onboarding);
+v1.route('/mistakes', mistakes);
+v1.route('/audio', audio);
+v1.route('/sync', sync);
+v1.route('/ai', ai);
+app.route('/v1', v1);
+
+app.notFound((c) => c.json(new ApiError(404, 'NOT_FOUND', 'Route not found.').toBody(), 404));
+
+app.onError((err, c) => {
+  if (err instanceof ApiError) return c.json(err.toBody(), err.status);
+  // Log the error type only; messages can contain user text or tokens.
+  console.error(`[lexiflow-api] unhandled ${err.name} on ${c.req.method} ${c.req.routePath}`);
+  return c.json(new ApiError(500, 'INTERNAL', 'Something went wrong.').toBody(), 500);
+});
+
+export default {
+  fetch: app.fetch,
+  // Daily cron (wrangler.toml [triggers]): data retention.
+  async scheduled(_controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
+    ctx.waitUntil(
+      runRetention(env.DB).then((r) => console.log(`[lexiflow-api] retention: ${JSON.stringify(r)}`))
+    );
+  }
+} satisfies ExportedHandler<Bindings>;

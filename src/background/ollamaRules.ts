@@ -60,7 +60,7 @@ export async function setupOllamaOriginRules(): Promise<void> {
       removeRuleIds: OLLAMA_RULE_IDS,
       addRules: rules
     });
-    console.log('[LexiFlow] Ollama Origin declarativeNetRequest rules registered successfully.');
+    console.debug('[LexiFlow] Ollama Origin declarativeNetRequest rules registered successfully.');
   } catch (err) {
     console.warn('[LexiFlow] Failed to register Ollama declarativeNetRequest dynamic rules:', err);
   }

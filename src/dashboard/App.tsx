@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { observeTargetLanguage } from '../shared/targetLang';
 import { VocabularyItem, UserSettings, FSRSRating } from '../types';
 import { Navbar, DashboardTab } from './components/Navbar';
 import { VocabularyView } from './components/VocabularyView';
 import { TargetedPracticeView } from './components/TargetedPracticeView';
 import { ReviewView } from './components/ReviewView';
-import { ArticleReaderView } from './components/ArticleReaderView';
-import { SentenceXRayView } from './components/SentenceXRayView';
 import { WordDifferenceView } from './components/WordDifferenceView';
 import { CoachView } from './components/CoachView';
 import { AnalyticsView } from './components/AnalyticsView';
@@ -13,29 +12,68 @@ import { SettingsView } from './components/SettingsView';
 import { DEFAULT_SETTINGS } from '../services/storage/settings';
 import { WeaknessDetector } from '../services/weakness/detector';
 import { FSRSEngine } from '../services/fsrs/engine';
-import { Menu, X, BookOpen, RotateCw, Newspaper, Settings as SettingsIcon } from 'lucide-react';
+import { Menu, X, BookOpen, Home, RotateCw, Settings as SettingsIcon, PanelRight, Sparkles } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ReadingListView } from './components/ReadingListView';
+import { SummaryPracticeView } from './components/SummaryPracticeView';
+import { MistakeMemoryView } from './components/MistakeMemoryView';
+import { SmartPracticeView } from './components/SmartPracticeView';
+import { TodayView, PracticeSection } from './components/TodayView';
+import { recordActivity } from '../services/learner/activity';
+import { syncLearnerData } from '../services/learner/sync';
+import { AuthService } from '../services/auth/authService';
 import './dashboard.css';
 
 const TAB_TITLES: Record<DashboardTab, string> = {
-  overview: 'Overview',
+  overview: 'Today',
   vocabulary: 'Vocabulary Library',
   targeted_practice: 'Targeted Practice',
-  review: 'Spaced Review',
-  article_reader: 'Article Reader',
-  sentence_xray: 'Sentence X-Ray',
+  review: 'Review',
+  reading_list: 'Reading List',
+  summary_practice: 'Summary Practice',
+  smart_practice: 'Smart Practice',
+  mistake_memory: 'Mistake Memory',
   word_difference: 'Word Difference',
   usage_coach: 'Usage Coach',
-  analytics: 'Learning Analytics',
+  analytics: 'Progress',
   settings: 'Settings'
 };
 
+/** Provider name only (no model) for the header's "AI:" pill. */
+const PROVIDER_NAMES: Record<string, string> = {
+  lexiflow: 'LexiFlow Cloud',
+  gemini: 'Gemini',
+  openai: 'OpenAI',
+  anthropic: 'Claude',
+  ollama: 'Ollama',
+  mock: 'Offline'
+};
+
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<DashboardTab>('vocabulary');
+  // dashboard.html#reading_list / #summary (from the popup) open straight on that tab
+  const [activeTab, setActiveTab] = useState<DashboardTab>(() =>
+    window.location.hash === '#reading_list'
+      ? 'reading_list'
+      : window.location.hash === '#summary'
+        ? 'summary_practice'
+        : window.location.hash === '#exam'
+          ? 'smart_practice'
+          : window.location.hash === '#vocabulary'
+            ? 'vocabulary'
+            : 'overview'
+  );
+  const [practiceSection, setPracticeSection] = useState<PracticeSection | undefined>(undefined);
   const [items, setItems] = useState<VocabularyItem[]>([]);
   const [dueItems, setDueItems] = useState<VocabularyItem[]>([]);
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
+  const targetLangRef = useRef(settings.targetLanguage || 'bn');
+  targetLangRef.current = settings.targetLanguage || 'bn';
+
+  // Tag translated text with its language and direction as the dashboard re-renders
+  useEffect(() => observeTargetLanguage(document.body, () => targetLangRef.current), []);
   const [coachWord, setCoachWord] = useState<string>('mitigate');
+  const [targetErrorCode, setTargetErrorCode] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [isNarrowScreen, setIsNarrowScreen] = useState(
@@ -55,6 +93,37 @@ export const App: React.FC = () => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // LexiFlow Cloud: keep mistakes, goals and activity in step across devices
+  useEffect(() => {
+    if (settings.aiProvider !== 'lexiflow') return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+    const run = async () => {
+      try {
+        if (cancelled || !(await AuthService.isSignedIn())) return;
+        await syncLearnerData((path, init) => AuthService.authorizedFetch(path, init));
+      } catch {
+        // Sync is best effort: local data stays as it is and the next change retries
+      }
+    };
+    void run();
+    const schedule = (e: Event) => {
+      if ((e as CustomEvent).detail?.fromSync) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void run(), 5000);
+    };
+    window.addEventListener('lexiflow_mistakes_updated', schedule);
+    window.addEventListener('lexiflow_activity_updated', schedule);
+    window.addEventListener('lexiflow_goals_updated', schedule);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('lexiflow_mistakes_updated', schedule);
+      window.removeEventListener('lexiflow_activity_updated', schedule);
+      window.removeEventListener('lexiflow_goals_updated', schedule);
+    };
+  }, [settings.aiProvider]);
 
   // Real-time synchronization across popup, settings, in-page popups, and other windows
   useEffect(() => {
@@ -409,6 +478,7 @@ export const App: React.FC = () => {
   };
 
   const handleReviewSubmit = async (id: string, rating: FSRSRating) => {
+    recordActivity('review');
     if (typeof chrome !== 'undefined' && chrome.runtime) {
       chrome.runtime.sendMessage({
         type: 'SCHEDULE_REVIEW',
@@ -529,11 +599,10 @@ export const App: React.FC = () => {
 
   // Weakness count for badge
   const weakCount = WeaknessDetector.getTargetedPracticeList(items).length;
-  const existingVocabWordSet = new Set(items.map((i) => i.word.toLowerCase().trim()));
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#94a3b8' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-muted)' }}>
         Loading LexiFlow AI...
       </div>
     );
@@ -556,6 +625,7 @@ export const App: React.FC = () => {
               <span className="drawer-title">LexiFlow Tools</span>
               <button
                 type="button"
+                data-testid="btn-drawer-close"
                 className="btn-drawer-close"
                 onClick={() => setIsSidebarOpen(false)}
                 title="Close Menu"
@@ -580,10 +650,66 @@ export const App: React.FC = () => {
       {/* Main content is shown on desktop always, and on narrow screens when sidebar drawer is closed */}
       {(!isNarrowScreen || !isSidebarOpen) && (
         <main className="main-content">
+          {/* Desktop Top Bar: Navigation Context, Status KPIs, and Quick Actions */}
+          {!isNarrowScreen && (
+            <header className="dashboard-top-bar">
+              <div className="breadcrumb-box">
+                <span className="breadcrumb-parent">LexiFlow</span>
+                <span className="breadcrumb-separator">/</span>
+                <span className="breadcrumb-active">{TAB_TITLES[activeTab]}</span>
+              </div>
+
+              <div className="top-bar-stats">
+                <div className="top-kpi-pill" title="Total captured vocabulary">
+                  <span className="top-kpi-dot"></span>
+                  <span className="top-kpi-label">Vocabulary:</span>
+                  <span className="top-kpi-val">{items.length}</span>
+                </div>
+
+                <div
+                  className={`top-kpi-pill ${dueItems.length > 0 ? 'kpi-warning' : ''}`}
+                  title="Items scheduled for active recall today"
+                  onClick={() => setActiveTab('review')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <span className="top-kpi-label">Due:</span>
+                  <span className="top-kpi-val">{dueItems.length}</span>
+                </div>
+
+                <div className="top-kpi-pill" title="Active AI provider">
+                  <span className="top-kpi-label">AI:</span>
+                  <span className="top-kpi-val">
+                    {PROVIDER_NAMES[settings.aiProvider] || settings.aiProvider}
+                  </span>
+                </div>
+
+                <div className="top-bar-actions">
+                  <button
+                    type="button"
+                    className="top-action-btn"
+                    onClick={handleToggleTheme}
+                    title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+                  >
+                    {theme === 'dark' ? '☀️' : '🌙'}
+                  </button>
+                  <button
+                    type="button"
+                    className="top-action-btn"
+                    onClick={handleOpenSidePanel}
+                    title="Open Native Side Panel"
+                  >
+                    <PanelRight size={14} />
+                  </button>
+                </div>
+              </div>
+            </header>
+          )}
+
           {isNarrowScreen && (
             <header className="narrow-top-bar">
               <button
                 type="button"
+                data-testid="narrow-menu-btn"
                 className="narrow-menu-toggle-btn"
                 onClick={() => setIsSidebarOpen(true)}
                 title="Open Tools Menu"
@@ -606,6 +732,17 @@ export const App: React.FC = () => {
           )}
 
           <ErrorBoundary fallbackTitle="View Encountered an Error">
+            {activeTab === 'overview' && (
+              <TodayView
+                dueVocabCount={dueItems.length}
+                onNavigate={(tab) => setActiveTab(tab)}
+                onPractice={(section) => {
+                  setPracticeSection(section);
+                  setActiveTab('smart_practice');
+                }}
+              />
+            )}
+
             {activeTab === 'vocabulary' && (
               <VocabularyView
                 items={items}
@@ -636,18 +773,32 @@ export const App: React.FC = () => {
               />
             )}
 
-            {activeTab === 'article_reader' && (
-              <ArticleReaderView
-                onSaveVocabulary={handleSaveVocabulary}
-                existingVocabWords={existingVocabWordSet}
+            {activeTab === 'reading_list' && (
+              <ReadingListView vocabItems={items} onWriteSummary={() => setActiveTab('summary_practice')} />
+            )}
+
+            {activeTab === 'summary_practice' && <SummaryPracticeView />}
+
+            {activeTab === 'smart_practice' && (
+              <SmartPracticeView
+                key={practiceSection || 'default'}
+                vocabItems={items}
+                initialSection={practiceSection}
+                onOpenSettings={() => setActiveTab('settings')}
               />
             )}
 
-            {activeTab === 'sentence_xray' && <SentenceXRayView />}
+            {activeTab === 'mistake_memory' && (
+              <MistakeMemoryView
+                initialErrorCode={targetErrorCode}
+                onClearInitialCode={() => setTargetErrorCode(null)}
+                targetLanguage={settings.targetLanguage || 'bn'}
+              />
+            )}
 
             {activeTab === 'word_difference' && <WordDifferenceView />}
 
-            {activeTab === 'usage_coach' && <CoachView initialWord={coachWord} />}
+            {activeTab === 'usage_coach' && <CoachView initialWord={coachWord} targetLanguage={settings.targetLanguage || 'bn'} />}
 
             {activeTab === 'analytics' && (
               <AnalyticsView
@@ -669,11 +820,12 @@ export const App: React.FC = () => {
             <nav className="narrow-bottom-nav">
               <button
                 type="button"
-                className={`bottom-nav-item ${activeTab === 'vocabulary' ? 'active' : ''}`}
-                onClick={() => handleTabSelect('vocabulary')}
+                className={`bottom-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+                onClick={() => handleTabSelect('overview')}
+                data-testid="bottom-nav-today"
               >
-                <BookOpen size={16} />
-                <span>Vocab</span>
+                <Home size={16} />
+                <span>Today</span>
               </button>
               <button
                 type="button"
@@ -686,11 +838,11 @@ export const App: React.FC = () => {
               </button>
               <button
                 type="button"
-                className={`bottom-nav-item ${activeTab === 'article_reader' ? 'active' : ''}`}
-                onClick={() => handleTabSelect('article_reader')}
+                className={`bottom-nav-item ${activeTab === 'smart_practice' ? 'active' : ''}`}
+                onClick={() => handleTabSelect('smart_practice')}
               >
-                <Newspaper size={16} />
-                <span>Reader</span>
+                <Sparkles size={16} />
+                <span>Practice</span>
               </button>
               <button
                 type="button"
@@ -712,6 +864,7 @@ export const App: React.FC = () => {
           )}
         </main>
       )}
+
     </div>
   );
 };
