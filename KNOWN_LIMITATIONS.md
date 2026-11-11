@@ -104,3 +104,11 @@ To preserve reading flow without overwhelming users with dictionary-length dumps
 - **Live AI Evaluation Suite**: Run with `npm run eval:live` (or `npx vite-node scripts/evaluate-live.mjs [--provider=gemini] [--apiKey=KEY]`).
   - Benchmarks 10 canonical linguistic cases: `run`, `set`, `light`, `bank` (financial), `break the ice`, `give up`, `look up`, `fast`, `bank` (geographical context), and `thingamajig` (low-information sentence).
 
+## 13. LexiFlow 2.0 Limitations (2026-11-11)
+- **Read-aloud check is not a pronunciation score.** It compares what the browser's speech recognition heard with the sentence. A word it could not match may be a pronunciation problem, a recognition error or background noise. It is labelled "LexiFlow estimate".
+- **Long-pause detection** uses the times new words appear in the live transcript, so it is approximate (within about half a second) and only works when the answer was spoken, not typed.
+- **Natural AI voice** needs LexiFlow Cloud (signed in), or a Gemini or OpenAI key. Claude, Ollama and offline mode use the best natural browser voice. Gemini's free tier has a low daily limit for the speech model; when it is reached the browser voice is used.
+- **Cloud sync** runs only for signed-in LexiFlow Cloud users. Saved words (vocabulary) are not part of this sync yet. If the same mistake changes on two devices before they sync, the most recent change wins.
+- **Reminders** depend on Chrome running; a reminder missed while Chrome is closed is not shown later.
+- **Bundle size**: the content script (about 470 KB) is injected on every page and the popup is about 650 KB. Most of this is real code (AI providers, grammar, Bengali, React). Loading the content script only on enabled sites, and moving AI providers to the background worker, would reduce it (proposed follow-up).
+- **Exam engines**: `exams/pte/` and `exams/ielts/` writing and speaking engines and the `/v1/ai/exam/*` endpoints still exist on the server, but no screen in the extension uses them since the PTE/IELTS practice screens were removed.

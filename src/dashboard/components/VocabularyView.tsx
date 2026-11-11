@@ -153,9 +153,9 @@ export const VocabularyView: React.FC<VocabularyViewProps> = ({
     <div className="view-container">
       <div className="view-header">
         <div>
-          <h2 className="view-title">Advanced Vocabulary Library</h2>
+          <h2 className="view-title">Vocabulary</h2>
           <p className="view-desc">
-            Search, sort, filter, star, and manage all captured words with persistent FSRS memory states
+            Every word you saved while reading. Search, star and review them.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>

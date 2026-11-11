@@ -38,9 +38,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     <div>
       <div className="view-header">
         <div>
-          <h2 className="view-title">Learning Analytics & Retention Engine</h2>
+          <h2 className="view-title">Progress</h2>
           <p className="view-desc">
-            Evidence-based retention metrics, Free Spaced Repetition Scheduler (FSRS) stability, and Personal Weakness Diagnostics
+            How well you remember your words, and which ones need more practice.
           </p>
         </div>
       </div>

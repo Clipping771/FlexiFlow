@@ -28,14 +28,14 @@ const TAB_TITLES: Record<DashboardTab, string> = {
   overview: 'Today',
   vocabulary: 'Vocabulary Library',
   targeted_practice: 'Targeted Practice',
-  review: 'Spaced Review',
+  review: 'Review',
   reading_list: 'Reading List',
   summary_practice: 'Summary Practice',
   smart_practice: 'Smart Practice',
   mistake_memory: 'Mistake Memory',
   word_difference: 'Word Difference',
   usage_coach: 'Usage Coach',
-  analytics: 'Learning Analytics',
+  analytics: 'Progress',
   settings: 'Settings'
 };
 

@@ -1,11 +1,27 @@
 # LexiFlow AI — Implementation Status
 
-Last Updated: 2026-10-13
+Last Updated: 2026-11-11
 
 ## Summary
-- **Current Milestone**: Full Build Complete & Production Hardened
-- **Build Status**: Verified Manifest V3 bundle generated in `dist/` (412ms build time)
-- **Automated Tests**: 7 test suites, 25 tests passing (100% pass rate with Vitest)
+- **Current Milestone**: LexiFlow 2.0: general English practice (the separate PTE/IELTS practice screens were removed for flexibility; Smart Practice covers reading, vocabulary, listening, writing and speaking from any article)
+- **Build Status**: Manifest V3 bundle in `dist/` (`npm run build`)
+- **Automated Tests**: extension `npm test` (about 570 tests, 73 files); server `npm --prefix server test` (174 tests, 19 files). Run `npm run ci` for isolation + typecheck + tests + build.
+
+## LexiFlow 2.0 additions (2026-11-11)
+
+| Feature | Area | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| Today home | Dashboard | Tested | Goals (level, focus, daily minutes, reminder), daily plan, streak, 7-day strip |
+| Daily reminder | Background | Tested | `alarms` + `notifications`; skipped on days already studied |
+| Mistake drills | Mistakes | Tested | Varied 4-question sessions, own sentences, drill bank for all 30 codes, pass = 3/4 |
+| Mistake scheduling | Mistakes | Tested | FSRS on top of mastery steps (3 days, then 21); relapse = FSRS lapse |
+| FSRS learning steps fix | Spaced repetition | Tested | Cards answered Good now graduate (learning steps were reset on every review) |
+| Bengali explanations | Mistakes | Tested | One Bangla explanation per taxonomy code, shown when the target language is Bengali |
+| Cloud sync | Cloud | Tested | `GET/PUT /v1/sync` (migration 0008, Zod schema); mistakes, goals and activity merged per item |
+| Natural AI voice | Listening | Tested | Gemini TTS / OpenAI TTS with own key, `POST /v1/ai/speech` for Cloud; natural browser voice fallback |
+| Speaking fluency | Speaking | Tested | Pace, fillers and long pauses (3s+) |
+| Read aloud | Speaking | Tested | Word-by-word match against an article sentence (no AI), labelled LexiFlow estimate |
+| Account deletion | Cloud | Tested | Also removes mistake, speaking, writing, reading/listening and sync records |
 
 ## Feature Implementation & Verification Status
 
@@ -32,12 +48,5 @@ Last Updated: 2026-10-13
 | Full Options Dashboard | UI | P2 | Tested | React dashboard with Vocabulary Library, Reviews, Tools, and Settings |
 | Import & Export | Data | P2 | Tested | JSON backup export and safe preview import |
 
-## Automated Test Suites Catalog
-- `src/content/__tests__/positioning.test.ts` (4 passed)
-- `src/content/__tests__/selection.test.ts` (2 passed)
-- `src/services/storage/__tests__/storage.test.ts` (3 passed)
-- `src/services/fsrs/__tests__/fsrs.test.ts` (4 passed)
-- `src/services/bengali/__tests__/bengali.test.ts` (4 passed)
-- `src/services/ai/__tests__/schemas.test.ts` (5 passed)
-- `src/services/dictionary/__tests__/dictionary.test.ts` (3 passed)
-- **Total: 25 passing tests**.
+## Automated Test Suites
+Test files live next to the code in `__tests__/` folders (extension) and in `server/test/` (server).

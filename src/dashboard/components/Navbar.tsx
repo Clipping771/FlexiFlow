@@ -201,7 +201,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="nav-icon-box">
               <BarChart3 size={16} strokeWidth={2} />
             </span>
-            <span className="nav-item-label">Analytics</span>
+            <span className="nav-item-label">Progress</span>
           </button>
 
           <button
